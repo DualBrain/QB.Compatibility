@@ -2,14 +2,16 @@
 Option Strict On
 Option Infer On
 
-Namespace QB
+Namespace Global
 
-  Public NotInheritable Class Multimedia
-
-    Private Sub New()
-    End Sub
+  Public NotInheritable Class QB
 
     ' Graphics
+
+    Public Shared Sub COLOR(fg%)
+      If fg% > 15 Then fg% -= 16
+      Console.ForegroundColor = CType(fg, ConsoleColor)
+    End Sub
 
     Public Shared Sub COLOR(fg%, bg%)
       Console.ForegroundColor = CType(fg, ConsoleColor)
@@ -18,26 +20,26 @@ Namespace QB
 
 #Region "SCREEN (Function)"
 
-    Public Shared Function SCREEN%(row%, column%, Optional colr% = 0)
-      If colr% = 0 Then
-        Dim ch = ConsoleEx.ReadChar(column - 1, row - 1)
-        If ch IsNot Nothing Then
-          Select Case CStr(ch)
-            Case "█" : Return 219
-            Case "▄" : Return 220
-            Case "▌" : Return 221
-            Case "▐" : Return 222
-            Case "▀" : Return 223
-            Case Else
-              Return Asc(CChar(ch))
-          End Select
-        Else
-          Return 0
-        End If
-      Else
-        Return 0
-      End If
-    End Function
+    'Public Shared Function SCREEN%(row%, column%, Optional colr% = 0)
+    '  If colr% = 0 Then
+    '    Dim ch = ConsoleEx.ReadChar(column - 1, row - 1)
+    '    If ch IsNot Nothing Then
+    '      Select Case CStr(ch)
+    '        Case "█" : Return 219
+    '        Case "▄" : Return 220
+    '        Case "▌" : Return 221
+    '        Case "▐" : Return 222
+    '        Case "▀" : Return 223
+    '        Case Else
+    '          Return Asc(CChar(ch))
+    '      End Select
+    '    Else
+    '      Return 0
+    '    End If
+    '  Else
+    '    Return 0
+    '  End If
+    'End Function
 
 #End Region
 

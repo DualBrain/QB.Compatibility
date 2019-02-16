@@ -2,9 +2,9 @@
 Option Strict On
 Option Infer On
 
-Namespace QB
+Namespace Global
 
-  Public NotInheritable Class Core
+  Partial Public NotInheritable Class QB
 
     Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
 
@@ -250,6 +250,28 @@ Namespace QB
 
     ' Arrays and Data
 
+    Private Shared m_data As New List(Of String)
+    Private Shared m_dataIndex As Integer = 0
+
+    Public Shared Sub DATA(ParamArray values$())
+      For Each value In values$
+        m_data.Add(value)
+      Next
+    End Sub
+
+    Public Shared Sub READ(ByRef value$)
+      If m_dataIndex < m_data.Count - 1 Then
+        value$ = m_data(m_dataIndex)
+        m_dataIndex += 1
+      Else
+        Throw New IndexOutOfRangeException()
+      End If
+    End Sub
+
+    Public Shared Sub RESTORE()
+      m_dataIndex = 0
+    End Sub
+
     ' Math
 
 #Region "ABS"
@@ -273,6 +295,19 @@ Namespace QB
 #End Region
 
     ' Simple I/O
+
+    Public Shared Sub CLS()
+      Console.Clear()
+    End Sub
+
+    Public Shared Sub CLS(viewport As Integer)
+      Select Case viewport
+        Case 0, 1, 2
+          CLS() 'TODO: For now, just call the base.
+        Case Else
+          Throw New ArgumentException
+      End Select
+    End Sub
 
     Public Shared Function CSRLIN() As Integer
       Return Console.CursorTop + 1
@@ -363,6 +398,11 @@ Namespace QB
         Return ""
       End If
     End Function
+
+    Public Shared Sub INPUT(string1$, ByRef string2$)
+      Console.WriteLine(string1$)
+      string2$ = Console.ReadLine()
+    End Sub
 
     Public Shared Function INPUT$(n%, Optional filenumber% = -1)
       If filenumber% = -1 Then

@@ -2,12 +2,9 @@
 Option Strict On
 Option Infer On
 
-Namespace QB
+Namespace Global
 
-  Public NotInheritable Class Devices
-
-    Private Sub New()
-    End Sub
+  Partial Public NotInheritable Class QB
 
     ' Keyboard
 
@@ -389,6 +386,79 @@ Namespace QB
 
 #End Region
 
+    'NOTE: The following file routines have to be "rebuilt" as the 
+    '      ones available as part of the VisualBasic.FileSystem aren't
+    '      capable of being utilized separately across multiple methods;
+    '      in other words, FileSystem does some "magic" with regards
+    '      to it's internal variables where these are localized to 
+    '      a particular scope; if you attempt to use the filenum from 
+    '      a different scope, the method will fail.
+
+    Private Shared m_files As New Dictionary(Of Integer, IO.FileStream)
+
+    Public Shared Sub CLOSE(ParamArray filenums%())
+
+      If filenums%.Count = 0 Then
+        ' Close all files.
+        For filenum% = 1 To 255
+          If m_files.ContainsKey(filenum%) Then
+            m_files(filenum%).Close()
+            m_files.Remove(filenum%)
+          End If
+        Next
+      Else
+        ' Close one or more specific files.
+        For Each filenum% In filenums%
+          m_files(filenum%).Close()
+          m_files.Remove(filenum%)
+        Next
+      End If
+
+    End Sub
+
+    Public Shared Function EOF(filenum%) As Boolean
+      If m_files.ContainsKey(filenum%) Then
+        If m_files(filenum%).Position = m_files(filenum%).Length - 1 Then
+          Return True
+        Else
+          Return False
+        End If
+      Else
+        Throw New ArgumentException("Bad file name or number")
+      End If
+    End Function
+
+    Public Shared Function FREEFILE() As Integer
+      If m_files.Count > 15 Then
+        Throw New InvalidOperationException("Too many files")
+      End If
+      For index = 1 To 255
+        If Not m_files.ContainsKey(index) Then
+          Return index
+        End If
+      Next
+      Throw New Exception() ' <--- Should never reach here.
+    End Function
+
+    Public Shared Sub LINE_INPUT(filenum%, ByRef value$)
+      value$ = ""
+      Dim b(0) As Byte
+      Do
+        Dim result = m_files(filenum%).Read(b, 0, 1)
+        If result = 0 Then
+          Return
+        End If
+        value$ &= Chr(b(0))
+        If b(0) = 13 Then
+          ' nearing end of line, assume next character is a LF...
+          result = m_files(filenum%).Read(b, 0, 1)
+          value$ &= Chr(b(0))
+          value$ = value$.Substring(0, value$.Length - 2) ' Trim of the CRLF
+          Return
+        End If
+      Loop
+    End Sub
+
     Public Shared Sub LSET(ByRef variable$, value$)
 
       variable$ = Space(Len(variable$))
@@ -399,6 +469,45 @@ Namespace QB
         ' ????
       End If
 
+    End Sub
+
+    Public Shared Sub NAME(oldfilespec$, newfilespec$)
+      IO.File.Move(oldfilespec$, newfilespec$)
+    End Sub
+
+    Public Shared Sub OPEN(file$, accessMode As OpenMode, filenum%)
+
+      Dim fm As IO.FileMode = IO.FileMode.Open
+      Select Case accessMode
+        Case OpenMode.Append : fm = IO.FileMode.Append
+        Case OpenMode.Binary : fm = IO.FileMode.OpenOrCreate
+        Case OpenMode.Input : fm = IO.FileMode.Open
+        Case OpenMode.Output : fm = IO.FileMode.OpenOrCreate
+        Case OpenMode.Random : fm = IO.FileMode.OpenOrCreate
+        Case Else
+      End Select
+
+      Select Case accessMode
+        Case OpenMode.Output
+          If IO.File.Exists(file$) Then
+            IO.File.Delete(file$)
+          End If
+      End Select
+
+      If m_files.ContainsKey(filenum%) Then
+        Throw New ArgumentException
+      Else
+        Dim fs = New IO.FileStream(file$, fm)
+        m_files.Add(filenum%, fs)
+      End If
+
+    End Sub
+
+    Public Shared Sub PRINT(filenum%, value$)
+      If m_files.ContainsKey(filenum%) Then
+        Dim b = Text.ASCIIEncoding.ASCII.GetBytes(value$ & vbCrLf)
+        m_files(filenum%).Write(b, 0, b.Length)
+      End If
     End Sub
 
   End Class

@@ -2,12 +2,9 @@
 Option Strict On
 Option Infer On
 
-Namespace QB
+Namespace Global
 
-  Public NotInheritable Class Development
-
-    Private Sub New()
-    End Sub
+  Partial Public NotInheritable Class QB
 
     ' DOS and Program Management
 
