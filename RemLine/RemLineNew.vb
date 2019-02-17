@@ -48,21 +48,7 @@ Module RemLineNew
   '   If you do not like the way REMLINE formats its output, you can modify
   '   the output lines in SUB GenOutFile. An example is shown in comments.
 
-  REM DEFINT A-Z
-
-  ' Function and Subprocedure declarations
-  REM Declare Function GetToken$ (Search$, Delim$)
-  REM Declare Function StrSpn% (InString$, Separator$)
-  REM Declare Function StrBrk% (InString$, Separator$)
-  REM Declare Function IsDigit% (Char$)
-  REM Declare Sub GetFileNames ()
-  REM Declare Sub BuildTable ()
-  REM Declare Sub GenOutFile ()
-  REM Declare Sub InitKeyTable ()
-
   ' Global and constant data
-  REM Const True = -1
-  REM Const False = 0
   Const MaxLines = 10000
 
   Private ReadOnly LineTable!(MaxLines)
@@ -71,39 +57,25 @@ Module RemLineNew
 
   ' Keyword search data
   Const KeyWordCount = 9
-  'Private ReadOnly KeyWordTable$(KeyWordCount)
   Private ReadOnly KeywordTable$() = {"", "THEN", "ELSE", "GOSUB", "GOTO", "RESUME", "RETURN", "RESTORE", "RUN", "ERL", ""}
 
   Public Sub SubMain()
 
-    REM Shared LineTable!(MaxLines)
-    REM Shared LineCount
-    REM Shared Seps$, InputFile$, OutputFile$, TmpFile$
-
-    ' Keyword search data
-    REM Const KeyWordCount = 9
-    REM Shared KeyWordTable$(KeyWordCount)
-
-KeyData:
-    'DATA("THEN", "ELSE", "GOSUB", "GOTO", "RESUME", "RETURN", "RESTORE", "RUN", "ERL", "")
-
     ' Start of module-level program code
     Seps$ = " ,:=<>()" + Chr(9)
-    'InitKeyTable()
     GetFileNames()
     On Error GoTo FileErr1
-    REM OPEN(InputFile$, OpenMode.Input, 1)
-    REM CLOSE(1)
+    OPEN(InputFile$, OpenMode.Input, 1)
     On Error GoTo 0
     COLOR(7) : PRINT("Working", True) : COLOR(23) : PRINT(" . . .") : COLOR(7) : PRINT()
     BuildTable()
-    REM CLOSE(1)
-    REM OPEN(InputFile$, OpenMode.Input, 1)
-    REM On Error GoTo FileErr2
-    REM OPEN(OutputFile$, OpenMode.Output, 2)
-    REM On Error GoTo 0
+    CLOSE(1)
+    OPEN(InputFile$, OpenMode.Input, 1)
+    On Error GoTo FileErr2
+    OPEN(OutputFile$, OpenMode.Output, 2)
+    On Error GoTo 0
     GenOutFile()
-    REM CLOSE(1, 2)
+    CLOSE(1, 2)
     If OutputFile$ <> "CON" Then CLS()
 
     End
@@ -143,12 +115,9 @@ FileErr2:
     Static Inlin$
     Static Token$
 
-    'OPEN(InputFile$, OpenMode.Input, 1)
-    FileSystem.FileOpen(1, InputFile, OpenMode.Input)
-    Do While Not FileSystem.EOF(1)
+    Do While Not EOF(1)
       ' Get line and first token
-      'LINE_INPUT(1, Inlin)
-      Inlin$ = FileSystem.LineInput(1)
+      LINE_INPUT(1, Inlin$)
       Token$ = GetToken$(Inlin, Seps$)
       Do While (Token$ <> "")
         For KeyIndex = 1 To KeyWordCount
@@ -172,7 +141,6 @@ FileErr2:
         Token$ = GetToken$("", Seps$)
       Loop
     Loop
-    FileSystem.FileClose(1)
 
   End Sub
 
@@ -186,73 +154,64 @@ FileErr2:
   '
   Sub GenOutFile() REM Static
 
-    FileSystem.FileOpen(1, InputFile$, OpenMode.Input)
-    FileSystem.FileOpen(2, OutputFile$, OpenMode.Output)
-    Try
+    ' Speed up by eliminating comma and colon (can't separate first token)
+    Dim sep$ = $" {vbTab}"
 
-      ' Speed up by eliminating comma and colon (can't separate first token)
-      Dim sep$ = $" {vbTab}"
+    Do While Not EOF(1)
 
-      Do While Not FileSystem.EOF(1)
+      Dim inLin$ = "" : LINE_INPUT(1, inLin$)
 
-        Dim inLin$ = FileSystem.LineInput(1)
+      If (inLin$ <> "") Then
 
-        If (inLin$ <> "") Then
+        ' Get first token and process if it is a line number
+        Dim token$ = GetToken$(inLin$, sep$)
 
-          ' Get first token and process if it is a line number
-          Dim token$ = GetToken$(inLin$, sep$)
+        If IsDigit(Left(token, 1)) Then
 
-          If IsDigit(Left(token, 1)) Then
+          Dim lineNumber! = CSng(Val(token))
+          Dim foundNumber = False
 
-            Dim lineNumber! = CSng(Val(token))
-            Dim foundNumber = False
+          ' See if line number is in table of referenced line numbers
+          For index = 1 To LineCount
+            If (lineNumber = LineTable!(index)) Then
+              foundNumber = True
+            End If
+          Next
 
-            ' See if line number is in table of referenced line numbers
-            For index = 1 To LineCount
-              If (lineNumber = LineTable!(index)) Then
-                foundNumber = True
-              End If
-            Next
+          ' Modify line strings
+          If 1 = 0 Then
 
-            ' Modify line strings
-            If 1 = 0 Then
-
-              If Not foundNumber Then
-                token = Space(Len(token))
-                MID$(inLin$, StrSpn(inLin$, sep$), Len(token)) = token
-              End If
-
-            Else
-
-              ' You can replace the previous lines with your own
-              ' code to reformat output. For example, try these lines:
-
-              Dim tmpPos1 = StrSpn(inLin$, sep$) + Len(token)
-              Dim tmpPos2 = tmpPos1 + StrSpn(Mid(inLin$, tmpPos1), sep$) - 1
-
-              If foundNumber Then
-                inLin$ = $"{Left(inLin$, tmpPos1 - 1)}:{vbCrLf}{vbTab}{Mid(inLin$, tmpPos2)}"
-              Else
-                inLin$ = $"{vbTab}{Mid(inLin$, tmpPos2)}"
-              End If
+            If Not foundNumber Then
+              token = Space(Len(token))
+              MID$(inLin$, StrSpn(inLin$, sep$), Len(token)) = token
             End If
 
+          Else
+
+            ' You can replace the previous lines with your own
+            ' code to reformat output. For example, try these lines:
+
+            Dim tmpPos1 = StrSpn(inLin$, sep$) + Len(token)
+            Dim tmpPos2 = tmpPos1 + StrSpn(Mid(inLin$, tmpPos1), sep$) - 1
+
+            If foundNumber Then
+              inLin$ = $"{Left(inLin$, tmpPos1 - 1)}:{vbCrLf}{vbTab}{Mid(inLin$, tmpPos2)}"
+            Else
+              inLin$ = $"{vbTab}{Mid(inLin$, tmpPos2)}"
+            End If
           End If
+
         End If
+      End If
 
-        ' Print line to file or console (PRINT is faster than console device)
-        If OutputFile$ = "CON" Then
-          PRINT(inLin$)
-        Else
-          REM PRINT(2, InLin$)
-          FileSystem.PrintLine(2, inLin$)
-        End If
+      ' Print line to file or console (PRINT is faster than console device)
+      If OutputFile$ = "CON" Then
+        PRINT(inLin$)
+      Else
+        PRINT(2, inLin$)
+      End If
 
-      Loop
-
-    Finally
-      FileSystem.FileClose(1, 2)
-    End Try
+    Loop
 
   End Sub
 
