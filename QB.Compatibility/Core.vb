@@ -399,9 +399,29 @@ Namespace Global
       End If
     End Function
 
-    Public Shared Sub INPUT(string1$, ByRef string2$)
-      Console.WriteLine(string1$)
-      string2$ = Console.ReadLine()
+    Public Shared Sub INPUT(ByRef result%)
+      result% = CInt(Console.ReadLine())
+    End Sub
+
+    Public Shared Sub INPUT(ByRef result&)
+      result& = CLng(Console.ReadLine())
+    End Sub
+
+    Public Shared Sub INPUT(ByRef result!)
+      result! = CSng(Console.ReadLine())
+    End Sub
+
+    Public Shared Sub INPUT(ByRef result#)
+      result# = CDbl(Console.ReadLine())
+    End Sub
+
+    Public Shared Sub INPUT(ByRef result$)
+      result$ = Console.ReadLine()
+    End Sub
+
+    Public Shared Sub INPUT(prompt$, ByRef result$)
+      Console.Write(prompt$ & " ")
+      result$ = Console.ReadLine()
     End Sub
 
     Public Shared Function INPUT$(n%, Optional filenumber% = -1)
@@ -435,13 +455,20 @@ Namespace Global
       Return Console.CursorLeft + 1
     End Function
 
-#Region "PRINT"
+#Region "PRINT, PRINT USING"
 
     Public Shared Sub PRINT()
       Console.WriteLine()
     End Sub
 
     Public Shared Sub PRINT(text$, Optional noCr As Boolean = False)
+      'TODO: (Possibly) Need to take into account the usage of TAB
+      '      Tab should return a token that can then be used
+      '      within the PRINT statement in order to do 
+      '      specific formatting.  This is because the TAB
+      '      could be called after other formatting (USING) takes
+      '      place.  So should determine the total output and then
+      '      adjust for TAB(s).
       If noCr Then
         Console.Write(text)
       Else
@@ -449,7 +476,41 @@ Namespace Global
       End If
     End Sub
 
+    Public Shared Sub PRINT_USING(template$, ParamArray values$())
+      Console.Write([USING](template$, values$))
+    End Sub
+
+    Public Shared Function [USING](template$, ParamArray values$()) As String
+      'TODO: Need to actually implement...
+      Dim result$ = ""
+      For Each value$ In values$
+        result$ &= value$
+      Next
+      Return result$
+    End Function
+
 #End Region
+
+    Public Shared Function TAB(column%) As String
+      If column% <= 32767 Then
+        If column% < 0 Then
+          column% = 1
+        Else
+          column% = column% Mod 80
+        End If
+        Dim current% = Console.CursorLeft + 1
+        Dim count% = column% - current%
+        Dim result$ = ""
+        If count% < 0 Then
+          result$ = vbCrLf : count% = column%
+        End If
+        result$ &= Space(count%)
+        Return result$
+      Else
+        Throw New ArgumentException
+      End If
+    End Function
+
 
     Public Shared Sub WIDTH(Optional a% = -1, Optional b% = -1)
       Console.ForegroundColor = ConsoleColor.Gray

@@ -6,7 +6,7 @@
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{BA897CF8-0892-4B49-B65D-EEF006486989}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <StartupObject>Sub Main</StartupObject>
+    <StartupObject>RemLine.Module1</StartupObject>
     <RootNamespace>RemLine</RootNamespace>
     <AssemblyName>RemLine</AssemblyName>
     <FileAlignment>512</FileAlignment>
@@ -69,6 +69,8 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CONST.vb" />
+    <Compile Include="DEFtype.vb" />
     <Compile Include="Module1.vb" />
     <Compile Include="RemLineNew.vb" />
     <Compile Include="RemLineOrg.vb" />
