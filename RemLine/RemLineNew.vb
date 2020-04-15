@@ -1,8 +1,14 @@
 ﻿Option Explicit On
-Option Strict On
+Option Strict Off 'On
 Option Infer On
 
-Imports QB
+Imports QB.Console
+Imports QB.Core
+Imports QB.Development
+Imports QB.Devices
+Imports QB.File
+Imports QB.Multimedia
+'Imports QB.Video
 
 Module RemLineNew
 
@@ -130,7 +136,7 @@ FileErr2:
             ' of ON GOSUB or ON GOTO). A non-numeric token will
             ' terminate search.
             Do While (IsDigit(Left(Token$, 1)))
-              LineCount = LineCount + 1
+              LineCount += 1
               LineTable!(LineCount) = CSng(Val(Token$))
               Token$ = GetToken$("", Seps$)
               If Token$ <> "" Then KeyIndex = 0

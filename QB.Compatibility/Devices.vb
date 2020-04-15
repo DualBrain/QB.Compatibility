@@ -2,9 +2,9 @@
 Option Strict On
 Option Infer On
 
-Namespace Global
+Namespace Global.QB
 
-  Partial Public NotInheritable Class QB
+  Partial Public NotInheritable Class Devices
 
     ' Keyboard
 
@@ -28,7 +28,7 @@ Namespace Global
       For j = 1 To 2
         Dim c = b(j)
         For k = 1 To 8
-          n = n + CShort(1)
+          n += CShort(1)
           Dim y = CShort(Fix(c / (2 ^ (8 - k))))
           If y = 1 Then
             d(n) = y ' Binary array
@@ -46,7 +46,7 @@ Namespace Global
         total = CShort(total + d(i + 2) * (2 ^ n))
       Next
       If d(1) = 1 Then ' Sign of the value
-        total = total * CShort(-1)
+        total *= CShort(-1)
       End If
 
       Return total
@@ -72,7 +72,7 @@ Namespace Global
       For J = 1 To 3
         C = B(J)
         For k = 1 To 8
-          N = N + CShort(1)
+          N += CShort(1)
           Y = CShort(Fix(C / (2 ^ (8 - k))))
           If Y = 1 Then
             D(N) = Y ' Binary array for mantissa
@@ -101,7 +101,7 @@ Namespace Global
 
       For i = 0 To Pwr - CShort(1) ' Calculation - Binary
         N = (Pwr - CShort(1)) - i
-        k = k + CShort(1)
+        k += CShort(1)
         If i < 23 Then
           STOT = CShort(STOT + D(i + 2) * (2 ^ N))
         End If
@@ -113,16 +113,16 @@ Namespace Global
 
       For J = k + CShort(1) To 24 ' Calculation - Binary Decimal
         If PNT < 0 Then
-          N = N - CShort(1)
+          N -= CShort(1)
         Else : N = PNT - (J + CShort(1))
         End If
         STOT = CShort(STOT + D(J) * (2 ^ N))
       Next
 
-      TOT = TOT + STOT ' Full Total
+      TOT += STOT ' Full Total
 
       If D(1) = 1 Then ' Sign of the value
-        TOT = TOT * (-1)
+        TOT *= (-1)
       End If
 
       Return TOT
@@ -149,7 +149,7 @@ Namespace Global
       For J = 1 To 7
         C = B(J)
         For k = 1 To 8
-          N = N + CShort(1)
+          N += CShort(1)
           Y = CShort(Fix(C / (2 ^ (8 - k))))
           If Y = 1 Then
             D(N) = Y ' Binary array for mantissa
@@ -178,9 +178,9 @@ Namespace Global
 
       For i = 0 To Pwr - CShort(1) ' Calculation - Binary
         N = CShort((Pwr - 1) - i)
-        k = k + CShort(1)
+        k += CShort(1)
         If i < 55 Then
-          STOT = STOT + D(i + 2) * (2 ^ N)
+          STOT += D(i + 2) * (2 ^ N)
         End If
       Next
 
@@ -190,16 +190,16 @@ Namespace Global
 
       For J = k + CShort(1) To 56 ' Calculation - Binary Decimal
         If PNT < 0 Then
-          N = N - CShort(1)
+          N -= CShort(1)
         Else : N = PNT - (J + CShort(1))
         End If
-        STOT = STOT + D(J) * (2 ^ N)
+        STOT += D(J) * (2 ^ N)
       Next
 
-      TOT = TOT + STOT ' Full Total
+      TOT += STOT ' Full Total
 
       If D(1) = 1 Then ' Sign of the value
-        TOT = TOT * (-1)
+        TOT *= (-1)
       End If
 
       Return TOT
@@ -216,13 +216,14 @@ Namespace Global
       '    End If
       '    CVII$ = S
 
-      Dim S, SS As Short
-      Try
-        S = CShort(AscW(X.Substring(0, 1)) + AscW(X.Substring(X.Length - 1)) * 256)
-      Catch
-        SS = CShort(255 - AscW(X.Substring(0, 1)) + (255 - AscW(X.Substring(X.Length - 1))) * 256 + 1)
-        S = CShort((SS) * -1)
-      End Try
+      Dim S As Short
+      'Try
+      S = CShort(AscW(X.Substring(0, 1)) + AscW(X.Substring(X.Length - 1)) * 256)
+      'Catch
+      '  Dim SS As Short
+      '  SS = CShort(255 - AscW(X.Substring(0, 1)) + (255 - AscW(X.Substring(X.Length - 1))) * 256 + 1)
+      '  S = CShort((SS) * -1)
+      'End Try
       CVII$ = S.ToString
 
     End Function
@@ -253,7 +254,7 @@ Namespace Global
       N = 0
       For J = 1 To 2 ' Divide - 8 bit bytes
         For k = 1 To 8
-          N = N + CShort(1)
+          N += CShort(1)
           V(J) = CByte(V(J) + D(N) * 2 ^ (8 - k))
         Next
       Next
@@ -349,14 +350,14 @@ Namespace Global
         AExp = 0
       Else
         AExp = CShort(129 + MxExp)
-        E = E - (2 ^ MxExp)
+        E -= (2 ^ MxExp)
       End If
 
       For k = 1 To 55 ' Set Binary array
         N = MxExp - k
         If Conversion.Fix(E / (2 ^ N)) = 1 Then
           D(k + 1) = 1
-          E = E - (2 ^ N)
+          E -= (2 ^ N)
         Else : D(k + 1) = 0
         End If
       Next
@@ -377,9 +378,9 @@ Namespace Global
       tMKD = ""
       For i = 1 To 7 ' Set-up String
         k = CShort(8 - i)
-        tMKD = tMKD + ChrW(V(k))
+        tMKD += ChrW(V(k))
       Next
-      tMKD = tMKD + ChrW(AExp)
+      tMKD += ChrW(AExp)
 
       Return tMKD
     End Function
@@ -394,71 +395,6 @@ Namespace Global
     '      a particular scope; if you attempt to use the filenum from 
     '      a different scope, the method will fail.
 
-    Private Shared m_files As New Dictionary(Of Integer, IO.FileStream)
-
-    Public Shared Sub CLOSE(ParamArray filenums%())
-
-      If filenums%.Count = 0 Then
-        ' Close all files.
-        For filenum% = 1 To 255
-          If m_files.ContainsKey(filenum%) Then
-            m_files(filenum%).Close()
-            m_files.Remove(filenum%)
-          End If
-        Next
-      Else
-        ' Close one or more specific files.
-        For Each filenum% In filenums%
-          m_files(filenum%).Close()
-          m_files.Remove(filenum%)
-        Next
-      End If
-
-    End Sub
-
-    Public Shared Function EOF(filenum%) As Boolean
-      If m_files.ContainsKey(filenum%) Then
-        If m_files(filenum%).Position = m_files(filenum%).Length - 1 Then
-          Return True
-        Else
-          Return False
-        End If
-      Else
-        Throw New ArgumentException("Bad file name or number")
-      End If
-    End Function
-
-    Public Shared Function FREEFILE() As Integer
-      If m_files.Count > 15 Then
-        Throw New InvalidOperationException("Too many files")
-      End If
-      For index = 1 To 255
-        If Not m_files.ContainsKey(index) Then
-          Return index
-        End If
-      Next
-      Throw New Exception() ' <--- Should never reach here.
-    End Function
-
-    Public Shared Sub LINE_INPUT(filenum%, ByRef value$)
-      value$ = ""
-      Dim b(0) As Byte
-      Do
-        Dim result = m_files(filenum%).Read(b, 0, 1)
-        If result = 0 Then
-          Return
-        End If
-        value$ &= Chr(b(0))
-        If b(0) = 13 Then
-          ' nearing end of line, assume next character is a LF...
-          result = m_files(filenum%).Read(b, 0, 1)
-          value$ &= Chr(b(0))
-          value$ = value$.Substring(0, value$.Length - 2) ' Trim of the CRLF
-          Return
-        End If
-      Loop
-    End Sub
-
     Public Shared Sub LSET(ByRef variable$, value$)
 
       variable$ = Space(Len(variable$))
@@ -469,45 +405,6 @@ Namespace Global
         ' ????
       End If
 
-    End Sub
-
-    Public Shared Sub NAME(oldfilespec$, newfilespec$)
-      IO.File.Move(oldfilespec$, newfilespec$)
-    End Sub
-
-    Public Shared Sub OPEN(file$, accessMode As OpenMode, filenum%)
-
-      Dim fm As IO.FileMode = IO.FileMode.Open
-      Select Case accessMode
-        Case OpenMode.Append : fm = IO.FileMode.Append
-        Case OpenMode.Binary : fm = IO.FileMode.OpenOrCreate
-        Case OpenMode.Input : fm = IO.FileMode.Open
-        Case OpenMode.Output : fm = IO.FileMode.OpenOrCreate
-        Case OpenMode.Random : fm = IO.FileMode.OpenOrCreate
-        Case Else
-      End Select
-
-      Select Case accessMode
-        Case OpenMode.Output
-          If IO.File.Exists(file$) Then
-            IO.File.Delete(file$)
-          End If
-      End Select
-
-      If m_files.ContainsKey(filenum%) Then
-        Throw New ArgumentException
-      Else
-        Dim fs = New IO.FileStream(file$, fm)
-        m_files.Add(filenum%, fs)
-      End If
-
-    End Sub
-
-    Public Shared Sub PRINT(filenum%, value$)
-      If m_files.ContainsKey(filenum%) Then
-        Dim b = Text.ASCIIEncoding.ASCII.GetBytes(value$ & vbCrLf)
-        m_files(filenum%).Write(b, 0, b.Length)
-      End If
     End Sub
 
   End Class

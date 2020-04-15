@@ -1,7 +1,9 @@
 ﻿Option Explicit Off
 
 
-Imports QB
+Imports QB.Core
+Imports QB.Console
+Imports QB.File
 
 Module CONSTsample
 

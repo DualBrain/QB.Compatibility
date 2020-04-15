@@ -2,11 +2,9 @@
 Option Strict On
 Option Infer On
 
-Namespace Global
+Namespace Global.QB
 
-  Partial Public NotInheritable Class QB
-
-    Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
+  Partial Public NotInheritable Class Core
 
     Private Sub New()
     End Sub
@@ -36,7 +34,7 @@ Namespace Global
     Public Shared Sub SWAP(ByRef value1 As Integer, ByRef value2 As Integer)
       Dim temp = value1
       value1 = value2
-      value2 = value1
+      value2 = temp
     End Sub
 
 #End Region
@@ -50,6 +48,188 @@ Namespace Global
 
     ' Strings
 
+    Public Shared Function QBAsc%(value$)
+
+      Select Case value$
+
+        Case vbNullChar : Return 0
+        Case "☺" : Return 1
+        Case "☻" : Return 2
+        Case "♥" : Return 3
+        Case "♦" : Return 4
+        Case "♣" : Return 5
+        Case "♠" : Return 6
+        Case "●" : Return 7
+        Case "◘" : Return 8
+        Case "○" : Return 9
+        Case "◙" : Return 10
+        Case "♂" : Return 11
+        Case "♀" : Return 12
+        Case "♪" : Return 13
+        Case "♫" : Return 14
+        Case "☼" : Return 15
+        Case "►" : Return 16
+        Case "◄" : Return 17
+        Case "↕" : Return 18
+        Case "‼" : Return 19
+        Case "¶" : Return 20
+        Case "§" : Return 21
+        Case "▬" : Return 22
+        Case "↨" : Return 23
+        Case "↑" : Return 24
+        Case "↓" : Return 25
+
+        Case "→" : Return 26
+        Case "←" : Return 27
+        Case "∟" : Return 28
+        Case "↔" : Return 29
+
+        Case "▲" : Return 30
+        Case "▼" : Return 31
+
+        Case " " : Return 32
+
+        Case "∆" : Return 33
+
+'http://ascii-table.com/ascii-extended-pc-list.php
+
+        Case "Ç" : Return 128
+        Case "ü" : Return 129
+        Case "é" : Return 130
+        Case "â" : Return 131
+        Case "ä" : Return 132
+        Case "à" : Return 133
+        Case "å" : Return 134
+        Case "ç" : Return 135
+        Case "ê" : Return 136
+        Case "ë" : Return 137
+        Case "è" : Return 138
+        Case "ï" : Return 139
+        Case "î" : Return 140
+        Case "ì" : Return 141
+        Case "Ä" : Return 142
+        Case "Å" : Return 143
+        Case "É" : Return 144
+        Case "æ" : Return 145
+        Case "Æ" : Return 146
+        Case "ô" : Return 147
+        Case "ö" : Return 148
+        Case "ò" : Return 149
+        Case "û" : Return 150
+        Case "ù" : Return 151
+        Case "ÿ" : Return 152
+        Case "Ö" : Return 153
+        Case "Ü" : Return 154
+        Case "¢" : Return 155
+        Case "£" : Return 156
+        Case "¥" : Return 157
+        Case "₧" : Return 158
+        Case "ƒ" : Return 159
+        Case "á" : Return 160
+        Case "í" : Return 161
+        Case "ó" : Return 162
+        Case "ú" : Return 163
+        Case "ñ" : Return 164
+        Case "Ñ" : Return 165
+        Case "ª" : Return 166
+        Case "º" : Return 167
+        Case "¿" : Return 168
+        Case "⌐" : Return 169
+        Case "¬" : Return 170
+        Case "½" : Return 171
+        Case "¼" : Return 172
+        Case "¡" : Return 173
+        Case "«" : Return 174
+        Case "»" : Return 175
+        Case "░" : Return 176
+        Case "▒" : Return 177
+        Case "▓" : Return 178
+        Case "│" : Return 179
+        Case "┤" : Return 180
+        Case "╡" : Return 181
+        Case "╢" : Return 182
+        Case "╖" : Return 183
+        Case "╕" : Return 184
+        Case "╣" : Return 185
+        Case "║" : Return 186
+        Case "╗" : Return 187
+        Case "╝" : Return 188
+        Case "╜" : Return 189
+        Case "╛" : Return 190
+        Case "┐" : Return 191
+        Case "└" : Return 192
+        Case "┴" : Return 193
+        Case "┬" : Return 194
+        Case "├" : Return 195
+        Case "─" : Return 196
+        Case "┼" : Return 197
+        Case "╞" : Return 198
+        Case "╟" : Return 199
+        Case "╚" : Return 200
+        Case "╔" : Return 201
+        Case "╩" : Return 202
+        Case "╦" : Return 203
+        Case "╠" : Return 204
+        Case "═" : Return 205
+        Case "╬" : Return 206
+        Case "╧" : Return 207
+        Case "╨" : Return 208
+        Case "╤" : Return 209
+        Case "╥" : Return 210
+        Case "╙" : Return 211
+        Case "╘" : Return 212
+        Case "╒" : Return 213
+        Case "╓" : Return 214
+        Case "╫" : Return 215
+        Case "╪" : Return 216
+        Case "┘" : Return 217
+        Case "┌" : Return 218
+        Case "█" : Return 219
+        Case "▄" : Return 220
+        Case "▌" : Return 221
+        Case "▐" : Return 222
+        Case "▀" : Return 223
+        Case "α" : Return 224
+        Case "ß" : Return 225
+        Case "Γ" : Return 226
+        Case "π" : Return 227
+        Case "Σ" : Return 228
+        Case "σ" : Return 229
+        Case "µ" : Return 230
+        Case "τ" : Return 231
+        Case "Φ" : Return 232
+        Case "Θ" : Return 233
+        Case "Ω" : Return 234
+        Case "δ" : Return 235
+        Case "∞" : Return 236
+        Case "φ" : Return 237
+        Case "ε" : Return 238
+        Case "∩" : Return 239
+        Case "≡" : Return 240
+        Case "±" : Return 241
+        Case "≥" : Return 242
+        Case "≤" : Return 243
+        Case "⌠" : Return 244
+        Case "⌡" : Return 245
+        Case "÷" : Return 246
+        Case "≈" : Return 247
+        Case "°" : Return 248
+        Case "●" : Return 249
+        Case "·" : Return 250
+        Case "√" : Return 251
+        Case "ⁿ" : Return 252
+        Case "²" : Return 253
+        Case "■" : Return 254
+        Case " " : Return 255
+
+        Case "�" : Return 32
+
+        Case Else
+          Return Asc(value)
+      End Select
+
+    End Function
+
     Public Shared Function QBChr$(value%)
 
       '┘ └ ┌ ┐ ─ │ ├ ├ ╟ ╙ ╓ ╥ ╨ ┬ ┴ ║ ┤
@@ -58,7 +238,7 @@ Namespace Global
 
       Select Case value%
 
-        Case 0 : Return " "
+        Case 0 : Return vbNullChar ' " "
         Case 1 : Return "☺"
         Case 2 : Return "☻"
         Case 3 : Return "♥"
@@ -96,37 +276,40 @@ Namespace Global
         Case 32 : Return " "
 
         Case 127 : Return "∆"
-        Case 128 : Return " "
-        Case 129 : Return " "
-        Case 130 : Return " "
-        Case 131 : Return " "
-        Case 132 : Return " "
-        Case 133 : Return " "
-        Case 134 : Return " "
-        Case 135 : Return " "
-        Case 136 : Return " "
-        Case 137 : Return " "
-        Case 138 : Return " "
-        Case 139 : Return " "
-        Case 140 : Return " "
-        Case 141 : Return " "
-        Case 142 : Return " "
-        Case 143 : Return " "
-        Case 144 : Return " "
-        Case 145 : Return " "
-        Case 146 : Return " "
-        Case 147 : Return " "
-        Case 148 : Return " "
-        Case 149 : Return " "
-        Case 150 : Return " "
-        Case 151 : Return " "
-        Case 152 : Return " "
-        Case 153 : Return " "
-        Case 154 : Return " "
+
+'http://ascii-table.com/ascii-extended-pc-list.php
+
+        Case 128 : Return "Ç"
+        Case 129 : Return "ü"
+        Case 130 : Return "é"
+        Case 131 : Return "â"
+        Case 132 : Return "ä"
+        Case 133 : Return "à"
+        Case 134 : Return "å"
+        Case 135 : Return "ç"
+        Case 136 : Return "ê"
+        Case 137 : Return "ë"
+        Case 138 : Return "è"
+        Case 139 : Return "ï"
+        Case 140 : Return "î"
+        Case 141 : Return "ì"
+        Case 142 : Return "Ä"
+        Case 143 : Return "Å"
+        Case 144 : Return "É"
+        Case 145 : Return "æ"
+        Case 146 : Return "Æ"
+        Case 147 : Return "ô"
+        Case 148 : Return "ö"
+        Case 149 : Return "ò"
+        Case 150 : Return "û"
+        Case 151 : Return "ù"
+        Case 152 : Return "ÿ"
+        Case 153 : Return "Ö"
+        Case 154 : Return "Ü"
         Case 155 : Return "¢"
         Case 156 : Return "£"
         Case 157 : Return "¥"
-        Case 158 : Return " "
+        Case 158 : Return "₧"
         Case 159 : Return "ƒ"
         Case 160 : Return "á"
         Case 161 : Return "í"
@@ -134,8 +317,8 @@ Namespace Global
         Case 163 : Return "ú"
         Case 164 : Return "ñ"
         Case 165 : Return "Ñ"
-        Case 166 : Return " "
-        Case 167 : Return " "
+        Case 166 : Return "ª"
+        Case 167 : Return "º"
         Case 168 : Return "¿"
         Case 169 : Return "⌐"
         Case 170 : Return "¬"
@@ -144,7 +327,6 @@ Namespace Global
         Case 173 : Return "¡"
         Case 174 : Return "«"
         Case 175 : Return "»"
-
         Case 176 : Return "░"
         Case 177 : Return "▒"
         Case 178 : Return "▓"
@@ -193,37 +375,37 @@ Namespace Global
         Case 221 : Return "▌"
         Case 222 : Return "▐"
         Case 223 : Return "▀"
-        Case 224 : Return " "
-        Case 225 : Return " "
-        Case 226 : Return " "
-        Case 227 : Return " "
-        Case 228 : Return "Ʃ"
-        Case 229 : Return " "
+        Case 224 : Return "α"
+        Case 225 : Return "ß"
+        Case 226 : Return "Γ"
+        Case 227 : Return "π"
+        Case 228 : Return "Σ"
+        Case 229 : Return "σ"
         Case 230 : Return "µ"
-        Case 231 : Return " "
-        Case 232 : Return " "
-        Case 233 : Return " "
+        Case 231 : Return "τ"
+        Case 232 : Return "Φ"
+        Case 233 : Return "Θ"
         Case 234 : Return "Ω"
-        Case 235 : Return " "
-        Case 236 : Return " "
-        Case 237 : Return " "
-        Case 238 : Return " "
-        Case 239 : Return " "
-        Case 240 : Return " "
+        Case 235 : Return "δ"
+        Case 236 : Return "∞"
+        Case 237 : Return "φ"
+        Case 238 : Return "ε"
+        Case 239 : Return "∩"
+        Case 240 : Return "≡"
         Case 241 : Return "±"
-        Case 242 : Return " "
-        Case 243 : Return " "
-        Case 244 : Return " "
-        Case 245 : Return " "
-        Case 246 : Return " "
-        Case 247 : Return " "
-        Case 248 : Return " "
+        Case 242 : Return "≥"
+        Case 243 : Return "≤"
+        Case 244 : Return "⌠"
+        Case 245 : Return "⌡"
+        Case 246 : Return "÷"
+        Case 247 : Return "≈"
+        Case 248 : Return "°"
         Case 249 : Return "●" ' ?
-        Case 250 : Return "∙"
+        Case 250 : Return "·"
         Case 251 : Return "√"
-        Case 252 : Return " "
-        Case 253 : Return " "
-        Case 254 : Return "█"
+        Case 252 : Return "ⁿ"
+        Case 253 : Return "²"
+        Case 254 : Return "■"
         Case 255 : Return " "
 
         Case Else
@@ -250,8 +432,14 @@ Namespace Global
 
     ' Arrays and Data
 
-    Private Shared m_data As New List(Of String)
+    Private Shared ReadOnly m_data As New List(Of String)
     Private Shared m_dataIndex As Integer = 0
+
+    Public Shared Sub DATA(ParamArray values%())
+      For Each value In values
+        m_data.Add(value.ToString)
+      Next
+    End Sub
 
     Public Shared Sub DATA(ParamArray values$())
       For Each value In values$
@@ -268,228 +456,69 @@ Namespace Global
       End If
     End Sub
 
+    Public Shared Sub READ(ByRef value%)
+      If m_dataIndex < m_data.Count - 1 Then
+        value = CInt(m_data(m_dataIndex))
+        m_dataIndex += 1
+      Else
+        Throw New IndexOutOfRangeException()
+      End If
+    End Sub
+
+    Public Shared Sub READ(ByRef value&)
+      If m_dataIndex < m_data.Count - 1 Then
+        value = CLng(m_data(m_dataIndex))
+        m_dataIndex += 1
+      Else
+        Throw New IndexOutOfRangeException()
+      End If
+    End Sub
+
     Public Shared Sub RESTORE()
       m_dataIndex = 0
     End Sub
 
     ' Math
 
-#Region "ABS"
+    '#Region "ABS"
 
-    Public Shared Function ABS(value As Integer) As Integer
-      Return Math.Abs(value)
-    End Function
+    '    Public Shared Function ABS(value As Integer) As Integer
+    '      Return Math.Abs(value)
+    '    End Function
 
-    Public Shared Function ABS(value As String) As Integer
-      Return Math.Abs(CInt(value))
-    End Function
+    '    Public Shared Function ABS(value As String) As Integer
+    '      Return Math.Abs(CInt(value))
+    '    End Function
 
-    Public Shared Function ABS(value As Boolean) As Integer
-      Return Math.Abs(CInt(value))
-    End Function
+    '    Public Shared Function ABS(value As Boolean) As Integer
+    '      Return Math.Abs(CInt(value))
+    '    End Function
 
-    Public Shared Function ABS(value As Long) As Long
-      Return Math.Abs(value)
-    End Function
+    '    Public Shared Function ABS(value As Long) As Long
+    '      Return Math.Abs(value)
+    '    End Function
 
-#End Region
+    '#End Region
 
     ' Simple I/O
 
-    Public Shared Sub CLS()
-      Console.Clear()
-    End Sub
+    'Public Shared Function INPUT$(n As Long, Optional filenumber% = -1)
+    '  If filenumber% = -1 Then
+    '    Dim resuLtKey$ = ""
+    '    Do
+    '      Dim A$ = INKEY()
+    '      If A$ <> "" Then
+    '        resuLtKey$ &= A$ : A$ = ""
+    '        If Len(resuLtKey$) >= n Then
+    '          Return resuLtKey$
+    '        End If
+    '      End If
+    '    Loop
+    '  Else
+    '    Throw New NotImplementedException()
+    '  End If
+    'End Function
 
-    Public Shared Sub CLS(viewport As Integer)
-      Select Case viewport
-        Case 0, 1, 2
-          CLS() 'TODO: For now, just call the base.
-        Case Else
-          Throw New ArgumentException
-      End Select
-    End Sub
-
-    Public Shared Function CSRLIN() As Integer
-      Return Console.CursorTop + 1
-    End Function
-
-    Public Shared Function INKEY$()
-      If Console.KeyAvailable Then
-        Dim cki = Console.ReadKey(True)
-
-        Dim shift = GetAsyncKeyState(&H10) <> 0
-        Dim ctrl = GetAsyncKeyState(&H11) <> 0
-        Dim alt = GetAsyncKeyState(&H12) <> 0
-
-        Dim adder = 0
-        If shift Then
-          adder = 0
-        ElseIf ctrl Then
-          adder = 10
-        ElseIf alt Then
-          adder = 20
-        End If
-
-        Select Case cki.Key
-          Case ConsoleKey.Delete
-            Return Chr(0) & Chr(83)
-          Case ConsoleKey.Home
-            Return Chr(0) & Chr(71)
-          Case ConsoleKey.UpArrow
-            Return Chr(0) & Chr(72)
-          Case ConsoleKey.PageUp
-            Return Chr(0) & Chr(73)
-          Case ConsoleKey.End
-            Return Chr(0) & Chr(79)
-          Case ConsoleKey.DownArrow
-            Return Chr(0) & Chr(80)
-          Case ConsoleKey.PageDown
-            Return Chr(0) & Chr(81)
-
-          Case ConsoleKey.LeftArrow
-            Return Chr(0) & Chr(75)
-          Case ConsoleKey.RightArrow
-            Return Chr(0) & Chr(77)
-
-          Case ConsoleKey.F1
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(84 + adder), Chr(59))
-          Case ConsoleKey.F2
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(85 + adder), Chr(60))
-          Case ConsoleKey.F3
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(86 + adder), Chr(61))
-          Case ConsoleKey.F4
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(87 + adder), Chr(62))
-          Case ConsoleKey.F5
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(88 + adder), Chr(63))
-          Case ConsoleKey.F6
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(89 + adder), Chr(64))
-          Case ConsoleKey.F7
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(80 + adder), Chr(65))
-          Case ConsoleKey.F8
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(91 + adder), Chr(66))
-          Case ConsoleKey.F9
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(92 + adder), Chr(67))
-          Case ConsoleKey.F10
-            Return Chr(0) & If(shift OrElse ctrl OrElse alt, Chr(93 + adder), Chr(68))
-          Case ConsoleKey.F11
-            If shift Then
-              Return Chr(0) & Chr(135)
-            ElseIf ctrl Then
-              Return Chr(0) & Chr(137)
-            ElseIf alt Then
-              Return Chr(0) & Chr(139)
-            Else
-              Return Chr(0) & Chr(133)
-            End If
-          Case ConsoleKey.F12
-            If shift Then
-              Return Chr(0) & Chr(136)
-            ElseIf ctrl Then
-              Return Chr(0) & Chr(138)
-            ElseIf alt Then
-              Return Chr(0) & Chr(140)
-            Else
-              Return Chr(0) & Chr(134)
-            End If
-          Case Else
-            Return cki.KeyChar
-        End Select
-      Else
-        Return ""
-      End If
-    End Function
-
-    Public Shared Sub INPUT(ByRef result%)
-      result% = CInt(Console.ReadLine())
-    End Sub
-
-    Public Shared Sub INPUT(ByRef result&)
-      result& = CLng(Console.ReadLine())
-    End Sub
-
-    Public Shared Sub INPUT(ByRef result!)
-      result! = CSng(Console.ReadLine())
-    End Sub
-
-    Public Shared Sub INPUT(ByRef result#)
-      result# = CDbl(Console.ReadLine())
-    End Sub
-
-    Public Shared Sub INPUT(ByRef result$)
-      result$ = Console.ReadLine()
-    End Sub
-
-    Public Shared Sub INPUT(prompt$, ByRef result$)
-      Console.Write(prompt$ & " ")
-      result$ = Console.ReadLine()
-    End Sub
-
-    Public Shared Function INPUT$(n%, Optional filenumber% = -1)
-      If filenumber% = -1 Then
-        Dim result$ = ""
-        Do
-          Dim A$ = INKEY()
-          If A$ <> "" Then
-            result$ &= A$ : A$ = ""
-            If Len(result$) >= n% Then
-              Return result$
-            End If
-          End If
-        Loop
-      Else
-        Throw New NotImplementedException()
-      End If
-    End Function
-
-    Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional a% = -1, Optional b% = -1, Optional c% = -1)
-      If row% = -1 AndAlso column% > 0 Then
-        Console.CursorLeft = column% - 1
-      ElseIf column% = -1 AndAlso row% > 0 Then
-        Console.CursorTop = row% - 1
-      ElseIf row% > 0 AndAlso column% > 0 Then
-        Console.SetCursorPosition(column% - 1, row% - 1)
-      End If
-    End Sub
-
-    Public Shared Function POS(value%) As Integer
-      Return Console.CursorLeft + 1
-    End Function
-
-#Region "PRINT, PRINT USING"
-
-    Public Shared Sub PRINT()
-      Console.WriteLine()
-    End Sub
-
-    Public Shared Sub PRINT(text$, Optional noCr As Boolean = False)
-      'TODO: (Possibly) Need to take into account the usage of TAB
-      '      Tab should return a token that can then be used
-      '      within the PRINT statement in order to do 
-      '      specific formatting.  This is because the TAB
-      '      could be called after other formatting (USING) takes
-      '      place.  So should determine the total output and then
-      '      adjust for TAB(s).
-      If noCr Then
-        Console.Write(text)
-      Else
-        Console.WriteLine(text)
-      End If
-    End Sub
-
-    Public Shared Sub PRINT_USING(template$, ParamArray values$())
-      Console.Write([USING](template$, values$))
-    End Sub
-
-    Public Shared Function [USING](template$, ParamArray values$()) As String
-      'TODO: Need to actually implement...
-      Dim result$ = ""
-      For Each value$ In values$
-        result$ &= value$
-      Next
-      Return result$
-    End Function
-
-#End Region
 
     Public Shared Function TAB(column%) As String
       If column% <= 32767 Then
@@ -498,25 +527,18 @@ Namespace Global
         Else
           column% = column% Mod 80
         End If
-        Dim current% = Console.CursorLeft + 1
+        Dim current% = System.Console.CursorLeft + 1
         Dim count% = column% - current%
-        Dim result$ = ""
+        Dim resuLtKey$ = ""
         If count% < 0 Then
-          result$ = vbCrLf : count% = column%
+          resuLtKey$ = vbCrLf : count% = column%
         End If
-        result$ &= Space(count%)
-        Return result$
+        resuLtKey$ &= Space(count%)
+        Return resuLtKey$
       Else
         Throw New ArgumentException
       End If
     End Function
-
-
-    Public Shared Sub WIDTH(Optional a% = -1, Optional b% = -1)
-      Console.ForegroundColor = ConsoleColor.Gray
-      Console.BackgroundColor = ConsoleColor.Black
-      Console.Clear()
-    End Sub
 
     ' Error Trapping
 
@@ -526,37 +548,13 @@ Namespace Global
       Return Today.ToString("MM-dd-yyyy")
     End Function
 
-#Region "SLEEP"
-
-    Public Shared Sub SLEEP()
-      Do
-        If INKEY() <> "" Then
-          Exit Do
-        End If
-        Threading.Thread.Sleep(100)
-      Loop
-    End Sub
-
-    Public Shared Sub SLEEP(seconds As Integer)
-      Dim till = DateAdd(DateInterval.Second, seconds, Now)
-      Do
-        If INKEY() <> "" OrElse
-           Now >= till Then
-          Exit Do
-        End If
-        Threading.Thread.Sleep(100)
-      Loop
-    End Sub
-
-#End Region
-
     Public Shared Function QBTime() As String
       Return Now.ToString("HH:mm:ss")
     End Function
 
-    Public Shared Sub QBTime(value As String)
-      'NOTE: Set the time???? (Is this even possible?)
-    End Sub
+    'Public Shared Sub QBTime(value As String)
+    '  'NOTE: Set the time???? (Is this even possible?)
+    'End Sub
 
     Public Shared Function QBTimer() As Long
       Dim midnight = New Date(Now.Year, Now.Month, Now.Day)

@@ -2,10 +2,11 @@
 
   Sub Main()
 
+    Nibbles.SubMain()
     'RemLineOrg.SubMain()
     'RemLineNew.SubMain()
     'CONSTsample.Main()
-    DEFtype.Main()
+    'DEFtype.Main()
 
     If Debugger.IsAttached Then
       Console.WriteLine()

@@ -2,7 +2,9 @@
 Option Strict Off 'On
 Option Infer On
 
-Imports QB
+Imports QB.Core
+Imports QB.Console
+Imports QB.File
 
 Module RemLineOrg
 
@@ -156,7 +158,7 @@ FileErr2:
             ' of ON GOSUB or ON GOTO). A non-numeric token will
             ' terminate search.
             Do While (IsDigit(Left(Token$, 1)))
-              LineCount = LineCount + 1
+              LineCount += 1
               LineTable!(LineCount) = Val(Token$)
               Token$ = GetToken$("", Seps$)
               If Token$ <> "" Then KeyIndex = 0
@@ -183,6 +185,7 @@ FileErr2:
     ' Speed up by eliminating comma and colon (can't separate first token)
     Dim Sep$ = " " + Chr(9)
     Do While Not EOF(1)
+      Dim InLin$ = ""
       LINE_INPUT(1, InLin$)
       If (InLin$ <> "") Then
         ' Get first token and process if it is a line number
@@ -247,7 +250,7 @@ FileErr2:
     If (OutputFile$ = "") Then OutputFile$ = "CON"
 
     If InStr(InputFile$, ".") = 0 Then
-      InputFile$ = InputFile$ + ".BAS"
+      InputFile$ += ".BAS"
     End If
 
     If InStr(OutputFile$, ".") = 0 Then
@@ -255,14 +258,14 @@ FileErr2:
         Case "CON", "SCRN", "PRN", "COM1", "COM2", "LPT1", "LPT2", "LPT3"
           Exit Sub
         Case Else
-          OutputFile$ = OutputFile$ + ".BAS"
+          OutputFile$ += ".BAS"
       End Select
     End If
 
     Do While InputFile$ = OutputFile$
       TmpFile$ = Left(InputFile$, InStr(InputFile$, ".")) + "BAK"
       On Error GoTo FileErr1
-      NAME(InputFile$, TmpFile$)
+      Rename(InputFile$, TmpFile$)
       On Error GoTo 0
       If TmpFile$ <> "" Then InputFile$ = TmpFile$
     Loop
@@ -402,7 +405,7 @@ FileErr1:
         StrBrk = 0
         Exit Function
       Else
-        BegPos = BegPos + 1
+        BegPos += 1
       End If
     Loop
     StrBrk = BegPos
@@ -430,7 +433,7 @@ FileErr1:
         StrSpn% = 0
         Exit Function
       Else
-        BegPos = BegPos + 1
+        BegPos += 1
       End If
     Loop
     StrSpn% = BegPos

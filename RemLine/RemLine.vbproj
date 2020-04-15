@@ -71,7 +71,9 @@
   <ItemGroup>
     <Compile Include="CONST.vb" />
     <Compile Include="DEFtype.vb" />
+    <Compile Include="GlobalSuppressions.vb" />
     <Compile Include="Module1.vb" />
+    <Compile Include="Nibbles.vb" />
     <Compile Include="RemLineNew.vb" />
     <Compile Include="RemLineOrg.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
