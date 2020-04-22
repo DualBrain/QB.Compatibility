@@ -2,6 +2,8 @@
 Option Strict On
 Option Infer On
 
+Imports System.Drawing
+Imports System.Windows.Forms
 Imports QB.Core
 
 Namespace Global.QB
@@ -21,12 +23,44 @@ Namespace Global.QB
 
     Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
 
+    Private Shared m_display As Image = New Bitmap(640, 480)
+
+    Private Shared m_pictureBox As System.Windows.Forms.PictureBox
+
+    Public Shared WriteOnly Property PictureBox As System.Windows.Forms.PictureBox
+      Set(value As System.Windows.Forms.PictureBox)
+        m_pictureBox = value
+        m_pictureBox.Image = m_display
+      End Set
+    End Property
+
     Private Sub New()
     End Sub
 
+    Private Shared m_cursorRow As Integer
+    Private Shared m_cursorCol As Integer
+    Private Shared m_textH As Integer = 14
+    Private Shared m_textW As Integer = 8
+    Private Shared m_palette() As Color = {System.Drawing.Color.Black,
+                                           System.Drawing.Color.DarkBlue,
+                                           System.Drawing.Color.DarkGreen,
+                                           System.Drawing.Color.DarkCyan,
+                                           System.Drawing.Color.DarkRed,
+                                           System.Drawing.Color.DarkMagenta,
+                                           System.Drawing.Color.Brown,
+                                           System.Drawing.Color.LightGray,
+                                           System.Drawing.Color.Gray,
+                                           System.Drawing.Color.Blue,
+                                           System.Drawing.Color.LightGreen,
+                                           System.Drawing.Color.Cyan,
+                                           System.Drawing.Color.Red,
+                                           System.Drawing.Color.Magenta,
+                                           System.Drawing.Color.Yellow,
+                                           System.Drawing.Color.White}
 
     Public Shared Sub PRINT()
-      Throw New NotImplementedException
+      m_cursorRow += 1
+      m_cursorCol = 1
     End Sub
 
     Public Shared Sub PRINT(text$, Optional noCr As Boolean = False)
@@ -37,24 +71,38 @@ Namespace Global.QB
       '      could be called after other formatting (USING) takes
       '      place.  So should determine the total output and then
       '      adjust for TAB(s).
-      'If noCr Then
-      '  System.Console.Write(text)
-      'Else
-      '  System.Console.WriteLine(text)
-      'End If
-      Throw New NotImplementedException
+      Using g = Graphics.FromImage(m_display)
+        Dim x = (m_cursorCol - 1) * m_textW
+        Dim y = (m_cursorRow - 1) * m_textH
+        Using b = New SolidBrush(m_palette(m_bgColor))
+          g.FillRectangle(b, x, y, m_textW * text$.Length, m_textH)
+        End Using
+        Using f = New Font("Consolas", 9, FontStyle.Regular)
+          Using b = New SolidBrush(m_palette(m_fgColor))
+            g.DrawString(text$, f, b, x, y)
+          End Using
+        End Using
+      End Using
+      m_pictureBox.Image = m_display ': m_pictureBox.Refresh()
+      If noCr Then
+        m_cursorCol += If(text?.Length, 0)
+      Else
+        m_cursorCol = 1
+        m_cursorRow += 1
+      End If
     End Sub
 
     Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional a% = -1, Optional b% = -1, Optional c% = -1)
       If a <> 0 OrElse b <> 0 OrElse c <> 0 Then
       End If
-      Throw New NotImplementedException
       If row% = -1 AndAlso column% > 0 Then
-        System.Console.CursorLeft = column% - 1
+        m_cursorCol = column%
       ElseIf column% = -1 AndAlso row% > 0 Then
         System.Console.CursorTop = row% - 1
+        m_cursorRow = row%
       ElseIf row% > 0 AndAlso column% > 0 Then
-        System.Console.SetCursorPosition(column% - 1, row% - 1)
+        m_cursorCol = column%
+        m_cursorRow = row%
       End If
     End Sub
 
@@ -102,21 +150,49 @@ Namespace Global.QB
       Throw New NotImplementedException
     End Sub
 
-    Public Shared Sub LINE_INPUT(prompt$, ByRef value$)
-      Throw New NotImplementedException
-    End Sub
+    Public Shared Async Function LineInputAsync(prompt$) As Task(Of String)
+      PRINT(prompt$)
+      Dim result$
+      Do
+        Await Task.Delay(1)
+        Dim a$ = INKEY()
+        If a$?.Length > 0 Then
+          If a$ = Chr(13) Then
+            Return result$
+          Else
+            result$ &= a$
+            PRINT(a$, True)
+          End If
+        End If
+      Loop
+    End Function
+
+    'Private Shared m_bgBrush As Brush = Brushes.Black
+    'Private Shared m_fgBrush As Brush = Brushes.White
+
+    Private Shared m_bgColor As Integer = 0
+    Private Shared m_fgColor As Integer = 7
 
     Public Shared Sub COLOR(fg%)
-      If fg% > 15 Then fg% -= 16
-      Throw New NotImplementedException
+      'If fg% > 15 Then fg% -= 16
+      'Throw New NotImplementedException
+      m_fgColor = fg
     End Sub
 
     Public Shared Sub COLOR(fg%, bg%)
-      Throw New NotImplementedException
+      'Throw New NotImplementedException
+      m_fgColor = fg
+      m_bgColor = bg
     End Sub
 
     Public Shared Sub CLS()
-      Throw New NotImplementedException
+      Using g = Graphics.FromImage(m_display)
+        Using b = New SolidBrush(m_palette(m_bgColor))
+          g.FillRectangle(b, 0, 0, m_display.Width, m_display.Height)
+        End Using
+      End Using
+      m_cursorCol = 1
+      m_cursorRow = 1
     End Sub
 
     Public Shared Sub CLS(viewport As Integer)
@@ -128,9 +204,22 @@ Namespace Global.QB
       End Select
     End Sub
 
-    Public Shared Sub INPUT(prompt$, ByRef resuLtKey$)
-      Throw New NotImplementedException
-    End Sub
+    Public Shared Async Function InputAsync(prompt$) As Task(Of String)
+      PRINT(prompt$)
+      Dim result$
+      Do
+        Await Task.Delay(1)
+        Dim a$ = INKEY()
+        If a$?.Length > 0 Then
+          If a$ = Chr(13) Then
+            Return result$
+          Else
+            result$ &= a$
+            PRINT(a$, True)
+          End If
+        End If
+      Loop
+    End Function
 
 #Region "SCREEN (Function)"
 
@@ -173,10 +262,22 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub SCREEN(mode%)
-      If mode = 0 Then
-      Else
+      If m_pictureBox IsNot Nothing AndAlso
+         m_pictureBox.Image IsNot Nothing Then
+        m_pictureBox.Image = Nothing
       End If
-      Throw New NotImplementedException
+      Select Case mode
+        Case 0 ' Text Mode
+          m_display = New Bitmap(640, 480) ' 80 x 25 text
+          m_textW = 8 : m_textH = 19
+          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
+        Case 9
+          m_display = New Bitmap(640, 350) ' 80 x 25 text
+          m_textW = 8 : m_textH = 14
+          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
+        Case Else
+          Throw New NotImplementedException
+      End Select
     End Sub
 
 #End Region
@@ -185,19 +286,27 @@ Namespace Global.QB
       Throw New NotImplementedException
     End Sub
 
-    Public Shared Sub PALETTE(OBJECTCOLOR%, BackColor%)
-      Throw New NotImplementedException
+    Public Shared Sub PALETTE(color%, display%)
+      If color < 0 OrElse color > 16 Then
+        Throw New ArgumentOutOfRangeException(NameOf(color))
+      End If
+      If display < 0 OrElse display > 16 Then
+        Throw New ArgumentOutOfRangeException(NameOf(display))
+      End If
+      m_palette(color) = System.Drawing.Color.FromArgb(QBColor(display))
     End Sub
 
     Public Shared Sub QbWidth(Optional a% = -1, Optional b% = -1)
-      If a <> 0 OrElse b <> 0 Then
+      If a <> 80 OrElse b <> 25 Then
+        Throw New NotImplementedException
       End If
-      Throw New NotImplementedException
     End Sub
 
+    Public Shared m_keys As New Stack(Of Keys)
+
     Public Shared Function INKEY$()
-      If System.Console.KeyAvailable Then
-        Dim cki = System.Console.ReadKey(True)
+      If m_keys.Count > 0 Then
+        Dim key = m_keys.Pop
 
         Dim shift = GetAsyncKeyState(&H10) <> 0
         Dim ctrl = GetAsyncKeyState(&H11) <> 0
@@ -212,48 +321,48 @@ Namespace Global.QB
           adder = 20
         End If
 
-        Select Case cki.Key
-          Case ConsoleKey.Delete
+        Select Case key
+          Case Keys.Delete
             Return QBChr(0) & QBChr(83)
-          Case ConsoleKey.Home
+          Case Keys.Home
             Return QBChr(0) & QBChr(71)
-          Case ConsoleKey.UpArrow
+          Case Keys.Up
             Return QBChr(0) & QBChr(72)
-          Case ConsoleKey.PageUp
+          Case Keys.PageUp
             Return QBChr(0) & QBChr(73)
-          Case ConsoleKey.End
+          Case Keys.End
             Return QBChr(0) & QBChr(79)
-          Case ConsoleKey.DownArrow
+          Case Keys.Down
             Return QBChr(0) & QBChr(80)
-          Case ConsoleKey.PageDown
+          Case Keys.PageDown
             Return QBChr(0) & QBChr(81)
 
-          Case ConsoleKey.LeftArrow
+          Case Keys.Left
             Return QBChr(0) & QBChr(75)
-          Case ConsoleKey.RightArrow
+          Case Keys.Right
             Return QBChr(0) & QBChr(77)
 
-          Case ConsoleKey.F1
+          Case Keys.F1
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(84 + adder), QBChr(59))
-          Case ConsoleKey.F2
+          Case Keys.F2
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(85 + adder), QBChr(60))
-          Case ConsoleKey.F3
+          Case Keys.F3
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(86 + adder), QBChr(61))
-          Case ConsoleKey.F4
+          Case Keys.F4
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(87 + adder), QBChr(62))
-          Case ConsoleKey.F5
+          Case Keys.F5
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(88 + adder), QBChr(63))
-          Case ConsoleKey.F6
+          Case Keys.F6
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(89 + adder), QBChr(64))
-          Case ConsoleKey.F7
+          Case Keys.F7
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(80 + adder), QBChr(65))
-          Case ConsoleKey.F8
+          Case Keys.F8
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(91 + adder), QBChr(66))
-          Case ConsoleKey.F9
+          Case Keys.F9
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(92 + adder), QBChr(67))
-          Case ConsoleKey.F10
+          Case Keys.F10
             Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(93 + adder), QBChr(68))
-          Case ConsoleKey.F11
+          Case Keys.F11
             If shift Then
               Return QBChr(0) & QBChr(135)
             ElseIf ctrl Then
@@ -263,7 +372,7 @@ Namespace Global.QB
             Else
               Return QBChr(0) & QBChr(133)
             End If
-          Case ConsoleKey.F12
+          Case Keys.F12
             If shift Then
               Return QBChr(0) & QBChr(136)
             ElseIf ctrl Then
@@ -274,7 +383,7 @@ Namespace Global.QB
               Return QBChr(0) & QBChr(134)
             End If
           Case Else
-            Return cki.KeyChar
+            Return ChrW(key)
         End Select
       Else
         Return ""

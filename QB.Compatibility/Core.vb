@@ -448,7 +448,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub READ(ByRef value$)
-      If m_dataIndex < m_data.Count - 1 Then
+      If m_dataIndex < m_data.Count Then
         value$ = m_data(m_dataIndex)
         m_dataIndex += 1
       Else
@@ -457,7 +457,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub READ(ByRef value%)
-      If m_dataIndex < m_data.Count - 1 Then
+      If m_dataIndex < m_data.Count Then
         value = CInt(m_data(m_dataIndex))
         m_dataIndex += 1
       Else
@@ -466,7 +466,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub READ(ByRef value&)
-      If m_dataIndex < m_data.Count - 1 Then
+      If m_dataIndex < m_data.Count Then
         value = CLng(m_data(m_dataIndex))
         m_dataIndex += 1
       Else

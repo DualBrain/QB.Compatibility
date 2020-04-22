@@ -9,6 +9,7 @@ Namespace Global.QB
     ' Sound
 
     Public Shared Sub PLAY(instructions As String)
+      Return
       'TODO: Need to implement play... for now we have silence.
       If String.IsNullOrEmpty(instructions) Then
       End If

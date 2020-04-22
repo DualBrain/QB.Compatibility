@@ -1,6 +1,6 @@
-﻿Option Explicit Off
-Option Strict Off
-Option Infer Off
+﻿Option Explicit On
+Option Strict Off 'On
+Option Infer On
 
 Imports QB.Core
 Imports QB.Multimedia
@@ -13,12 +13,9 @@ Imports QB.Video
 Imports VB = Microsoft.VisualBasic
 
 Imports System.Math
+Imports QB
 
 Public Class Form1
-
-  'Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-
-  'End Sub
 
   '                         Q B a s i c   G o r i l l a s
   '
@@ -117,7 +114,7 @@ Public Class Form1
   'Screen Color Variables
   Private ExplosionColor%
   Private SunColor%
-  Private BackColor%
+  Private qbBackColor%
   Private SunHit%
 
   Private SunHt%
@@ -131,117 +128,16 @@ Public Class Form1
 
   Sub Todo()
 
+    ' The following was at the very start of the program...
+
     REM DEF SEG = 0                         ' Set NumLock to ON
-    KeyFlags = PEEK(1047)
+    Dim KeyFlags = PEEK(1047)
     If (KeyFlags And 32) = 0 Then
       POKE(1047, KeyFlags Or 32)
     End If
     REM DEF SEG
 
-    REM Gosub InitVars
-
     '------
-
-    pi# = 4 * Atan(1.0#)
-
-    'This is a clever way to pick the best graphics mode available
-    On Error GoTo ScreenModeError
-    Mode = 9
-    SCREEN(Mode)
-    On Error GoTo PaletteError
-    If Mode = 9 Then PALETTE(4, 0)   'Check for 64K EGA
-    On Error GoTo 0
-
-    MachSpeed = CalcDelay()
-
-    If Mode = 9 Then
-      ScrWidth = 640
-      ScrHeight = 350
-      GHeight = 25
-      REM RESTORE EGABanana
-
-      RESTORE()
-
-EGABanana:
-      'BananaLeft
-      DATA(458758, 202116096, 471604224, 943208448, 943208448, 943208448, 471604224, 202116096, 0)
-      'BananaDown
-      DATA(262153, -2134835200, -2134802239, -2130771968, -2130738945, 8323072, 8323199, 4063232, 4063294)
-      'BananaUp
-      DATA(262153, 4063232, 4063294, 8323072, 8323199, -2130771968, -2130738945, -2134835200, -2134802239)
-      'BananaRight
-      DATA(458758, -1061109760, -522133504, 1886416896, 1886416896, 1886416896, -522133504, -1061109760, 0)
-
-      ReDim LBan&(8), RBan&(8), UBan&(8), DBan&(8)
-
-      For i = 0 To 8
-        READ(LBan&(i))
-      Next i
-
-      For i = 0 To 8
-        READ(DBan&(i))
-      Next i
-
-      For i = 0 To 8
-        READ(UBan&(i))
-      Next i
-
-      For i = 0 To 8
-        READ(RBan&(i))
-      Next i
-
-      SunHt = 39
-
-    Else
-
-      ScrWidth = 320
-      ScrHeight = 200
-      GHeight = 12
-
-      REM RESTORE CGABanana
-      RESTORE()
-
-CGABanana:
-      'BananaLeft
-      DATA(327686, -252645316, 60)
-      'BananaDown
-      DATA(196618, -1057030081, 49344)
-      'BananaUp
-      DATA(196618, -1056980800, 63)
-      'BananaRight
-      DATA(327686, 1010580720, 240)
-
-
-      ReDim LBan&(2), RBan&(2), UBan&(2), DBan&(2)
-      REM ReDim GorL&(20), GorD&(20), GorR&(20)
-
-      For i = 0 To 2
-        READ(LBan&(i))
-      Next i
-      For i = 0 To 2
-        READ(DBan&(i))
-      Next i
-      For i = 0 To 2
-        READ(UBan&(i))
-      Next i
-      For i = 0 To 2
-        READ(RBan&(i))
-      Next i
-
-      MachSpeed = MachSpeed * 1.3
-      SunHt = 20
-    End If
-
-    ' -----
-
-    ' Sub Program 1
-    Intro()
-    ' Sub Progam 2
-    GetInputs(Name1$, Name2$, NumGames)
-    ' Sub Program 3
-    GorillaIntro(Name1$, Name2$)
-    ' Sub Program 4
-    PlayGame(Name1$, Name2$, NumGames)
 
     REM DEF SEG = 0                         ' Restore NumLock state
     POKE(1047, KeyFlags)
@@ -355,7 +251,8 @@ PaletteError:
   '  Checks speed of the machine.
   Function CalcDelay!()
 
-    s! = QBTimer()
+    Dim s! = QBTimer()
+    Dim i!
 
     Do
       i! = i! + 1
@@ -371,7 +268,7 @@ PaletteError:
   '   Text$ - text to be printed
   '
   Sub Center(ByRef Row%, ByRef Text$)
-    Col = MaxCol \ 2
+    Dim Col = MaxCol \ 2
     LOCATE(Row, Col - (Len(Text$) / 2 + 0.5))
     PRINT(Text$, True)
   End Sub
@@ -383,7 +280,8 @@ PaletteError:
   '
   Sub DoExplosion(ByRef x#, ByRef y#)
     PLAY("MBO0L32EFGEFDC")
-    Radius = ScrHeight / 50
+    Dim Radius = ScrHeight / 50
+    Dim Inc#
     If Mode = 9 Then Inc# = 0.5 Else Inc# = 0.41
     For c# = 0 To Radius Step Inc#
       CIRCLE(x#, y#, c#, ExplosionColor)
@@ -406,6 +304,7 @@ PaletteError:
   Function DoShot(ByRef PlayerNum, ByRef x, ByRef y)
 
     'Input shot
+    Dim LocateCol%
     If PlayerNum = 1 Then
       LocateCol = 1
     Else
@@ -417,12 +316,12 @@ PaletteError:
     End If
 
     LOCATE(2, LocateCol)
-    PRINT("Angle:", nocr)
-    Angle# = GetNum#(2, LocateCol + 7)
+    PRINT("Angle:", True)
+    Dim Angle# = GetNum#(2, LocateCol + 7)
 
     LOCATE(3, LocateCol)
     PRINT("Velocity:", True)
-    Velocity = GetNum#(3, LocateCol + 10)
+    Dim Velocity = GetNum#(3, LocateCol + 10)
 
     If PlayerNum = 2 Then
       Angle# = 180 - Angle#
@@ -437,7 +336,7 @@ PaletteError:
     Next
 
     SunHit = False
-    PlayerHit = PlotShot(x, y, Angle#, Velocity, PlayerNum)
+    Dim PlayerHit = PlotShot(x, y, Angle#, Velocity, PlayerNum)
     If PlayerHit = 0 Then
       DoShot = False
     Else
@@ -454,6 +353,8 @@ PaletteError:
   '   Mouth - If TRUE draws "O" mouth else draws a smile mouth.
   '
   Sub DoSun(ByRef Mouth)
+
+    Dim x%, y%
 
     'set position of sun
     x = ScrWidth \ 2 : y = Scl(25)
@@ -585,10 +486,11 @@ PaletteError:
   'Parameters:
   '  X#, Y# - shot location
   Function ExplodeGorilla(ByRef x#, ByRef y#)
-    YAdj = Scl(12)
-    XAdj = Scl(5)
-    SclX# = ScrWidth / 320
-    SclY# = ScrHeight / 200
+    Dim YAdj = Scl(12)
+    Dim XAdj = Scl(5)
+    Dim SclX# = ScrWidth / 320
+    Dim SclY# = ScrHeight / 200
+    Dim PlayerHit%
     If x# < ScrWidth / 2 Then PlayerHit = 1 Else PlayerHit = 2
     PLAY("MBO0L16EFGEFDC")
 
@@ -616,12 +518,14 @@ PaletteError:
   'Parameters:
   '  Player1$, Player2$ - player names
   '  NumGames - number of games to play
-  Sub GetInputs(ByRef Player1$, ByRef Player2$, ByRef NumGames%)
-    Color(7, 0)
+  Async Function GetInputsAsync() As Task(Of (Player1 As String, Player2 As String, NumGames As Integer))
+
+    COLOR(7, 0)
     CLS()
 
     LOCATE(8, 15)
-    LINE_INPUT("Name of Player 1 (Default = 'Player 1'): ", Player1$)
+    REM LINE_INPUT("Name of Player 1 (Default = 'Player 1'): ", Player1$)
+    Dim Player1$ = Await LineInputAsync("Name of Player 1 (Default = 'Player 1'): ")
     If Player1$ = "" Then
       Player1$ = "Player 1"
     Else
@@ -629,45 +533,54 @@ PaletteError:
     End If
 
     LOCATE(10, 15)
-    LINE_INPUT("Name of Player 2 (Default = 'Player 2'): ", Player2$)
+    REM LINE_INPUT("Name of Player 2 (Default = 'Player 2'): ", Player2$)
+    Dim Player2$ = Await LineInputAsync("Name of Player 2 (Default = 'Player 2'): ")
     If Player2$ = "" Then
       Player2$ = "Player 2"
     Else
       Player2$ = VB.Left(Player2$, 10)
     End If
 
+    Dim game$, NumGames%
     Do
       LOCATE(12, 56) : PRINT(Space(25), True)
       LOCATE(12, 13)
-      INPUT("Play to how many total points (Default = 3)", game$)
+      REM INPUT("Play to how many total points (Default = 3)", game$)
+      game$ = Await InputAsync("Play to how many total points (Default = 3)")
       NumGames = Val(VB.Left(game$, 2))
     Loop Until NumGames > 0 And Len(game$) < 3 Or Len(game$) = 0
     If NumGames = 0 Then NumGames = 3
 
+    Dim grav$
     Do
       LOCATE(14, 53) : PRINT(Space(28), True)
       LOCATE(14, 17)
-      INPUT("Gravity in Meters/Sec (Earth = 9.8)", grav$)
+      'INPUT("Gravity in Meters/Sec (Earth = 9.8)", grav$)
+      grav$ = Await InputAsync("Gravity in Meters/Sec (Earth = 9.8)")
       gravity# = Val(grav$)
     Loop Until gravity# > 0 Or Len(grav$) = 0
     If gravity# = 0 Then gravity# = 9.8
-  End Sub
+
+    Return (Player1, Player2, NumGames)
+
+  End Function
 
   'GetNum:
   '  Gets valid numeric input from user
   'Parameters:
   '  Row, Col - location to echo input
   Function GetNum#(Row, Col)
-    Result$ = ""
-    Done = False
-    While INKEY$ <> "" : End While   'Clear keyboard buffer
+    Dim Result$ = ""
+    Dim Done = False
+    While INKEY$() <> "" : End While   'Clear keyboard buffer
 
     Do While Not Done
 
       LOCATE(Row, Col)
       PRINT($"{Result$}{QBChr(95)}    ", True)
 
-      Kbd$ = INKEY$
+      Dim Kbd$ = INKEY$()
+
       Select Case Kbd$
         Case "0" To "9"
           Result$ = Result$ + Kbd$
@@ -710,10 +623,12 @@ PaletteError:
     LOCATE(19, 34) : PRINT("P = Play Game")
     LOCATE(21, 35) : PRINT("Your Choice?")
 
+    Dim Ch$
     Do While Ch$ = ""
-      Ch$ = INKEY$
+      Ch$ = INKEY$()
     Loop
 
+    Dim x%, y%
     If Mode = 1 Then
       x = 125
       y = 100
@@ -722,14 +637,14 @@ PaletteError:
       y = 175
     End If
 
-    Screen(Mode)
+    SCREEN(Mode)
     SetScreen()
 
     If Mode = 1 Then Center(5, "Please wait while gorillas are drawn.")
 
     VIEW_PRINT(9, 24)
 
-    If Mode = 9 Then PALETTE(OBJECTCOLOR, BackColor)
+    If Mode = 9 Then PALETTE(OBJECTCOLOR, qbBackColor)
 
     DrawGorilla(x, y, ARMSDOWN)
     CLS(2)
@@ -744,7 +659,7 @@ PaletteError:
     If UCase(Ch$) = "V" Then
       Center(2, "Q B A S I C   G O R I L L A S")
       Center(5, "             STARRING:               ")
-      P$ = Player1$ + " AND " + Player2$
+      Dim P$ = Player1$ + " AND " + Player2$
       Center(7, P$)
 
       PUT(x - 13, y, GorD&, PUT_PSET)
@@ -786,13 +701,15 @@ PaletteError:
 
   'Intro:
   '  Displays game introduction
-  Sub Intro()
+  Async Function IntroAsync() As Task
 
     SCREEN(0)
     QbWidth(80, 25)
     MaxCol = 80
     COLOR(15, 0)
     CLS()
+
+    Await Task.Delay(1)
 
     Center(4, "Q B a s i c    G O R I L L A S")
     COLOR(7)
@@ -805,9 +722,10 @@ PaletteError:
     Center(24, "Press any key to continue")
 
     PLAY("MBT160O1L8CDEDCDL4ECC")
-    SparklePause() 'TODO: 
+    Await SparklePauseAsync()
     If Mode = 1 Then MaxCol = 40
-  End Sub
+
+  End Function
 
   'MakeCityScape:
   '  Creates random skyline for game
@@ -816,10 +734,13 @@ PaletteError:
   '  the upper left corner of each building.
   Sub MakeCityScape(ByRef BCoor() As XYPoint)
 
-    x = 2
+    Dim x = 2
+
+    Dim NewHt%, BottomLine%, HtInc%, DefBWidth%, RandomHeight%, WWidth%, WHeight%
+    Dim WDifV%, WDifh%, MaxHeight%, BuildingColor%, BackGround%
 
     'Set the sloping trend of the city scape. NewHt is new building height
-    Slope = FnRan(6)
+    Dim Slope = FnRan(6)
     Select Case Slope
       Case 1 : NewHt = 15                 'Upward slope
       Case 2 : NewHt = 130                'Downward slope
@@ -848,7 +769,7 @@ PaletteError:
       WDifh = 4
     End If
 
-    CurBuilding = 1
+    Dim CurBuilding = 1
     Do
 
       Select Case Slope
@@ -871,11 +792,11 @@ PaletteError:
       End Select
 
       'Set width of building and check to see if it would go off the screen
-      BWidth = FnRan(DefBWidth) + DefBWidth
+      Dim BWidth = FnRan(DefBWidth) + DefBWidth
       If x + BWidth > ScrWidth Then BWidth = ScrWidth - x - 2
 
       'Set height of building and check to see if it goes below screen
-      BHeight = FnRan(RandomHeight) + NewHt
+      Dim BHeight = FnRan(RandomHeight) + NewHt
       If BHeight < HtInc Then BHeight = HtInc
 
       'Check to see if Building is too high
@@ -892,9 +813,10 @@ PaletteError:
       LINE(x, BottomLine, x + BWidth, BottomLine - BHeight, BuildingColor, BF)
 
       'Draw the windows
-      c = x + 3
+      Dim c = x + 3
       Do
         For i = BHeight - 3 To 7 Step -WDifV
+          Dim WinColr%
           If Mode <> 9 Then
             WinColr = (FnRan(2) - 2) * -3
           ElseIf FnRan(4) = 1 Then
@@ -927,8 +849,9 @@ PaletteError:
 
     'Draw Wind speed arrow
     If Wind <> 0 Then
-      WindLine = Wind * 3 * (ScrWidth \ 320)
+      Dim WindLine = Wind * 3 * (ScrWidth \ 320)
       LINE(ScrWidth \ 2, ScrHeight - 5, ScrWidth \ 2 + WindLine, ScrHeight - 5, ExplosionColor)
+      Dim arrowDir%
       If Wind > 0 Then ArrowDir = -2 Else ArrowDir = 2
       LINE(ScrWidth / 2 + WindLine, ScrHeight - 5, ScrWidth / 2 + WindLine + ArrowDir, ScrHeight - 5 - 2, ExplosionColor)
       LINE(ScrWidth / 2 + WindLine, ScrHeight - 5, ScrWidth / 2 + WindLine + ArrowDir, ScrHeight - 5 + 2, ExplosionColor)
@@ -942,6 +865,8 @@ PaletteError:
   '  BCoor() - user-defined TYPE array which stores upper left coordinates
   '  of each building.
   Sub PlaceGorillas(ByRef BCoor() As XYPoint)
+
+    Dim XAdj%, YAdj%, SclX#, SclY#, BNum%, BWidth%
 
     If Mode = 9 Then
       XAdj = 14
@@ -971,8 +896,12 @@ PaletteError:
   '  Player1$, Player2$ - player names
   '  NumGames - number of games to play
   Sub PlayGame(Player1$, Player2$, NumGames%)
+
     Dim BCoor(0 To 30) As XYPoint
     Dim TotalWins%(0 To 2) ' was 1 To 2
+
+    Dim J%, Tosser%, Tossee%
+    Dim Hit As Boolean
 
     J = 1
 
@@ -1011,11 +940,11 @@ PaletteError:
     CLS()
 
     Center(8, "GAME OVER!")
-    Center (10, "Score:")
+    Center(10, "Score:")
     LOCATE(11, 30) : PRINT($"{Player1$}{TAB(50)}{TotalWins(1)}")
     LOCATE(12, 30) : PRINT($"{Player2$}{TAB(50)}{TotalWins(2)}")
     Center(24, "Press any key to continue")
-    SparklePause()
+    REM Await SparklePauseAsync()
     COLOR(7, 0)
     CLS()
   End Sub
@@ -1030,13 +959,13 @@ PaletteError:
   Function PlotShot(ByVal StartX%, ByVal StartY%, ByVal Angle#, ByVal Velocity%, ByVal PlayerNum%)
 
     Angle# = Angle# / 180 * pi#  'Convert degree angle to radians
-    Radius = Mode Mod 7
+    Dim Radius = Mode Mod 7
 
-    InitXVel# = Cos(Angle#) * Velocity
-    InitYVel# = Sin(Angle#) * Velocity
+    Dim InitXVel# = Cos(Angle#) * Velocity
+    Dim InitYVel# = Sin(Angle#) * Velocity
 
-    oldx# = StartX
-    oldy# = StartY
+    Dim oldx# = StartX
+    Dim oldy# = StartY
 
     'draw gorilla toss
     If PlayerNum = 1 Then
@@ -1052,19 +981,20 @@ PaletteError:
     'redraw gorilla
     PUT(StartX, StartY, GorD&, PUT_PSET)
 
-    adjust = Scl(4)                   'For scaling CGA
+    Dim adjust = Scl(4)                   'For scaling CGA
 
-    xedge = Scl(9) * (2 - PlayerNum)  'Find leading edge of banana for check
+    Dim xedge = Scl(9) * (2 - PlayerNum)  'Find leading edge of banana for check
 
-    Impact = False
-    ShotInSun = False
-    OnScreen = True
-    PlayerHit = 0
-    NeedErase = False
+    Dim Impact = False
+    Dim ShotInSun = False
+    Dim OnScreen = True
+    Dim PlayerHit = 0
+    Dim NeedErase = False
 
-    StartXPos = StartX
-    StartYPos = StartY - adjust - 3
+    Dim StartXPos = StartX
+    Dim StartYPos = StartY - adjust - 3
 
+    Dim direction%
     If PlayerNum = 2 Then
       StartXPos = StartXPos + Scl(25)
       direction = Scl(4)
@@ -1072,11 +1002,14 @@ PaletteError:
       direction = Scl(-4)
     End If
 
+    Dim x#, y#, pointVal%
     If Velocity < 2 Then              'Shot too slow - hit self
       x# = StartX
       y# = StartY
       pointval = OBJECTCOLOR
     End If
+
+    Dim oldrot%, t#
 
     Do While (Not Impact) And OnScreen
 
@@ -1098,15 +1031,17 @@ PaletteError:
 
       If OnScreen And y# > 0 Then
 
+        Dim rot%
+
         'check it
-        LookY = 0
-        LookX = Scl(8 * (2 - PlayerNum))
+        Dim LookY = 0
+        Dim LookX = Scl(8 * (2 - PlayerNum))
         Do
-          pointval = Point(x# + LookX, y# + LookY)
+          pointval = POINT(x# + LookX, y# + LookY)
           If pointval = 0 Then
             Impact = False
             If ShotInSun = True Then
-              If ABS(ScrWidth \ 2 - x#) > Scl(20) Or y# > SunHt Then ShotInSun = False
+              If Abs(ScrWidth \ 2 - x#) > Scl(20) Or y# > SunHt Then ShotInSun = False
             End If
           ElseIf pointval = SUNATTR And y# < SunHt Then
             If Not SunHit Then DoSun(SUNSHOCK)
@@ -1150,8 +1085,8 @@ PaletteError:
   'Rest:
   '  pauses the program
   Sub Rest(ByRef t#)
-    s# = QBTimer()
-    t2# = MachSpeed * t# / SPEEDCONST
+    Dim s# = QBTimer()
+    Dim t2# = MachSpeed * t# / SPEEDCONST
     Do
     Loop Until QBTimer() - s# > t2#
   End Sub
@@ -1180,7 +1115,7 @@ PaletteError:
 
     If Mode = 9 Then
       ExplosionColor = 2
-      BackColor = 1
+      qbBackColor = 1
       PALETTE(0, 1)
       PALETTE(1, 46)
       PALETTE(2, 44)
@@ -1191,47 +1126,190 @@ PaletteError:
       PALETTE(9, 63)       'Display Color
     Else
       ExplosionColor = 2
-      BackColor = 0
-      COLOR(BackColor, 2)
+      qbBackColor = 0
+      COLOR(qbBackColor, 2)
 
+    End If
+
+  End Sub
+
+  Private Async Sub Me_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+
+    Me.Show()
+    Await Task.Delay(1)
+
+    Video.PictureBox = PictureBox1
+
+    If False Then
+      Video.LOCATE(5, 5)
+      Video.PRINT("Hello World!")
+    Else
+
+      pi# = 4 * Atan(1.0#)
+
+      'This is a clever way to pick the best graphics mode available
+      Mode = 9
+      SCREEN(Mode)
+      REM If Mode = 9 Then PALETTE(4, 0)   'Check for 64K EGA
+
+      MachSpeed = CalcDelay()
+
+      If Mode = 9 Then
+        ScrWidth = 640
+        ScrHeight = 350
+        GHeight = 25
+        REM RESTORE EGABanana
+
+        RESTORE()
+
+EGABanana:
+        'BananaLeft
+        DATA(458758, 202116096, 471604224, 943208448, 943208448, 943208448, 471604224, 202116096, 0)
+        'BananaDown
+        DATA(262153, -2134835200, -2134802239, -2130771968, -2130738945, 8323072, 8323199, 4063232, 4063294)
+        'BananaUp
+        DATA(262153, 4063232, 4063294, 8323072, 8323199, -2130771968, -2130738945, -2134835200, -2134802239)
+        'BananaRight
+        DATA(458758, -1061109760, -522133504, 1886416896, 1886416896, 1886416896, -522133504, -1061109760, 0)
+
+        ReDim LBan&(8), RBan&(8), UBan&(8), DBan&(8)
+
+        For i = 0 To 8
+          READ(LBan&(i))
+        Next i
+
+        For i = 0 To 8
+          READ(DBan&(i))
+        Next i
+
+        For i = 0 To 8
+          READ(UBan&(i))
+        Next i
+
+        For i = 0 To 8
+          READ(RBan&(i))
+        Next i
+
+        SunHt = 39
+
+      Else
+
+        ScrWidth = 320
+        ScrHeight = 200
+        GHeight = 12
+
+        REM RESTORE CGABanana
+        RESTORE()
+
+CGABanana:
+        'BananaLeft
+        DATA(327686, -252645316, 60)
+        'BananaDown
+        DATA(196618, -1057030081, 49344)
+        'BananaUp
+        DATA(196618, -1056980800, 63)
+        'BananaRight
+        DATA(327686, 1010580720, 240)
+
+        ReDim LBan&(2), RBan&(2), UBan&(2), DBan&(2)
+        REM ReDim GorL&(20), GorD&(20), GorR&(20)
+
+        For i = 0 To 2
+          READ(LBan&(i))
+        Next i
+        For i = 0 To 2
+          READ(DBan&(i))
+        Next i
+        For i = 0 To 2
+          READ(UBan&(i))
+        Next i
+        For i = 0 To 2
+          READ(RBan&(i))
+        Next i
+
+        MachSpeed = MachSpeed * 1.3
+        SunHt = 20
+      End If
+
+      ' -----
+
+      ' Sub Program 1
+      Await IntroAsync()
+      ' Sub Progam 2
+      REM GetInputs(Name1$, Name2$, NumGames)
+      Dim r = Await GetInputsAsync()
+      Dim Name1$ = r.Player1 : Dim Name2$ = r.Player2 : Dim NumGames = r.NumGames
+
+      ' Sub Program 3
+      GorillaIntro(Name1$, Name2$)
+      ' Sub Program 4
+      REM PlayGame(Name1$, Name2$, NumGames)
+
+      MsgBox("Done!")
+
+    End If
+
+  End Sub
+
+  Private Sub Me_Resize(sender As Object, e As EventArgs) Handles Me.Resize
+
+    ' Resizes the picture box preserving the aspect ratio of 4x3.
+
+    Dim clientW = ClientSize.Width
+    Dim clientH = ClientSize.Height
+
+    If clientH > clientW * 0.75 Then
+      PictureBox1.Width = clientW
+      PictureBox1.Height = clientW * 0.75
+      PictureBox1.Left = 0
+      PictureBox1.Top = (clientH - PictureBox1.Height) \ 2
+    Else
+      PictureBox1.Height = clientH
+      PictureBox1.Width = clientH * 1.333
+      PictureBox1.Top = 0
+      PictureBox1.Left = (clientW - PictureBox1.Width) \ 2
     End If
 
   End Sub
 
   'SparklePause:
   '  Creates flashing border for intro and game over screens
-  Sub SparklePause()
+  Async Function SparklePauseAsync() As Task
 
     Dim a%, b%
 
-    COLOR(4, 0)
-    Aa$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
-    While INKEY$ <> "" : End While 'Clear keyboard buffer
+    COLOR(14, 0)
+    Dim Aa$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
+    While INKEY$() <> "" : End While 'Clear keyboard buffer
 
-    While INKEY$ = ""
-      For A = 1 To 5
+    While INKEY$() = ""
+
+      For a = 1 To 5
         LOCATE(1, 1)                             'print horizontal sparkles
         PRINT(Mid(Aa$, a, 80), True)
         LOCATE(22, 1)
         PRINT(Mid(Aa$, 6 - a, 80), True)
 
         For b = 2 To 21                         'Print Vertical sparkles
-          c = (A + b) Mod 5
+          Dim c = (a + b) Mod 5
           If c = 1 Then
-            LOCATE(B, 80)
+            LOCATE(b, 80)
             PRINT("*", True)
-            LOCATE(23 - B, 1)
+            LOCATE(23 - b, 1)
             PRINT("*", True)
           Else
-            LOCATE(B, 80)
+            LOCATE(b, 80)
             PRINT(" ", True)
-            LOCATE(23 - B, 1)
+            LOCATE(23 - b, 1)
             PRINT(" ", True)
           End If
         Next b
-      Next A
+        Await Task.Delay(1)
+      Next a
+
     End While
-  End Sub
+
+  End Function
 
   'UpdateScores:
   '  Updates players' scores
@@ -1261,6 +1339,10 @@ PaletteError:
       PLAY("MFO0L32EFGEFDC")
       Rest(0.2)
     Next
+  End Sub
+
+  Private Sub Form1_KeyDown(sender As Object, e As KeyEventArgs) Handles Me.KeyDown
+    m_keys.Push(e.KeyCode) : e.Handled = True : e.SuppressKeyPress = True
   End Sub
 
 End Class
