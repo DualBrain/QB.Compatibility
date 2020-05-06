@@ -50,7 +50,7 @@ Namespace Global.QB
       Else
         ' Do nothing...
       End If
-      Throw New NotImplementedException
+      'Throw New NotImplementedException
     End Sub
 
     Public Shared Function PEEK(address As Integer) As Integer

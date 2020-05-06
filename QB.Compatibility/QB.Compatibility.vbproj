@@ -72,6 +72,7 @@
     <Compile Include="Core.vb" />
     <Compile Include="Development.vb" />
     <Compile Include="Devices.vb" />
+    <Compile Include="Extensions.vb" />
     <Compile Include="File.vb" />
     <Compile Include="Multimedia.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />

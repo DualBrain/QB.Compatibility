@@ -73,9 +73,8 @@
     <Import Include="System.Threading.Tasks" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Form1.vb">
-      <SubType>Form</SubType>
-    </Compile>
+    <Compile Include="Extensions.vb" />
+    <Compile Include="Form1.vb" />
     <Compile Include="Form1.Designer.vb">
       <DependentUpon>Form1.vb</DependentUpon>
       <SubType>Form</SubType>
@@ -124,6 +123,18 @@
       <Project>{993dfa07-3e49-403c-b7f5-a1296399f874}</Project>
       <Name>QB.Compatibility</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\LBan.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\UBan.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\DBan.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\RBan.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>

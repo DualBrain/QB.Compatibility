@@ -520,25 +520,25 @@ Namespace Global.QB
     'End Function
 
 
-    Public Shared Function TAB(column%) As String
-      If column% <= 32767 Then
-        If column% < 0 Then
-          column% = 1
-        Else
-          column% = column% Mod 80
-        End If
-        Dim current% = System.Console.CursorLeft + 1
-        Dim count% = column% - current%
-        Dim resuLtKey$ = ""
-        If count% < 0 Then
-          resuLtKey$ = vbCrLf : count% = column%
-        End If
-        resuLtKey$ &= Space(count%)
-        Return resuLtKey$
-      Else
-        Throw New ArgumentException
-      End If
-    End Function
+    'Public Shared Function TAB(column%) As String
+    '  If column% <= 32767 Then
+    '    If column% < 0 Then
+    '      column% = 1
+    '    Else
+    '      column% = column% Mod 80
+    '    End If
+    '    Dim current% = System.Console.CursorLeft + 1
+    '    Dim count% = column% - current%
+    '    Dim resuLtKey$ = ""
+    '    If count% < 0 Then
+    '      resuLtKey$ = vbCrLf : count% = column%
+    '    End If
+    '    resuLtKey$ &= Space(count%)
+    '    Return resuLtKey$
+    '  Else
+    '    Throw New ArgumentException
+    '  End If
+    'End Function
 
     ' Error Trapping
 
