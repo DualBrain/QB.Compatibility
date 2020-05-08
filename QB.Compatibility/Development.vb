@@ -40,7 +40,7 @@ Namespace Global.QB
       Else
         ' Do nothing...
       End If
-      Throw New NotImplementedException
+      'Throw New NotImplementedException
       Return 0
     End Function
 
