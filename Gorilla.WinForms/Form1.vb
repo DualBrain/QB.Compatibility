@@ -483,7 +483,7 @@ PaletteError:
 
     'legs
     For i = 0 To 4
-      CIRCLE(x + Scl(i), y + Scl(25), Scl(10), OBJECTCOLOR, 3 * pi# / 4, 9 * pi# / 8)
+      CIRCLE(x + Scl(i), y + Scl(25), Scl(10), OBJECTCOLOR, 3 * pi# / 4, 9.1 * pi# / 8)
       CIRCLE(x + Scl(-6) + Scl(i - 0.1), y + Scl(25), Scl(10), OBJECTCOLOR, 15 * pi# / 8, pi# / 4)
     Next
 
@@ -1136,6 +1136,9 @@ PaletteError:
 
   'Rest:
   '  pauses the program
+
+  Private scaleValue As Integer = 1
+
   Async Function RestAsync(t#) As Task
     'Dim s# = QBTimer()
     'Dim t2# = MachSpeed * t# / SPEEDCONST
@@ -1157,7 +1160,7 @@ PaletteError:
     If Mode = 1 Then
       Scl = CInt(n! / 2 + 0.1)
     Else
-      Scl = CInt(n!)
+      Scl = CInt(n!) * scaleValue
     End If
 
   End Function
@@ -1195,12 +1198,78 @@ PaletteError:
 
 GoAgain:
 
-    If False Then
-      LOCATE(5, 5)
-      PRINT("Hello World!")
-    Else
+    pi# = 4 * Atan(1.0#)
 
-      pi# = 4 * Atan(1.0#)
+    If False Then
+      'COLOR(14, 1)
+      'CLS()
+      SCREEN(9)
+      LOCATE(1, 1)
+      PRINT("Hello World!")
+      CIRCLE(100, 100, 50)
+
+      COLOR(14, 1)
+      CLS()
+
+      Dim x = 100, y = 100
+      Dim i As Single   ' Local index must be single precision
+      Dim arms = 3
+
+      scaleValue = 1
+
+      'draw head
+      LINE(x - Scl(4), y, x + Scl(2.9), y + Scl(6), 14, BF)
+      LINE(x - Scl(5), y + Scl(2), x + Scl(4), y + Scl(4), 14, BF)
+
+      'draw eyes/brow
+      LINE(x - Scl(3), y + Scl(2), x + Scl(2), y + Scl(2), 0)
+
+      'draw nose if ega
+      'If Mode = 9 Then
+      For i = -2 To -1
+        PSET(x + i, y + 4, 0)
+        PSET(x + i + 3, y + 4, 0)
+      Next i
+      'End If
+
+      'neck
+      LINE(x - Scl(3), y + Scl(7), x + Scl(2), y + Scl(7), 14)
+
+      'body
+      LINE(x - Scl(8), y + Scl(8), x + Scl(6.9), y + Scl(14), 14, BF)
+      LINE(x - Scl(6), y + Scl(15), x + Scl(4.9), y + Scl(20), 14, BF)
+
+      'legs
+      For i = 0 To 4
+        CIRCLE(x + Scl(i), y + Scl(25), Scl(10), 10 + i, 3 * pi# / 4, 9.1 * pi# / 8)
+        CIRCLE(x + Scl(-6) + Scl(i - 0.1), y + Scl(25), Scl(10), 10 + i, 15 * pi# / 8, pi# / 4)
+      Next
+
+      'chest
+      CIRCLE(x - Scl(4.9), y + Scl(10), Scl(4.9), 0, 3 * pi# / 2, 0)
+      CIRCLE(x + Scl(4.9), y + Scl(10), Scl(4.9), 0, pi#, 3 * pi# / 2)
+
+      For i = -5 To -1
+        Select Case arms
+          Case 1
+            'Right arm up
+            CIRCLE(x + Scl(i - 0.1), y + Scl(14), Scl(9), 14, 3 * pi# / 4, 5 * pi# / 4)
+            CIRCLE(x + Scl(4.9) + Scl(i), y + Scl(4), Scl(9), 14, 7 * pi# / 4, pi# / 4)
+            '[GET](x - Scl(15), y - Scl(1), x + Scl(14), y + Scl(28), GorR)
+          Case 2
+            'Left arm up
+            CIRCLE(x + Scl(i - 0.1), y + Scl(4), Scl(9), 14, 3 * pi# / 4, 5 * pi# / 4)
+            CIRCLE(x + Scl(4.9) + Scl(i), y + Scl(14), Scl(9), 14, 7 * pi# / 4, pi# / 4)
+            '[GET](x - Scl(15), y - Scl(1), x + Scl(14), y + Scl(28), GorL)
+          Case 3
+            'Both arms down
+            CIRCLE(x + Scl(i - 0.1), y + Scl(14), Scl(9), 14, 3 * pi# / 4, 5 * pi# / 4)
+            CIRCLE(x + Scl(4.9) + Scl(i), y + Scl(14), Scl(9), 14, 7 * pi# / 4, pi# / 4)
+            '[GET](x - Scl(15), y - Scl(1), x + Scl(14), y + Scl(28), GorD)
+        End Select
+      Next i
+
+    Else
 
       'This is a clever way to pick the best graphics mode available
       Mode = 9
@@ -1314,7 +1383,7 @@ CGABanana:
 
     Dim a%, b%
 
-    COLOR(14, 0)
+    COLOR(4, 0)
     Dim Aa$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
     While INKEY$() <> "" : End While 'Clear keyboard buffer
 
