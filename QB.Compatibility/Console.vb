@@ -213,7 +213,7 @@ Namespace Global.QB
         Dim A$ = INKEY()
         If Not String.IsNullOrEmpty(A$) Then
           resuLtKey$ &= A$ ': A$ = ""
-          If Len(resuLtKey$) >= n Then
+          If resuLtKey$?.Length >= n Then
             Return resuLtKey$
           End If
         End If
@@ -253,7 +253,7 @@ Namespace Global.QB
       Dim till = DateAdd(DateInterval.Second, seconds, Now)
       Do
         If Not String.IsNullOrEmpty(INKEY) OrElse
-           Now >= till Then
+           Microsoft.VisualBasic.Now >= till Then
           Exit Do
         End If
         Threading.Thread.Sleep(100)

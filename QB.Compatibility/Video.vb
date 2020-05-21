@@ -6,7 +6,7 @@ Imports System.Drawing
 Imports System.Windows.Forms
 Imports QB.Core
 
-Imports Extensions
+Imports QB.Extensions
 Imports System.CodeDom.Compiler
 
 Namespace Global.QB
@@ -800,25 +800,25 @@ Namespace Global.QB
 
     Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
 
-    Private Shared m_display As Image = New Bitmap(640, 480)
+    Private Shared m_display As System.Drawing.Image = New System.Drawing.Bitmap(640, 480)
 
-    Private Shared m_parent As Form
+    Private Shared m_parent As System.Windows.Forms.Form
     Private Shared m_pictureBox As System.Windows.Forms.PictureBox
 
     Private Sub New()
     End Sub
 
-    Public Shared Sub Init(parent As Form, pic As PictureBox)
+    Public Shared Sub Init(parent As System.Windows.Forms.Form, pic As System.Windows.Forms.PictureBox)
       m_parent = parent
       m_parent.BackColor = Drawing.Color.Black
       m_pictureBox = pic
-      m_pictureBox.SizeMode = PictureBoxSizeMode.StretchImage
+      m_pictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage
       AddHandler parent.KeyDown, AddressOf Me_KeyDown
       AddHandler parent.Resize, AddressOf Me_Resize
       Me_Resize(Nothing, EventArgs.Empty)
     End Sub
 
-    Private Shared Sub Me_KeyDown(sender As Object, e As KeyEventArgs)
+    Private Shared Sub Me_KeyDown(sender As Object, e As System.Windows.Forms.KeyEventArgs)
       m_keys.Push(e.KeyCode) : e.Handled = True : e.SuppressKeyPress = True
     End Sub
 
@@ -1251,23 +1251,23 @@ allplotted:
       End If
     End Sub
 
-    Public Shared Sub PUT(x%, y%, img As Image, po As PutOption)
-      Using g = Graphics.FromImage(m_display)
+    Public Shared Sub PUT(x%, y%, img As System.Drawing.Image, po As PutOption)
+      Using g = System.Drawing.Graphics.FromImage(m_display)
         Dim src = New Rectangle(0, 0, img.Width, img.Height)
         Dim dest = New Rectangle(x, y, img.Width, img.Height)
-        g.DrawImage(img, dest, src, GraphicsUnit.Pixel)
+        g.DrawImage(img, dest, src, System.Drawing.GraphicsUnit.Pixel)
       End Using
       Refresh()
     End Sub
 
-    Private Shared m_address As New List(Of Image)
+    Private Shared m_address As New List(Of System.Drawing.Image)
 
-    Public Shared Sub [GET](x1%, y1%, x2%, y2%, ByRef img As Image)
-      img = New Bitmap(x2 - x1, y2 - y1)
-      Using g = Graphics.FromImage(img)
+    Public Shared Sub [GET](x1%, y1%, x2%, y2%, ByRef img As System.Drawing.Image)
+      img = New System.Drawing.Bitmap(x2 - x1, y2 - y1)
+      Using g = System.Drawing.Graphics.FromImage(img)
         Dim src = New Rectangle(x1, y1, x2 - x1, y2 - y1)
         Dim dest = New Rectangle(0, 0, x2 - x1, y2 - y1)
-        g.DrawImage(m_display, dest, src, GraphicsUnit.Pixel)
+        g.DrawImage(m_display, dest, src, System.Drawing.GraphicsUnit.Pixel)
       End Using
     End Sub
 

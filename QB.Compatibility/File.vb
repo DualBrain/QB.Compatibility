@@ -5,6 +5,8 @@ Option Infer On
 Imports System.IO
 Imports QB.Core
 
+Imports VB = Microsoft.VisualBasic
+
 Namespace Global.QB
 
   Public NotInheritable Class File

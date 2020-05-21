@@ -556,9 +556,9 @@ Namespace Global.QB
     '  'NOTE: Set the time???? (Is this even possible?)
     'End Sub
 
-    Public Shared Function QBTimer() As Long
+    Public Shared Function QBTimer() As Single
       Dim midnight = New Date(Now.Year, Now.Month, Now.Day)
-      Return DateDiff(DateInterval.Second, midnight, Now)
+      Return CSng(DateDiff(DateInterval.Second, midnight, Now)) '+ ((Now.Millisecond \ 10) * 0.01))
     End Function
 
   End Class

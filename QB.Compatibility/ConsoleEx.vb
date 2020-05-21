@@ -5,7 +5,7 @@ Option Infer On
 Imports System.Runtime.InteropServices
 Imports Microsoft.Win32.SafeHandles
 
-Namespace Global
+Namespace Global.QB
 
   Public NotInheritable Class ConsoleEx
 
@@ -384,27 +384,27 @@ Namespace Global
 
       If Not restore Then
 
-        ReDim Snap(Console.WindowHeight - 1, Console.WindowWidth - 1)
+        ReDim Snap(System.Console.WindowHeight - 1, System.Console.WindowWidth - 1)
 
-        For r As Short = 0 To CShort(Console.WindowHeight - 1)
+        For r As Short = 0 To CShort(System.Console.WindowHeight - 1)
 
           Dim position = New COORD(0, r)
 
-          Dim attributes(Console.WindowWidth - 1) As UShort
+          Dim attributes(System.Console.WindowWidth - 1) As UShort
           Dim read As UInteger = 0
-          Dim success = ReadConsoleOutputAttribute(consoleHandle, attributes, Convert.ToUInt32(Console.WindowWidth), position, read)
+          Dim success = ReadConsoleOutputAttribute(consoleHandle, attributes, Convert.ToUInt32(System.Console.WindowWidth), position, read)
 
           If Not success OrElse
-           read <> Console.WindowWidth Then
+           read <> System.Console.WindowWidth Then
             Stop
           End If
 
-          Dim characters = New Text.StringBuilder(Console.WindowWidth - 1)
+          Dim characters = New Text.StringBuilder(System.Console.WindowWidth - 1)
           read = 0
-          success = ReadConsoleOutputCharacter(consoleHandle, characters, Convert.ToUInt32(Console.WindowWidth), position, read)
+          success = ReadConsoleOutputCharacter(consoleHandle, characters, Convert.ToUInt32(System.Console.WindowWidth), position, read)
 
           If Not success OrElse
-           read <> Console.WindowWidth Then
+           read <> System.Console.WindowWidth Then
             Stop
           End If
 
@@ -423,20 +423,20 @@ Namespace Global
 
         If Snap IsNot Nothing Then
 
-          For r = 0 To Console.WindowHeight - 1
-            Console.SetCursorPosition(0, r)
-            For c = 0 To Console.WindowWidth - 1
-              If r = Console.WindowHeight - 1 AndAlso c = Console.WindowWidth - 1 Then
+          For r = 0 To System.Console.WindowHeight - 1
+            System.Console.SetCursorPosition(0, r)
+            For c = 0 To System.Console.WindowWidth - 1
+              If r = System.Console.WindowHeight - 1 AndAlso c = System.Console.WindowWidth - 1 Then
                 ' skip
               Else
                 Dim character = Snap(r, c).Char
                 Dim attribute = Snap(r, c).Attr
                 Dim f = CType(attribute And &HF, ConsoleColor)
                 Dim b = CType((((attribute And &HF0) >> 4) And &HF), ConsoleColor)
-                If Console.ForegroundColor <> f Then Console.ForegroundColor = f
-                If Console.BackgroundColor <> b Then Console.BackgroundColor = b
+                If System.Console.ForegroundColor <> f Then System.Console.ForegroundColor = f
+                If System.Console.BackgroundColor <> b Then System.Console.BackgroundColor = b
                 'Console.Write(QB.QBChr(Asc(character)))
-                Console.Write(character)
+                System.Console.Write(character)
               End If
             Next
           Next
@@ -449,21 +449,21 @@ Namespace Global
 
     Public Shared Sub Resize(cols%, rows%)
       Try
-        Console.SetWindowSize(cols%, rows%) ' Set the windows size...
+        System.Console.SetWindowSize(cols%, rows%) ' Set the windows size...
       Catch ex As Exception
-        Console.WriteLine("1 - " & ex.ToString)
+        System.Console.WriteLine("1 - " & ex.ToString)
         Threading.Thread.Sleep(5000)
       End Try
       Try
-        Console.SetBufferSize(cols%, rows%) ' Then set the buffer size to the now window size...
+        System.Console.SetBufferSize(cols%, rows%) ' Then set the buffer size to the now window size...
       Catch ex As Exception
-        Console.WriteLine("2 - " & ex.ToString)
+        System.Console.WriteLine("2 - " & ex.ToString)
         Threading.Thread.Sleep(5000)
       End Try
       Try
-        Console.SetWindowSize(cols%, rows%) ' Then set the window size again so that the scroll bar area is removed.
+        System.Console.SetWindowSize(cols%, rows%) ' Then set the window size again so that the scroll bar area is removed.
       Catch ex As Exception
-        Console.WriteLine("3 - " & ex.ToString)
+        System.Console.WriteLine("3 - " & ex.ToString)
         Threading.Thread.Sleep(5000)
       End Try
     End Sub
