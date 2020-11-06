@@ -557,8 +557,7 @@ Namespace Global.QB
     'End Sub
 
     Public Shared Function QBTimer() As Single
-      Dim midnight = New Date(Now.Year, Now.Month, Now.Day)
-      Return CSng(DateDiff(DateInterval.Second, midnight, Now)) '+ ((Now.Millisecond \ 10) * 0.01))
+      Return CSng(DateDiff(DateInterval.Second, New Date(Now.Year, Now.Month, Now.Day), Now)) '+ ((Now.Millisecond \ 10) * 0.01))
     End Function
 
   End Class

@@ -49,7 +49,7 @@ Namespace Global.QB
       Friend FontWeight As Integer
       Friend FaceName() As Char
       Public Sub Initialize()
-        ReDim Me.FaceName(LF_FACESIZE)
+        ReDim FaceName(LF_FACESIZE)
       End Sub
     End Structure
 

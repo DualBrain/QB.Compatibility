@@ -2,12 +2,17 @@
 Option Strict On
 Option Infer On
 
-Imports System.Drawing
-Imports System.Windows.Forms
-Imports QB.Core
+' Yet another approach... try again on another episode.
+' https://stackoverflow.com/questions/24701703/c-sharp-faster-alternatives-to-setpixel-and-getpixel-for-bitmaps-for-windows-f
 
+#Const oldway = False
+
+Imports System.Drawing
+Imports System.Runtime.InteropServices
+Imports System.Windows.Forms
+
+Imports QB.Core
 Imports QB.Extensions
-Imports System.CodeDom.Compiler
 
 Namespace Global.QB
 
@@ -800,21 +805,56 @@ Namespace Global.QB
 
     Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
 
+#If oldway Then
     Private Shared m_display As System.Drawing.Image = New System.Drawing.Bitmap(640, 480)
+#Else
+    Private Shared m_display As System.Drawing.Image = New System.Drawing.Bitmap(640, 480)
+    Private Shared m_rectangle As New Rectangle
+    Private Shared m_context As BufferedGraphicsContext
+    Private Shared m_buffer As BufferedGraphics
+#End If
 
     Private Shared m_parent As System.Windows.Forms.Form
     Private Shared m_pictureBox As System.Windows.Forms.PictureBox
 
+    Private Shared m_manualMode As Boolean = False
+
     Private Sub New()
     End Sub
 
-    Public Shared Sub Init(parent As System.Windows.Forms.Form, pic As System.Windows.Forms.PictureBox)
+#Region "Interop"
+
+    '<DllImport("user32.dll")>
+    'Private Shared Function GetDC(hwnd As IntPtr) As IntPtr
+    'End Function
+
+    '<DllImport("user32.dll")>
+    'Private Shared Function ReleaseDC(hwnd As IntPtr, hdc As IntPtr) As Int32
+    'End Function
+
+    <DllImport("gdi32.dll")>
+    Private Shared Function GetPixel(hdc As IntPtr, nXPos As Integer, nYPos As Integer) As UInteger
+    End Function
+
+    Public Shared Function GetColor(g As Graphics, x%, y%) As Color
+      Dim hdc = g.GetHdc
+      Dim pixel = GetPixel(hdc, x, y)
+      g.ReleaseHdc(hdc)
+      Dim c = System.Drawing.Color.FromArgb(CInt(Fix(pixel)))
+      Return System.Drawing.Color.FromArgb(255, c.B, c.G, c.R)
+    End Function
+
+#End Region
+
+    Public Shared Sub Init(parent As System.Windows.Forms.Form, pic As System.Windows.Forms.PictureBox, Optional manualMode As Boolean = False)
+      m_manualMode = manualMode
       m_parent = parent
       m_parent.BackColor = Drawing.Color.Black
       m_pictureBox = pic
       m_pictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage
       AddHandler parent.KeyDown, AddressOf Me_KeyDown
       AddHandler parent.Resize, AddressOf Me_Resize
+      GraphicsInit(640, 480)
       Me_Resize(Nothing, EventArgs.Empty)
     End Sub
 
@@ -843,6 +883,31 @@ Namespace Global.QB
 
     End Sub
 
+    Private Shared Sub GraphicsInit(width%, height%)
+
+#If Not oldway Then
+
+      If m_buffer IsNot Nothing Then
+        m_buffer.Dispose() : m_buffer = Nothing
+        m_context = Nothing
+      End If
+
+      m_context = New BufferedGraphicsContext
+
+      m_rectangle.Width = width
+      m_rectangle.Height = height
+      'm_buffer = m_context.Allocate(m_pictureBox.CreateGraphics, m_rectangle)
+      m_buffer = m_context.Allocate(Graphics.FromImage(m_display), m_rectangle)
+      m_buffer.Graphics.CompositingMode = Drawing2D.CompositingMode.SourceOver
+      m_buffer.Graphics.CompositingQuality = Drawing2D.CompositingQuality.AssumeLinear
+      m_buffer.Graphics.SmoothingMode = Drawing2D.SmoothingMode.None
+      m_buffer.Graphics.InterpolationMode = CType(Drawing2D.QualityMode.Low, Drawing2D.InterpolationMode)
+      m_buffer.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.None
+
+#End If
+
+    End Sub
+
     Private Shared m_cursorRow As Integer
     Private Shared m_cursorCol As Integer
     Private Shared m_textH As Integer = 14
@@ -864,6 +929,41 @@ Namespace Global.QB
                                            System.Drawing.Color.Yellow,
                                            System.Drawing.Color.White}
 
+    Private Shared m_brush() As SolidBrush = {New SolidBrush(System.Drawing.Color.Black),
+                                              New SolidBrush(System.Drawing.Color.DarkBlue),
+                                              New SolidBrush(System.Drawing.Color.DarkGreen),
+                                              New SolidBrush(System.Drawing.Color.DarkCyan),
+                                              New SolidBrush(System.Drawing.Color.DarkRed),
+                                              New SolidBrush(System.Drawing.Color.DarkMagenta),
+                                              New SolidBrush(System.Drawing.Color.Brown),
+                                              New SolidBrush(System.Drawing.Color.LightGray),
+                                              New SolidBrush(System.Drawing.Color.Gray),
+                                              New SolidBrush(System.Drawing.Color.Blue),
+                                              New SolidBrush(System.Drawing.Color.LightGreen),
+                                              New SolidBrush(System.Drawing.Color.Cyan),
+                                              New SolidBrush(System.Drawing.Color.Red),
+                                              New SolidBrush(System.Drawing.Color.Magenta),
+                                              New SolidBrush(System.Drawing.Color.Yellow),
+                                              New SolidBrush(System.Drawing.Color.White)}
+
+    Private Shared m_pen() As Pen = {New Pen(System.Drawing.Color.Black),
+                                     New Pen(System.Drawing.Color.DarkBlue),
+                                     New Pen(System.Drawing.Color.DarkGreen),
+                                     New Pen(System.Drawing.Color.DarkCyan),
+                                     New Pen(System.Drawing.Color.DarkRed),
+                                     New Pen(System.Drawing.Color.DarkMagenta),
+                                     New Pen(System.Drawing.Color.Brown),
+                                     New Pen(System.Drawing.Color.LightGray),
+                                     New Pen(System.Drawing.Color.Gray),
+                                     New Pen(System.Drawing.Color.Blue),
+                                     New Pen(System.Drawing.Color.LightGreen),
+                                     New Pen(System.Drawing.Color.Cyan),
+                                     New Pen(System.Drawing.Color.Red),
+                                     New Pen(System.Drawing.Color.Magenta),
+                                     New Pen(System.Drawing.Color.Yellow),
+                                     New Pen(System.Drawing.Color.White)}
+
+
     Public Shared Sub PRINT()
       m_cursorRow += 1
       m_cursorCol = 1
@@ -881,13 +981,13 @@ Namespace Global.QB
         Using g = Graphics.FromImage(m_display)
           Dim x = (m_cursorCol - 1) * m_textW
           Dim y = (m_cursorRow - 1) * m_textH
-          Using b = New SolidBrush(m_palette(m_bgColor))
-            g.FillRectangle(b, x, y, m_textW * text$.Length, m_textH)
-          End Using
+          'Using b = New SolidBrush(m_palette(m_bgColor))
+          g.FillRectangle(m_brush(m_bgColor), x, y, m_textW * text$.Length, m_textH)
+          'End Using
           Using f = New Font("Consolas", 9, FontStyle.Regular)
-            Using b = New SolidBrush(m_palette(m_fgColor))
-              g.DrawString(text$, f, b, x, y)
-            End Using
+            'Using b = New SolidBrush(m_palette(m_fgColor))
+            g.DrawString(text$, f, m_brush(m_fgColor), x, y)
+            'End Using
           End Using
         End Using
       Else
@@ -904,7 +1004,7 @@ Namespace Global.QB
         m_cursorCol = 1
         m_cursorRow += 1
       End If
-      Refresh()
+      Invalidate()
     End Sub
 
     Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional a% = -1, Optional b% = -1, Optional c% = -1)
@@ -922,8 +1022,12 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub PSET(x%, y%, color%)
+#If oldway Then
       CType(m_display, Bitmap).SetPixel(x, y, m_palette(color))
-      Refresh()
+#Else
+      m_buffer.Graphics.FillRectangle(m_brush(color), x, y, 1, 1)
+#End If
+      Invalidate()
     End Sub
 
     Public Shared Sub CIRCLE(x%, y%, radius#)
@@ -1145,7 +1249,7 @@ allplotted:
         LINE(ix, iy, ix + x2, iy - y2, attribute)
       End If
 
-      Refresh()
+      Invalidate()
 
     End Sub
 
@@ -1179,16 +1283,36 @@ allplotted:
 
     Public Shared Sub PAINT([step] As Boolean, x%, y%, color%, border%, background$)
 
+      '#If oldway Then
       Dim p = New Drawing.Point(x, y)
       Dim stk As New Stack()
       stk.Push(p)
-      Dim b = CType(m_display, Bitmap)
+#If oldway Then
+      Dim b = DirectCast(m_display, Bitmap)
+#Else
+      'm_buffer.Render(Graphics.FromImage(m_display))
+      'Dim b = DirectCast(m_display, Bitmap)
+#End If
+#If oldway Then
       Dim replacementColor = b.GetPixel(x, y)
+#Else
+      Dim replacementColor = GetColor(m_buffer.Graphics, p.X, p.Y)
+#End If
       Do While stk.Count <> 0
         p = CType(stk.Pop(), Point)
+#If oldway Then
         Dim testColor = b.GetPixel(p.X, p.Y)
+#Else
+        Dim testColor = GetColor(m_buffer.Graphics, p.X, p.Y)
+#End If
         If SameColor(testColor, replacementColor) AndAlso Not SameColor(testColor, m_palette(color)) Then
-          CType(m_display, Bitmap).SetPixel(p.X, p.Y, m_palette(color))
+#If oldway Then
+          DirectCast(m_display, Bitmap).SetPixel(p.X, p.Y, m_palette(color))
+#Else
+          m_buffer.Graphics.FillRectangle(m_brush(color), p.X, p.Y, 1, 1)
+          'm_buffer.Render(Graphics.FromImage(m_display))
+          'b = DirectCast(m_display, Bitmap)
+#End If
           If p.X - 1 > -1 Then stk.Push(New Point(p.X - 1, p.Y))
           If p.X + 1 < m_display.Width Then stk.Push(New Point(p.X + 1, p.Y))
           If p.Y - 1 > -1 Then stk.Push(New Point(p.X, p.Y - 1))
@@ -1196,7 +1320,7 @@ allplotted:
         End If
       Loop
 
-      Refresh()
+      Invalidate()
 
     End Sub
 
@@ -1209,28 +1333,24 @@ allplotted:
       If x2 < x1 Then SWAP(x1, x2)
       If y2 < y1 Then SWAP(y1, y2)
 
+#If oldway Then
+      Using g = Graphics.FromImage(m_display)
+#Else
+      Dim g = m_buffer.Graphics
+#End If
       Select Case lo
         Case LineOption.None
-          Using g = Graphics.FromImage(m_display)
-            Using p = New Pen(m_palette(attr))
-              g.DrawLine(p, x1, y1, x2, y2)
-            End Using
-          End Using
+          g.DrawLine(m_pen(attr), x1, y1, x2, y2)
         Case LineOption.B
-          Using g = Graphics.FromImage(m_display)
-            Using p = New Pen(m_palette(attr))
-              g.DrawRectangle(p, x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
-            End Using
-          End Using
+          g.DrawRectangle(m_pen(attr), x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
         Case LineOption.BF
-          Using g = Graphics.FromImage(m_display)
-            Using b = New SolidBrush(m_palette(attr))
-              g.FillRectangle(b, x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
-            End Using
-          End Using
+          g.FillRectangle(m_brush(attr), x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
         Case Else
       End Select
-      Refresh()
+#If oldway Then
+      End Using
+#End If
+      Invalidate()
     End Sub
 
     Private Shared m_suspend As Boolean
@@ -1241,30 +1361,50 @@ allplotted:
 
     Public Shared Sub ResumeOutput()
       m_suspend = False
-      Refresh()
+      Invalidate()
     End Sub
 
-    Private Shared Sub Refresh()
+    Private Shared m_invalidated As Boolean
+
+    Private Shared Sub Invalidate()
+      m_invalidated = True
+      If Not m_manualMode Then
+        Render()
+      End If
+    End Sub
+
+    Public Shared Sub Render()
       If m_suspend Then Return
-      If m_pictureBox IsNot Nothing Then
+      If m_pictureBox IsNot Nothing AndAlso
+         m_invalidated Then
+#If Not oldway Then
+        m_buffer.Render(Graphics.FromImage(m_display))
+#End If
         m_pictureBox.Image = m_display
+        m_invalidated = False
       End If
     End Sub
 
     Public Shared Sub PUT(x%, y%, img As System.Drawing.Image, po As PutOption)
+#If oldway Then
       Using g = System.Drawing.Graphics.FromImage(m_display)
-        Dim src = New Rectangle(0, 0, img.Width, img.Height)
-        Dim dest = New Rectangle(x, y, img.Width, img.Height)
-        g.DrawImage(img, dest, src, System.Drawing.GraphicsUnit.Pixel)
+#Else
+      Dim g = m_buffer.Graphics
+#End If
+      Dim src = New Rectangle(0, 0, img.Width, img.Height)
+      Dim dest = New Rectangle(x, y, img.Width, img.Height)
+      g.DrawImage(img, dest, src, System.Drawing.GraphicsUnit.Pixel)
+#If oldway Then
       End Using
-      Refresh()
+#End If
+      Invalidate()
     End Sub
 
     Private Shared m_address As New List(Of System.Drawing.Image)
 
     Public Shared Sub [GET](x1%, y1%, x2%, y2%, ByRef img As System.Drawing.Image)
-      img = New System.Drawing.Bitmap(x2 - x1, y2 - y1)
-      Using g = System.Drawing.Graphics.FromImage(img)
+      img = New Bitmap(x2 - x1, y2 - y1)
+      Using g = Graphics.FromImage(img)
         Dim src = New Rectangle(x1, y1, x2 - x1, y2 - y1)
         Dim dest = New Rectangle(0, 0, x2 - x1, y2 - y1)
         g.DrawImage(m_display, dest, src, System.Drawing.GraphicsUnit.Pixel)
@@ -1307,14 +1447,16 @@ allplotted:
     End Sub
 
     Public Shared Sub CLS()
-      Using g = Graphics.FromImage(m_display)
-        Using b = New SolidBrush(m_palette(m_bgColor))
-          g.FillRectangle(b, 0, 0, m_display.Width, m_display.Height)
-        End Using
+#If oldway Then
+      Using g = System.Drawing.Graphics.FromImage(m_display)
+        g.FillRectangle(m_brush(m_bgColor), 0, 0, m_display.Width, m_display.Height)
       End Using
+#Else
+      m_buffer.Graphics.FillRectangle(m_brush(m_bgColor), 0, 0, m_rectangle.Width, m_rectangle.Height)
+#End If
       m_cursorCol = 1
       m_cursorRow = 1
-      Refresh()
+      Invalidate()
     End Sub
 
     Public Shared Sub CLS(viewport As Integer)
@@ -1393,14 +1535,22 @@ allplotted:
       Select Case mode
         Case 0 ' Text Mode
           m_mode = mode
-          m_display = New Bitmap(640, 480) ' 80 x 25 text
           m_textW = 8 : m_textH = 16
+          m_display = New Bitmap(640, 480) ' 80 x 25 text
+#If oldway Then
           If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
+#Else
+          GraphicsInit(640, 480)
+#End If
         Case 9
           m_mode = mode
-          m_display = New Bitmap(640, 350) ' 80 x 25 text
           m_textW = 8 : m_textH = 14
+          m_display = New Bitmap(640, 350) ' 80 x 25 text
+#If oldway Then
           If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
+#Else
+          GraphicsInit(640, 350)
+#End If
         Case Else
           Throw New NotImplementedException
       End Select
@@ -1488,6 +1638,10 @@ allplotted:
         Case Else
       End Select
       m_palette(color) = clr
+      If m_brush(color) IsNot Nothing Then m_brush(color).Dispose()
+      m_brush(color) = New SolidBrush(clr)
+      If m_pen(color) IsNot Nothing Then m_pen(color).Dispose()
+      m_pen(color) = New Pen(clr)
     End Sub
 
     Public Shared Sub QbWidth(Optional a% = -1, Optional b% = -1)
@@ -1611,10 +1765,20 @@ allplotted:
 #End Region
 
     Public Shared Function POINT%(x%, y%)
+      'Render()
+#If oldway Then
       Dim b = CType(m_display, Bitmap)
       Dim c = b.GetPixel(x, y)
+#Else
+      'm_buffer.Render(Graphics.FromImage(m_display))
+      'Dim c = DirectCast(m_display, Bitmap).GetPixel(x, y)
+      Dim c = GetColor(m_buffer.Graphics, x, y)
+
+#End If
       For entry = 0 To m_palette.Length - 1
-        If c = m_palette(entry) Then
+        If c.R = m_palette(entry).R AndAlso
+           c.G = m_palette(entry).G AndAlso
+           c.B = m_palette(entry).B Then
           Return entry
         End If
       Next
