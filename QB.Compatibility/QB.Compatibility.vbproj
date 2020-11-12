@@ -1,10 +1,15 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <RootNamespace></RootNamespace>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
-    <AssemblyName>QB.Compatibility</AssemblyName>
-  </PropertyGroup>
+	<PropertyGroup>
+		<RootNamespace></RootNamespace>
+		<TargetFramework>net5.0-windows</TargetFramework>
+		<AssemblyName>QB.Compatibility</AssemblyName>
+		<UseWindowsForms>True</UseWindowsForms>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+		<DebugSymbols>false</DebugSymbols>
+		<DebugType>none</DebugType>
+	</PropertyGroup>
 
 </Project>
