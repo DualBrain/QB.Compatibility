@@ -80,7 +80,7 @@ Namespace Global.QB
         Case 0, 1, 2
           CLS() 'TODO: For now, just call the base.
         Case Else
-          Throw New ArgumentException
+          Throw New ArgumentException("viewport valid values 0, 1, or 2.", NameOf(viewport))
       End Select
     End Sub
 
