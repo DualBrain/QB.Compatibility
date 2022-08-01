@@ -108,7 +108,11 @@ Namespace Global.QB
         Dim thing As FileThing
         thing.Filename = file$
         Dim fi = New FileInfo(file$)
-        thing.FileSize = fi.Length
+        Try
+          thing.FileSize = fi.Length
+        Catch
+          thing.FileSize = 0
+        End Try
         thing.Stream = New IO.FileStream(file$, fm)
         m_files.Add(filenum%, thing)
       End If
