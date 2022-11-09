@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<RootNamespace></RootNamespace>
-		<TargetFramework>net6.0-windows</TargetFramework>
+		<TargetFramework>net7.0-windows</TargetFramework>
 		<AssemblyName>QB.Compatibility</AssemblyName>
 		<UseWindowsForms>True</UseWindowsForms>
 	</PropertyGroup>
