@@ -475,7 +475,7 @@ Namespace Global.QB
     Public Shared Function SetColor(color As ConsoleColor, r As UInteger, g As UInteger, b As UInteger) As Integer
 
       Dim csbe As New CONSOLE_SCREEN_BUFFER_INFO_EX()
-      csbe.cbSize = CInt(Marshal.SizeOf(csbe)) ' 96 = 0x60
+      csbe.cbSize = CInt(Marshal.SizeOf(csbe)) ' 96 = &H60
 
       Dim hConsoleOutput As IntPtr = GetStdHandle(STD_OUTPUT_HANDLE) ' 7
 
