@@ -364,6 +364,10 @@ Namespace Global.QB
           value$ &= QBChr(b(0))
           value$ = value$.Substring(0, value$.Length - 2) ' Trim of the CRLF
           Return
+        ElseIf b(0) = 10 Then
+          ' end of line (and a CR was not encountered)...
+          value$ = value$.Substring(0, value$.Length - 1) ' Trim of the LF
+          Return
         End If
       Loop
     End Sub
