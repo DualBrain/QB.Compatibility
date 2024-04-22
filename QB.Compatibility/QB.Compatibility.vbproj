@@ -1,19 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<RootNamespace></RootNamespace>
-		<TargetFramework>net7.0-windows</TargetFramework>
-		<AssemblyName>QB.Compatibility</AssemblyName>
-		<UseWindowsForms>True</UseWindowsForms>
-	</PropertyGroup>
-
-	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-		<DebugSymbols>false</DebugSymbols>
-		<DebugType>none</DebugType>
-	</PropertyGroup>
-
-	<ItemGroup>
-	  <Folder Include="My Project\" />
-	</ItemGroup>
-
+  <PropertyGroup>
+    <RootNamespace>
+    </RootNamespace>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <AssemblyName>QB.Compatibility</AssemblyName>
+    <UseWindowsForms>True</UseWindowsForms>
+    <OptionStrict>On</OptionStrict>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <DebugSymbols>false</DebugSymbols>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="My Project\" />
+  </ItemGroup>
 </Project>
