@@ -1021,7 +1021,13 @@ Namespace Global.QB
       End If
     End Sub
 
+    Public Shared Sub PSET(x#, y#)
+      PSET(CInt(x), CInt(y), m_fgColor)
+    End Sub
+
     Public Shared Sub PSET(x%, y%, color%)
+      s_prevX = x
+      s_prevY = y
 #If oldway Then
       CType(m_display, Bitmap).SetPixel(x, y, m_palette(color))
 #Else
@@ -1328,7 +1334,21 @@ allplotted:
       Return ((c1.A = c2.A) AndAlso (c1.B = c2.B) AndAlso (c1.G = c2.G) AndAlso (c1.R = c2.R))
     End Function
 
-    Public Shared Sub LINE(x1!, y1!, x2!, y2!, attr%, Optional lo As LineOption = LineOption.None)
+    Public Shared Sub LINE(x2#, y2#)
+      LINE(s_prevX, s_prevY, x2, y2, m_fgColor)
+    End Sub
+
+    Private Shared s_prevX As Integer
+    Private Shared s_prevY As Integer
+
+    Public Shared Sub LINE(x1#, y1#, x2#, y2#)
+      LINE(x1, y1, x2, y2, m_fgColor)
+    End Sub
+
+    Public Shared Sub LINE(x1#, y1#, x2#, y2#, attr%, Optional lo As LineOption = LineOption.None)
+
+      s_prevX = CInt(x2)
+      s_prevY = CInt(y2)
 
       If x2 < x1 Then SWAP(x1, x2)
       If y2 < y1 Then SWAP(y1, y2)
@@ -1340,11 +1360,11 @@ allplotted:
 #End If
       Select Case lo
         Case LineOption.None
-          g.DrawLine(m_pen(attr), x1, y1, x2, y2)
+          g.DrawLine(m_pen(attr), CInt(x1), CInt(y1), CInt(x2), CInt(y2))
         Case LineOption.B
-          g.DrawRectangle(m_pen(attr), x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
+          g.DrawRectangle(m_pen(attr), CInt(x1), CInt(y1), CInt(x2 - x1) + 1, CInt(y2 - y1) + 1)
         Case LineOption.BF
-          g.FillRectangle(m_brush(attr), x1, y1, (x2 - x1) + 1, (y2 - y1) + 1)
+          g.FillRectangle(m_brush(attr), CInt(x1), CInt(y1), CInt(x2 - x1) + 1, CInt(y2 - y1) + 1)
         Case Else
       End Select
 #If oldway Then
@@ -1550,6 +1570,15 @@ allplotted:
           If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
 #Else
           GraphicsInit(640, 350)
+#End If
+        Case 13
+          m_mode = mode
+          m_textW = 8 : m_textH = 8
+          m_display = New Bitmap(320, 200) ' 40 x 25 text
+#If oldway Then
+          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
+#Else
+          GraphicsInit(320, 200)
 #End If
         Case Else
           Throw New NotImplementedException

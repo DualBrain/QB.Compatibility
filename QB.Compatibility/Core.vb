@@ -31,6 +31,12 @@ Namespace Global.QB
       value2 = temp
     End Sub
 
+    Public Shared Sub SWAP(ByRef value1 As Double, ByRef value2 As Double)
+      Dim temp = value1
+      value1 = value2
+      value2 = temp
+    End Sub
+
     Public Shared Sub SWAP(ByRef value1 As Integer, ByRef value2 As Integer)
       Dim temp = value1
       value1 = value2

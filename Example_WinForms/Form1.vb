@@ -1,10 +1,26 @@
 ﻿Imports QB.Video
+Imports System.Math
 
 Public Class Form1
 
-  Private Async Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
+  Private Sub Form1_Load(sender As Object, e As EventArgs) Handles MyBase.Load
 
     Init(Me, PictureBox1)
+
+    SCREEN(13)
+    COLOR(2)
+    PSET(140 + Cos(0), 20)
+    For i = 0 To 70 Step 0.1
+      LINE(i * Cos(i) + 140, 20 - i * (Sin(i) * 0.2 - 2))
+    Next
+    COLOR(14)
+    LINE(136, 20, 140, 12)
+    LINE(144, 20) : LINE(134, 16)
+    LINE(146, 16) : LINE(136, 20)
+
+  End Sub
+
+  Private Async Function LineDemoAsync() As Task
 
     SCREEN(9)
 
@@ -29,6 +45,6 @@ Public Class Form1
 
     Loop
 
-  End Sub
+  End Function
 
 End Class
