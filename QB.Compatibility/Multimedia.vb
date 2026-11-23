@@ -24,8 +24,8 @@ Namespace Global.QB
     Private Shared m_queuedTotal As Double
 
     ''' <summary>
-    ''' Where sound is heard.  By default an SDL2 audio device is opened the first time something is
-    ''' played (or a silent one, if there is no sound device); assign another device (for example a
+    ''' Where sound is heard.  By default the system's own audio is used (opened the first time something is
+    ''' played; silent, with the right timing, when there is no player); assign another device (for example a
     ''' HeadlessAudio) to use it instead.
     ''' </summary>
     Public Shared Property Audio As IAudioDevice
@@ -42,7 +42,7 @@ Namespace Global.QB
       End Set
     End Property
 
-    ''' <summary>Creates the audio device when sound is first played (SDL2 audio, with QB.Compatibility.Sdl); without one the sound is silent.</summary>
+    ''' <summary>Creates the audio device when sound is first played: the system's audio by default (QB.Speaker, with QB.Compatibility.Sdl, makes it SDL2 audio).</summary>
     Public Shared Property AudioFactory As Func(Of IAudioDevice)
 
     Private Shared Function Device() As IAudioDevice
@@ -51,7 +51,7 @@ Namespace Global.QB
           If m_device Is Nothing Then
             Try
               Dim factory = AudioFactory
-              m_device = If(factory Is Nothing, New SilentAudio, factory())
+              m_device = If(factory Is Nothing, New SystemAudio, factory())
             Catch ex As Exception
               m_device = New SilentAudio
             End Try
@@ -76,7 +76,7 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Plays a tone: <paramref name="frequency"/> 37 to 32767 Hz for <paramref name="duration"/> clock ticks (18.2 per second).</summary>
-    Friend Shared Sub SOUND(frequency As Double, duration As Double)
+    Public Shared Sub SOUND(frequency As Double, duration As Double)
       Dim f = Math.Round(frequency)
       Dim ticks = Math.Round(duration)
       If f < 37 OrElse f > 32767 OrElse ticks < 0 OrElse ticks > 65535 Then
@@ -97,7 +97,7 @@ Namespace Global.QB
     ''' <summary>
     ''' The number of notes still waiting to be played in the background by PLAY (MB).
     ''' </summary>
-    Friend Shared Function PLAY(n As Integer) As Integer
+    Public Shared Function PLAY(n As Integer) As Integer
       Events.Dispatch()
       Return PendingNotes()
     End Function
@@ -173,7 +173,7 @@ Namespace Global.QB
     ''' T n (tempo 32 to 255), MF and MB (foreground and background), MN, ML and MS (normal, legato,
     ''' staccato).  Settings last until the next PLAY.  X and = work with VARPTR$ (X plays that string, = reads a variable).
     ''' </summary>
-    Friend Shared Sub PLAY(commands As String)
+    Public Shared Sub PLAY(commands As String)
 
       Dim s = If(Core.ExpandExecute(commands), "").ToUpperInvariant()
       Dim i = 0

@@ -20,10 +20,10 @@ QB.Compatibility targets .NET 10 and runs on Windows, Linux and macOS (no WinFor
 |---|---|---|---|
 | text only: `PRINT`, `INPUT`, `LOCATE`, `COLOR`, `CLS`, files, errors, `BEEP` | `QB.Video` | `QB.Compatibility` | the terminal |
 | graphics (`SCREEN` 1 and up, `PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`/`PUT`, `DRAW`, `PALETTE`, `VIEW`, `WINDOW`), the joystick or the pen | `QB.Graphics` (instead of `QB.Video`) | plus `QB.Compatibility.Sdl` | an SDL2 window |
-| `SOUND` and `PLAY` | `QB.Speaker` (instead of `QB.Multimedia`) | plus `QB.Compatibility.Sdl` | SDL2 audio |
+| `SOUND`, `PLAY`, `BEEP` | `QB.Multimedia` | `QB.Compatibility` | the system's audio |
 | a serial port (`OPEN "COM1:..."`, `ON COM`) | `QB.Serial` (instead of `QB.File`) | plus `QB.Compatibility.Ports` | the port |
 
-Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` installs the audio.  A program that uses neither doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project DIR` chooses the imports and writes a project that references only what the program needs.
+Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` opens the system's audio.  A program that doesn't draw doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project DIR` chooses the imports and writes a project that references only what the program needs.
 
 **The terminal.**  Text programs run in the terminal by default.  A program that only prints and reads lines scrolls like any command-line tool; if the output is redirected it stays plain text (no escape sequences).  The first time a program uses the screen by position (`LOCATE`, `VIEW PRINT`, `WIDTH`, the `SCREEN` function) the terminal switches to a full-screen view of the 80 x 25 text screen (the terminal's alternate screen), redrawn when the text changes, and the last picture is left in the terminal when the program ends.  A terminal smaller than the screen is asked to resize (many honor it); otherwise the rows around the cursor are shown.  On Windows virtual terminal processing is switched on for the console.  Keys come from `Console.ReadKey`, or from the input when it is redirected (reading past the end is QBasic's "Input past end of file").  `BEEP` rings the bell when there is no audio device.
 
@@ -100,7 +100,7 @@ no hardware), `BSAVE`/`BLOAD` (the simulated memory) and, in `QB.File`, `LOCK`/`
 
 ## Sound
 
-`SOUND` and `PLAY` (in `QB.Speaker`, which needs `QB.Compatibility.Sdl`) make square-wave tones through SDL2 audio; `BEEP` (in `QB.Multimedia`) rings the terminal bell when there is no audio device.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).
+`SOUND`, `PLAY` and `BEEP` (in `QB.Multimedia`) make square-wave tones through the system's own audio, with no library to add: on Windows the waveform API (winmm), on macOS `afplay`, and on Linux a player that reads raw audio from its input (`paplay`, `pw-cat` or `aplay`, whichever is installed).  Without one, or with no sound device, the timing is kept silently and `BEEP` rings the terminal bell.  `QB.Speaker` (with `QB.Compatibility.Sdl`) can be imported instead to use SDL2 audio.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).
 
 ## Examples
 

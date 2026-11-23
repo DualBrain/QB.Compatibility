@@ -10,7 +10,7 @@ Imports QB.Development
 Imports QB.Devices
 Imports QB.Events
 Imports QB.File
-Imports QB.Speaker
+Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 

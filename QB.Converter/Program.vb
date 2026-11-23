@@ -105,7 +105,7 @@ Namespace QB2VB
       Console.WriteLine($"{input} -> {output}")
       If libDir <> "" Then
         Dim projectPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), moduleName & ".vbproj")
-        Dim needsSdl = conv.UsesGraphics OrElse conv.UsesSound
+        Dim needsSdl = conv.UsesGraphics
         File.WriteAllText(projectPath, ProjectText(moduleName, Path.GetFileName(output), Path.GetDirectoryName(projectPath), libDir, needsSdl, conv.UsesSerial, aot), New UTF8Encoding(False))
         Console.WriteLine($"{projectPath}  (references QB.Compatibility{If(needsSdl, " and QB.Compatibility.Sdl", "")}{If(conv.UsesSerial, " and QB.Compatibility.Ports", "")})")
       End If

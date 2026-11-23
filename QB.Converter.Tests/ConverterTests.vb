@@ -307,7 +307,8 @@ Namespace QB2VB.Tests
       Assert.Equal(graphics, c.UsesGraphics)
       Assert.Equal(sound, c.UsesSound)
       Assert.Contains(If(graphics, "Imports QB.Graphics", "Imports QB.Video"), vb)
-      Assert.Contains(If(sound, "Imports QB.Speaker", "Imports QB.Multimedia"), vb)
+      Assert.Contains("Imports QB.Multimedia", vb)
+      Assert.DoesNotContain("Imports QB.Speaker", vb)
       Assert.DoesNotContain(If(graphics, "Imports QB.Video", "Imports QB.Graphics"), vb)
     End Sub
 

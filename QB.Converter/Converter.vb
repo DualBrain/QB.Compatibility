@@ -56,7 +56,7 @@ Namespace QB2VB
     ''' <summary>The program draws, reads the joystick or the pen, or uses SCREEN 1 and up: it needs the graphics display (QB.Graphics).</summary>
     Public ReadOnly Property UsesGraphics As Boolean
 
-    ''' <summary>The program uses SOUND or PLAY: it needs audio (QB.Speaker).</summary>
+    ''' <summary>The program uses SOUND or PLAY (the system audio plays them: nothing extra is referenced).</summary>
     Public ReadOnly Property UsesSound As Boolean
 
     Friend Sub Feature(kind As String) Implements IContext.Feature
@@ -383,7 +383,7 @@ Namespace QB2VB
       sb.AppendLine("Imports QB.Devices")
       sb.AppendLine("Imports QB.Events")
       sb.AppendLine(If(m_usesSerial, "Imports QB.Serial", "Imports QB.File"))
-      sb.AppendLine(If(m_usesSound, "Imports QB.Speaker", "Imports QB.Multimedia"))
+      sb.AppendLine("Imports QB.Multimedia")
       sb.AppendLine("Imports QB.Printer")
       sb.AppendLine(If(m_usesGraphics, "Imports QB.Graphics", "Imports QB.Video"))
       sb.AppendLine()
