@@ -83,6 +83,7 @@ Namespace QB2VB
       {"FREEFILE", New BuiltinFn("FREEFILE", QT.Short, QT.Long)},
       {"HEX$", New BuiltinFn("Hex$", QT.String, QT.String)},
       {"INKEY$", New BuiltinFn("INKEY$", QT.String, QT.String)},
+      {"INPUT$", New BuiltinFn("InputStr", QT.String, QT.String)},
       {"INSTR", New BuiltinFn("InStr", QT.Short, QT.Long)},
       {"INT", New BuiltinFn("Int", QT.Single, QT.Double, True)},
       {"LCASE$", New BuiltinFn("LCase$", QT.String, QT.String)},
@@ -501,6 +502,7 @@ Namespace QB2VB
           m_pos += 1
         Else
           Do
+            If Cur IsNot Nothing AndAlso Cur.Is_("#") Then m_pos += 1   ' (a file number: EOF(#1), INPUT$(5, #1))
             args.Add(ParseExpr())
             If Cur IsNot Nothing AndAlso Cur.Is_(",") Then
               m_pos += 1
@@ -565,7 +567,7 @@ Namespace QB2VB
         End Select
         ' Arguments that VB wants as Integer.
         Select Case upper
-          Case "SPACE$", "LEFT$", "RIGHT$", "CHR$", "STRING$", "MID$", "TAB", "SPC", "INSTR"
+          Case "SPACE$", "LEFT$", "RIGHT$", "CHR$", "STRING$", "MID$", "TAB", "SPC", "INSTR", "INPUT$"
             For i = 0 To texts.Count - 1
               If args(i).Qt <> QT.String Then texts(i) = Coerce(args(i), QT.Long)
             Next

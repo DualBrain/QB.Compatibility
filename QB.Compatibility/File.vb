@@ -525,6 +525,75 @@ Namespace Global.QB
       value4 = ConvertField(Of T4)(ReadField(e))
     End Sub
 
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+    End Sub
+
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+      value6 = ConvertField(Of T6)(ReadField(e))
+    End Sub
+
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+      value6 = ConvertField(Of T6)(ReadField(e))
+      value7 = ConvertField(Of T7)(ReadField(e))
+    End Sub
+
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+      value6 = ConvertField(Of T6)(ReadField(e))
+      value7 = ConvertField(Of T7)(ReadField(e))
+      value8 = ConvertField(Of T8)(ReadField(e))
+    End Sub
+
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+      value6 = ConvertField(Of T6)(ReadField(e))
+      value7 = ConvertField(Of T7)(ReadField(e))
+      value8 = ConvertField(Of T8)(ReadField(e))
+      value9 = ConvertField(Of T9)(ReadField(e))
+    End Sub
+
+    Friend Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9, ByRef value10 As T10)
+      Dim e = ReadableEntry(filenum)
+      value1 = ConvertField(Of T1)(ReadField(e))
+      value2 = ConvertField(Of T2)(ReadField(e))
+      value3 = ConvertField(Of T3)(ReadField(e))
+      value4 = ConvertField(Of T4)(ReadField(e))
+      value5 = ConvertField(Of T5)(ReadField(e))
+      value6 = ConvertField(Of T6)(ReadField(e))
+      value7 = ConvertField(Of T7)(ReadField(e))
+      value8 = ConvertField(Of T8)(ReadField(e))
+      value9 = ConvertField(Of T9)(ReadField(e))
+      value10 = ConvertField(Of T10)(ReadField(e))
+    End Sub
+
 #End Region
 
 #Region "Random and binary access: GET and PUT"

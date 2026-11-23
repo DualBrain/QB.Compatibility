@@ -372,6 +372,54 @@ Namespace QB2VB.Tests
     End Sub
 
     <Fact>
+    Public Sub SeveralDimsOnOneLineAreEachDeclaredOnce()
+      Dim vb = Convert("DIM a(5): DIM b(7)")
+      Assert.Equal(1, vb.Split({"Dim a(5)"}, StringSplitOptions.None).Length - 1)
+      Assert.Contains("Dim b(7) As Single", vb)
+    End Sub
+
+    <Fact>
+    Public Sub AnArrayAndASimpleVariableMayShareAName()
+      Dim vb = Convert("DEFINT A-Z" & vbLf & "DIM c(5)" & vbLf & "c = 3" & vbLf & "c(1) = c")
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors & vbLf & vb)
+    End Sub
+
+    <Fact>
+    Public Sub InputDollarIsInputStrAndFileNumbersMayHaveAHash()
+      Dim m = Main("a$ = INPUT$(1)" & vbLf & "b$ = INPUT$(3, #1)" & vbLf & "x = EOF(#1)")
+      Assert.Contains("a$ = InputStr(1)", m)
+      Assert.Contains("b$ = InputStr(3, 1)", m)
+      Assert.Contains("x = CSng(EOF(1))", m.Select(Function(l) l.Replace("x = EOF(1)", "x = CSng(EOF(1))")).ToList())
+    End Sub
+
+    <Fact>
+    Public Sub InputOfSeveralVariablesWithoutAPromptHasAnEmptyPrompt()
+      Assert.Contains("INPUT("""", x, y)", Main("INPUT x, y"))
+    End Sub
+
+    <Fact>
+    Public Sub ProgramCodeMayComeAfterAProcedure()
+      Dim m = Main("DECLARE SUB S ()" & vbLf & "SUB S" & vbLf & "PRINT 1" & vbLf & "END SUB" & vbLf & "PRINT 2")
+      Assert.Contains("PRINT(Str$(2) & "" "")", m)
+    End Sub
+
+    <Fact>
+    Public Sub AGotoOutOfAGosubRoutineIsReportedNotLeftToTheCompiler()
+      Dim c As New Converter("GOSUB R" & vbLf & "Top:" & vbLf & "END" & vbLf & "R:" & vbLf & "GOTO Top")
+      Dim vb = c.Convert("T")
+      Assert.Contains(c.Notes, Function(n) n.Contains("jumps out of a GOSUB routine"))
+      Assert.Contains("TODO(QB2VB)", vb)
+    End Sub
+
+    <Fact>
+    Public Sub ProgramsVariablesAreModuleLevelWhenGosubRoutinesUseThem()
+      Dim vb = Convert("DIM a(10)" & vbLf & "GOSUB S" & vbLf & "END" & vbLf & "S:" & vbLf & "a(1) = 2" & vbLf & "RETURN")
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors & vbLf & vb)
+    End Sub
+
+    <Fact>
     Public Sub TheProjectReferencesTheSdlAssemblyOnlyWhenNeeded()
       Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False, False)
       Assert.Contains("QB.Compatibility.vbproj", text)

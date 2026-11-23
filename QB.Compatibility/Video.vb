@@ -3048,6 +3048,30 @@ allplotted:
       File.INPUT(filenum, value1, value2, value3, value4)
     End Sub
 
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5)
+      File.INPUT(filenum, value1, value2, value3, value4, value5)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6)
+      File.INPUT(filenum, value1, value2, value3, value4, value5, value6)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7)
+      File.INPUT(filenum, value1, value2, value3, value4, value5, value6, value7)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8)
+      File.INPUT(filenum, value1, value2, value3, value4, value5, value6, value7, value8)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9)
+      File.INPUT(filenum, value1, value2, value3, value4, value5, value6, value7, value8, value9)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9, ByRef value10 As T10)
+      File.INPUT(filenum, value1, value2, value3, value4, value5, value6, value7, value8, value9, value10)
+    End Sub
+
     ''' <summary>
     ''' GET # from a random or binary file into a variable: a record structure (a QBasic TYPE; strings need
     ''' VBFixedString), a number, or a string (which reads as many characters as it holds).  For random files
@@ -3183,6 +3207,54 @@ allplotted:
       Do
         Dim f = ReadInputFields(prompt, question, 4)
         If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 5)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 6)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) AndAlso File.TryConvertField(f(5), value6) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 7)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) AndAlso File.TryConvertField(f(5), value6) AndAlso File.TryConvertField(f(6), value7) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 8)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) AndAlso File.TryConvertField(f(5), value6) AndAlso File.TryConvertField(f(6), value7) AndAlso File.TryConvertField(f(7), value8) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 9)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) AndAlso File.TryConvertField(f(5), value6) AndAlso File.TryConvertField(f(6), value7) AndAlso File.TryConvertField(f(7), value8) AndAlso File.TryConvertField(f(8), value9) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4, T5, T6, T7, T8, T9, T10)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, ByRef value5 As T5, ByRef value6 As T6, ByRef value7 As T7, ByRef value8 As T8, ByRef value9 As T9, ByRef value10 As T10, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 10)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) AndAlso File.TryConvertField(f(4), value5) AndAlso File.TryConvertField(f(5), value6) AndAlso File.TryConvertField(f(6), value7) AndAlso File.TryConvertField(f(7), value8) AndAlso File.TryConvertField(f(8), value9) AndAlso File.TryConvertField(f(9), value10) Then Return
         PRINT("Redo from start")
       Loop
     End Sub

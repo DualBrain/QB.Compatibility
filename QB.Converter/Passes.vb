@@ -17,6 +17,7 @@ Namespace QB2VB
     Private m_procStatic As Boolean
     Private ReadOnly m_gosubTargets As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
     Private m_inGosub As Boolean
+    Private ReadOnly m_labelOwner As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)   ' label -> the line where its GOSUB routine starts, or -1 for the program itself
 
     ' ---- Pass 1: what the program declares ---------------------------------------------------------------
 
@@ -156,7 +157,7 @@ Namespace QB2VB
         Dim name = shared_.Replace("()", "")
         Dim hasSuffix As Boolean, bare As String = ""
         Dim qty = TypeOfName(name, hasSuffix, bare)
-        Dim key = KeyOf(bare, qty)
+        Dim key = KeyOf(bare, qty, isArray)
         Dim v As VarSym = Nothing
         If m_main.Vars.TryGetValue(key, v) Then
           m_main.Vars.Remove(key)
@@ -169,6 +170,19 @@ Namespace QB2VB
           Dim nv = DeclareVariable(m_module, name, isArray)
           nv.IsShared = True
         End If
+      Next
+
+      ' Which GOSUB routine (if any) each label of the program's own code belongs to.
+      For Each label In m_mainLabels.Keys
+        m_labelOwner(label) = -1
+      Next
+      For Each target In m_gosubTargets
+        Dim start As Integer
+        If Not m_mainLabels.TryGetValue(target, start) Then Continue For
+        For q = start To HandlerRegionEnd(start)
+          If m_lines(q).Label <> "" Then m_labelOwner(m_lines(q).Label) = start
+          If m_lines(q).LineNumber <> "" Then m_labelOwner(m_lines(q).LineNumber) = start
+        Next
       Next
 
     End Sub
@@ -319,7 +333,7 @@ Namespace QB2VB
           asType = ParseAsType(part, q, userType, fixedLen)
         End If
         ' REDIM of an array that is already declared (a shared one, say) resizes it.
-        If isRedim AndAlso FindVariable(scope, name) IsNot Nothing Then Continue For
+        If isRedim AndAlso FindVariable(scope, name, True) IsNot Nothing Then Continue For
         Dim v = DeclareVariable(target, name, isArray, asType, userType)
         If isShared Then v.IsShared = True
         If fixedLen <> 0 Then v.FixedLen = fixedLen

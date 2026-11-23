@@ -395,6 +395,7 @@ Namespace QB2VB
 
       m_procLines.Add(ln.Indent & If(m_curProc.IsFunction, "End Function", "End Sub"))
       m_procLines.Add("")
+      m_target = m_mainLines   ' (the program's own code can come after a procedure)
       m_scope = m_main
       m_curProc = Nothing
       m_procStatic = False
@@ -691,7 +692,7 @@ Namespace QB2VB
           asType = ParseAsType(part, q, userType, fixedLen)
         End If
         If keyword = "ReDim" Then
-          Dim existing = FindVariable(m_scope, name)
+          Dim existing = FindVariable(m_scope, name, True)
           If existing IsNot Nothing AndAlso (existing.IsShared OrElse existing.Declared OrElse Not m_scope.Locals.Contains(existing)) Then
             redims.Add(ExprParser.VarText(existing) & "(" & String.Join(", ", dims) & ")")
             If existing.FixedLen > 0 Then fills.Add("FixedString.Fill(" & ExprParser.VarText(existing) & ", " & existing.FixedLen & ")")
@@ -703,7 +704,8 @@ Namespace QB2VB
         If fixedLen > 0 Then v.FixedLen = fixedLen
         If isArray Then v.Dims = String.Join(", ", dims)
         ' GOSUB routines are lambdas at the top of the procedure: its locals must be declared there too, and sized where the DIM was.
-        If m_curProc IsNot Nothing AndAlso m_procGosubTargets.Count > 0 AndAlso Not hoist AndAlso Not m_procStatic Then
+        ' (The same for the program's own variables when GOSUB routines are procedures: they need module-level variables.)
+        If ((m_curProc IsNot Nothing AndAlso m_procGosubTargets.Count > 0 AndAlso Not m_procStatic) OrElse (m_curProc Is Nothing AndAlso m_gosubTargets.Count > 0)) AndAlso Not hoist Then
           v.Declared = False
           If isArray Then
             v.DeferRank = dims.Count

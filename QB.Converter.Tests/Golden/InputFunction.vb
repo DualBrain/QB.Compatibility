@@ -26,7 +26,7 @@ Module InputFunction
     PRINT(1, "The text")
     CLOSE()
     OPEN("TEST.DAT", OpenMode.Input, 1)
-    PRINT(INPUT$(3, 1))  'Print first 3 characters.
+    PRINT(InputStr(3, 1))  'Print first 3 characters.
     CLOSE()
   End Sub
 

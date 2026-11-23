@@ -149,6 +149,7 @@ Namespace QB2VB
             End If
 
           Case "GOTO"
+            CheckJump(t(s + 1).Text)
             Return "GoTo " & NeedLabel(t(s + 1))
 
           Case "GOSUB"
@@ -360,8 +361,10 @@ Namespace QB2VB
 
           Case "SHARED", "STATIC", "DIM", "REDIM", "COMMON"
             If w = "SHARED" Then Return ""
-            If w = "STATIC" Then Return DimText(t, "Static", False)
-            Return DimText(t, If(w = "REDIM", "ReDim", "Dim"), False)
+            ' (The statement is the tokens s to e: several DIMs can be on one line.)
+            Dim dimTokens = t.GetRange(s, e - s)
+            If w = "STATIC" Then Return DimText(dimTokens, "Static", False)
+            Return DimText(dimTokens, If(w = "REDIM", "ReDim", "Dim"), False)
 
           Case Else
             ' A call to a procedure, a library statement, or an assignment.
@@ -432,6 +435,15 @@ Namespace QB2VB
       Next
       Return -1
     End Function
+
+    ' A GOTO has to stay in the routine it is in: a GOSUB routine is a procedure of its own in VB, and so is what is outside it.
+    Private Sub CheckJump(label As String)
+      If m_curProc IsNot Nothing Then Return
+      Dim owner As Integer
+      If Not m_labelOwner.TryGetValue(label, owner) Then Return   ' (a label that isn't in the program: the compiler will say)
+      Dim here = If(m_inGosub, m_gosubStart, -1)
+      If owner <> here Then Throw New ConvertException("GOTO " & label & " jumps " & If(m_inGosub, "out of", "into") & " a GOSUB routine, which VB can't do")
+    End Sub
 
     ' A label used by GOTO and friends.  A module-level label that a procedure's ON ERROR names has its handler copied in.
     Private Function NeedLabel(tok As Token, Optional handler As Boolean = False) As String
@@ -1039,6 +1051,8 @@ Namespace QB2VB
       Dim args As New List(Of String)
       If fileNum <> "" Then args.Add(fileNum)
       If prompt <> "" Then args.Add(prompt)
+      ' INPUT a, b without a prompt: the prompt is empty (it still shows the question mark).
+      If fileNum = "" AndAlso prompt = "" AndAlso vars.Count > 1 Then args.Add(ChrW(34) & ChrW(34))
       args.AddRange(vars)
       If prompt <> "" AndAlso Not question Then args.Add("False")
       If fileNum = "" AndAlso prompt = "" AndAlso keep Then

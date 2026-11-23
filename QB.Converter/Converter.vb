@@ -105,8 +105,9 @@ Namespace QB2VB
       Return DefaultType(name)
     End Function
 
-    Private Shared Function KeyOf(bare As String, qty As QT) As String
-      Return bare.ToLowerInvariant() & "|" & Types.Suffix(qty)
+    ' An array and a simple variable of the same name are different variables in QBasic.
+    Private Shared Function KeyOf(bare As String, qty As QT, Optional isArray As Boolean = False) As String
+      Return bare.ToLowerInvariant() & "|" & Types.Suffix(qty) & If(isArray, "()", "")
     End Function
 
     Private Function ChooseVbName(bare As String, qty As QT, hasSuffix As Boolean, scope As Scope) As String
@@ -196,7 +197,7 @@ Namespace QB2VB
       If asType <> QT.Unknown Then
         qty = asType : declaredAs = True : hasSuffix = False
       End If
-      Dim key = KeyOf(bare, qty)
+      Dim key = KeyOf(bare, qty, isArray)
       Dim v As VarSym = Nothing
       If scope.Vars.TryGetValue(key, v) Then
         If isArray Then v.IsArray = True
@@ -213,7 +214,7 @@ Namespace QB2VB
     Private Function ResolveVariableCore(name As String, isArray As Boolean) As VarSym Implements IContext.ResolveVariable
       Dim hasSuffix As Boolean, bare As String = ""
       Dim qty = ResolveType(name, hasSuffix, bare)
-      Dim key = KeyOf(bare, qty)
+      Dim key = KeyOf(bare, qty, isArray)
       Dim v = Lookup(m_scope, key)
       If v IsNot Nothing Then
         If isArray Then v.IsArray = True
@@ -237,13 +238,13 @@ Namespace QB2VB
     End Function
 
     ''' <summary>An existing variable of this name that the scope can see (null when there isn't one).</summary>
-    Private Function FindVariable(scope As Scope, name As String) As VarSym
+    Private Function FindVariable(scope As Scope, name As String, Optional isArray As Boolean = False) As VarSym
       Dim hasSuffix As Boolean, bare As String = ""
       Dim saved = m_scope
       m_scope = scope
       Try
         Dim qty = ResolveType(name, hasSuffix, bare)
-        Return Lookup(scope, KeyOf(bare, qty))
+        Return Lookup(scope, KeyOf(bare, qty, isArray))
       Finally
         m_scope = saved
       End Try
@@ -276,7 +277,7 @@ Namespace QB2VB
     Private Function IsArrayCore(name As String) As Boolean Implements IContext.IsArray
       Dim hasSuffix As Boolean, bare As String = ""
       Dim qty = ResolveType(name, hasSuffix, bare)
-      Dim v = Lookup(m_scope, KeyOf(bare, qty))
+      Dim v = Lookup(m_scope, KeyOf(bare, qty, True))
       Return v IsNot Nothing AndAlso v.IsArray
     End Function
 

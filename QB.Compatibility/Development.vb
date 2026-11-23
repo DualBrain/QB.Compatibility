@@ -40,8 +40,8 @@ Namespace Global.QB
       File.CLOSE()
     End Sub
 
-    ''' <summary>CLEAR: closes the open files (the variables belong to the VB program).</summary>
-    Public Shared Sub CLEAR()
+    ''' <summary>CLEAR: closes the open files (the variables belong to the VB program).  The memory sizes of CLEAR ,,stack are ignored.</summary>
+    Public Shared Sub CLEAR(Optional dynamicSize% = -1, Optional stackSize% = -1, Optional unused% = -1)
       File.CLOSE()
     End Sub
 
