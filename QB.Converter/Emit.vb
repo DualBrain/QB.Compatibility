@@ -362,6 +362,7 @@ Namespace QB2VB
       Dim dims = If(v.IsArray, "(" & If(v.DeferRank > 0, New String(","c, v.DeferRank - 1), If(v.Dims <> "", v.Dims, "10")) & ")", "")
       If v.UserType <> "" Then Return name & dims & " As " & v.UserType
       If v.HasSuffix Then Return name & dims
+      If v.FixedLen > 0 AndAlso Not v.IsArray AndAlso v.Qt = QT.String Then Return name & " As String = FixedString.Blank(" & v.FixedLen & ")"
       Return name & dims & " As " & Types.VbName(v.Qt)
     End Function
 
@@ -661,6 +662,7 @@ Namespace QB2VB
       If p < t.Count AndAlso t(p).IsWord("SHARED") Then p += 1
       Dim items As New List(Of String)
       Dim redims As New List(Of String)      ' REDIM of an array that already exists: resized, not declared again
+      Dim fills As New List(Of String)       ' arrays of fixed-length strings are given their initial value
       Dim savedScope = m_scope
       If hoist Then m_scope = m_module
       For Each part In SplitTopLevel(t, p, t.Count)
@@ -692,11 +694,13 @@ Namespace QB2VB
           Dim existing = FindVariable(m_scope, name)
           If existing IsNot Nothing AndAlso (existing.IsShared OrElse existing.Declared OrElse Not m_scope.Locals.Contains(existing)) Then
             redims.Add(ExprParser.VarText(existing) & "(" & String.Join(", ", dims) & ")")
+            If existing.FixedLen > 0 Then fills.Add("FixedString.Fill(" & ExprParser.VarText(existing) & ", " & existing.FixedLen & ")")
             Continue For
           End If
         End If
         Dim v = DeclareVariable(m_scope, name, isArray, asType, userType)
         v.Declared = True
+        If fixedLen > 0 Then v.FixedLen = fixedLen
         If isArray Then v.Dims = String.Join(", ", dims)
         ' GOSUB routines are lambdas at the top of the procedure: its locals must be declared there too, and sized where the DIM was.
         If m_curProc IsNot Nothing AndAlso m_procGosubTargets.Count > 0 AndAlso Not hoist AndAlso Not m_procStatic Then
@@ -704,6 +708,7 @@ Namespace QB2VB
           If isArray Then
             v.DeferRank = dims.Count
             redims.Add(ExprParser.VarText(v) & "(" & String.Join(", ", dims) & ")")
+            If v.FixedLen > 0 Then fills.Add("FixedString.Fill(" & ExprParser.VarText(v) & ", " & v.FixedLen & ")")
           End If
           Continue For
         End If
@@ -714,8 +719,12 @@ Namespace QB2VB
         ElseIf v.HasSuffix Then
           items.Add(vbName & dimSuffix)
         ElseIf v.Qt = QT.String AndAlso fixedLen > 0 Then
-          items.Add(vbName & dimSuffix & " As String = New String("" ""c, " & fixedLen & ")")
-          Note($"{name}: STRING * {fixedLen} is an ordinary String here (not fixed length)")
+          If isArray Then
+            items.Add(vbName & dimSuffix & " As String")
+            fills.Add("FixedString.Fill(" & vbName & ", " & fixedLen & ")")
+          Else
+            items.Add(vbName & " As String = FixedString.Blank(" & fixedLen & ")")
+          End If
         Else
           items.Add(vbName & dimSuffix & " As " & Types.VbName(v.Qt))
         End If
@@ -724,6 +733,7 @@ Namespace QB2VB
       Dim result As New List(Of String)
       If redims.Count > 0 Then result.Add("ReDim " & String.Join(", ", redims))
       If items.Count > 0 Then result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & String.Join(", ", items))
+      If hoist Then m_mainPrologue.AddRange(fills) Else result.AddRange(fills)
       Return String.Join(" : ", result)
     End Function
 
@@ -751,18 +761,55 @@ Namespace QB2VB
       Dim head = m_lines(i).Tokens
       Dim ts = m_types(head(1).Text)
       Dim lines As New List(Of String)
+      Dim writes As New List(Of String)
+      Dim reads As New List(Of String)
       lines.Add("Structure " & ts.QbName)
+      lines.Add("  Implements IFileRecord")
       For Each f In ts.Fields
         Dim ftype = If(f.UserType <> "", f.UserType, Types.VbName(f.Qt))
         Dim hasSuffix As Boolean, bare As String = ""
         TypeOfName(f.Name, hasSuffix, bare)
         Dim fname = If(Keywords.IsVbReserved(bare), "[" & bare & "]", bare)
         If f.Qt = QT.String AndAlso f.Length > 0 Then
-          lines.Add("  <VBFixedString(" & f.Length & ")> Public " & fname & " As String")
+          ' A fixed-length string: the property keeps it STRING * n (padded or cut when assigned; CHR$(0)s until then).
+          Dim backing = "m_" & bare
+          lines.Add("  Private " & backing & " As String")
+          lines.Add("  Public Property " & fname & " As String")
+          lines.Add("    Get")
+          lines.Add("      Return If(" & backing & ", FixedString.Blank(" & f.Length & "))")
+          lines.Add("    End Get")
+          lines.Add("    Set(value As String)")
+          lines.Add("      " & backing & " = FixedString.Fit(value, " & f.Length & ")")
+          lines.Add("    End Set")
+          lines.Add("  End Property")
+          writes.Add("    writer.WriteString(" & fname & ", " & f.Length & ")")
+          reads.Add("    " & fname & " = reader.ReadString(" & f.Length & ")")
         Else
           lines.Add("  Public " & fname & " As " & ftype)
+          If f.UserType <> "" Then
+            writes.Add("    writer.Write(" & fname & ")")
+            reads.Add("    reader.Read(Of " & f.UserType & ")(" & fname & ")")
+          ElseIf f.Qt = QT.Short Then
+            writes.Add("    writer.Write(" & fname & ")")
+            reads.Add("    " & fname & " = reader.ReadInt16()")
+          ElseIf f.Qt = QT.Long Then
+            writes.Add("    writer.Write(" & fname & ")")
+            reads.Add("    " & fname & " = reader.ReadInt32()")
+          ElseIf f.Qt = QT.Single Then
+            writes.Add("    writer.Write(" & fname & ")")
+            reads.Add("    " & fname & " = reader.ReadSingle()")
+          ElseIf f.Qt = QT.Double Then
+            writes.Add("    writer.Write(" & fname & ")")
+            reads.Add("    " & fname & " = reader.ReadDouble()")
+          End If
         End If
       Next
+      lines.Add("  Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo")
+      lines.AddRange(writes)
+      lines.Add("  End Sub")
+      lines.Add("  Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom")
+      lines.AddRange(reads)
+      lines.Add("  End Sub")
       lines.Add("End Structure")
       m_hoisted.AddRange(lines)
       m_hoisted.Add("")

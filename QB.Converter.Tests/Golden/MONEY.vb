@@ -19,17 +19,91 @@ Module MONEY
   Const [TRUE] As Short = -1
   Const [FALSE] As Short = Not [TRUE]
   Structure AccountType
-    <VBFixedString(20)> Public Title As String
-    <VBFixedString(1)> Public AType As String
-    <VBFixedString(50)> Public Desc As String
+    Implements IFileRecord
+    Private m_Title As String
+    Public Property Title As String
+      Get
+        Return If(m_Title, FixedString.Blank(20))
+      End Get
+      Set(value As String)
+        m_Title = FixedString.Fit(value, 20)
+      End Set
+    End Property
+    Private m_AType As String
+    Public Property AType As String
+      Get
+        Return If(m_AType, FixedString.Blank(1))
+      End Get
+      Set(value As String)
+        m_AType = FixedString.Fit(value, 1)
+      End Set
+    End Property
+    Private m_Desc As String
+    Public Property Desc As String
+      Get
+        Return If(m_Desc, FixedString.Blank(50))
+      End Get
+      Set(value As String)
+        m_Desc = FixedString.Fit(value, 50)
+      End Set
+    End Property
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.WriteString(Title, 20)
+      writer.WriteString(AType, 1)
+      writer.WriteString(Desc, 50)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      Title = reader.ReadString(20)
+      AType = reader.ReadString(1)
+      Desc = reader.ReadString(50)
+    End Sub
   End Structure
   
   Structure Recordtype
-    <VBFixedString(8)> Public [Date] As String
-    <VBFixedString(10)> Public Ref As String
-    <VBFixedString(50)> Public Desc As String
+    Implements IFileRecord
+    Private m_Date As String
+    Public Property [Date] As String
+      Get
+        Return If(m_Date, FixedString.Blank(8))
+      End Get
+      Set(value As String)
+        m_Date = FixedString.Fit(value, 8)
+      End Set
+    End Property
+    Private m_Ref As String
+    Public Property Ref As String
+      Get
+        Return If(m_Ref, FixedString.Blank(10))
+      End Get
+      Set(value As String)
+        m_Ref = FixedString.Fit(value, 10)
+      End Set
+    End Property
+    Private m_Desc As String
+    Public Property Desc As String
+      Get
+        Return If(m_Desc, FixedString.Blank(50))
+      End Get
+      Set(value As String)
+        m_Desc = FixedString.Fit(value, 50)
+      End Set
+    End Property
     Public Fig1 As Double
     Public Fig2 As Double
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.WriteString([Date], 8)
+      writer.WriteString(Ref, 10)
+      writer.WriteString(Desc, 50)
+      writer.Write(Fig1)
+      writer.Write(Fig2)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      [Date] = reader.ReadString(8)
+      Ref = reader.ReadString(10)
+      Desc = reader.ReadString(50)
+      Fig1 = reader.ReadDouble()
+      Fig2 = reader.ReadDouble()
+    End Sub
   End Structure
   
   Dim account(19) As AccountType

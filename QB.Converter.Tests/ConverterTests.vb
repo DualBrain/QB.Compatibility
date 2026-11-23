@@ -195,6 +195,7 @@ Namespace QB2VB.Tests
           New Object() {"lprint", "u$ = ""\ \""" & vbLf & "LPRINT USING u$; ""ab""; 1" & vbLf & "LPRINT TAB(5); ""x"";" & vbLf & "LPRINT"},
           New Object() {"data in hex", "READ a, b" & vbLf & "DATA &HFF, &H10"},
           New Object() {"draw variables", "SCREEN 1" & vbLf & "n% = 12" & vbLf & "s$ = ""R10""" & vbLf & "DRAW ""U="" + VARPTR$(n%) + "";"" + ""X"" + VARPTR$(s$)" & vbLf & "PLAY ""L="" + VARPTR$(n%) + "";"""},
+          New Object() {"fixed strings", "TYPE Card" & vbLf & "Suit AS STRING * 9" & vbLf & "Value AS INTEGER" & vbLf & "END TYPE" & vbLf & "DIM c AS Card, w AS STRING * 8, l(1 TO 3) AS STRING * 5" & vbLf & "c.Suit = ""Hearts""" & vbLf & "w = ""abcdefghijk""" & vbLf & "l(2) = w" & vbLf & "OPEN ""c.dat"" FOR RANDOM AS #1 LEN = 11" & vbLf & "PUT #1, 1, c" & vbLf & "GET #1, 1, c" & vbLf & "PRINT c.Suit; l(2)"},
           New Object() {"files", "OPEN ""t.txt"" FOR OUTPUT AS #1" & vbLf & "PRINT #1, ""hi""" & vbLf & "CLOSE #1" & vbLf & "OPEN ""t.txt"" FOR INPUT AS #1" & vbLf & "LINE INPUT #1, a$" & vbLf & "CLOSE" & vbLf & "PRINT a$"}
         }
       End Get
@@ -340,6 +341,34 @@ Namespace QB2VB.Tests
       ' (This is what makes the window available from the first PRINT in a program that has no console.)
       Assert.Contains("QB.Graphics.WaitForKeyAtExit = True", New Converter("SCREEN 9").Convert("T"))
       Assert.Contains("QB.Video.WaitForKeyAtExit = True", New Converter("PRINT 1").Convert("T"))
+    End Sub
+
+    <Fact>
+    Public Sub FixedLengthStringsArePaddedAndCutWhenAssigned()
+      Dim m = Main("DIM s AS STRING * 4" & vbLf & "s = ""abcdefg""" & vbLf & "INPUT ""w""; s" & vbLf & "LINE INPUT t$" & vbLf & "READ s" & vbLf & "DATA x")
+      Assert.Contains("s = FixedString.Fit(""abcdefg"", 4)", m)
+      Assert.Contains("INPUT(""w"", s) : s = FixedString.Fit(s, 4)", m)
+      Assert.Contains("READ(s) : s = FixedString.Fit(s, 4)", m)
+    End Sub
+
+    <Fact>
+    Public Sub FixedLengthStringsStartAsNulsAndArraysAreFilled()
+      Dim vb = Convert("DIM s AS STRING * 4" & vbLf & "DIM a(1 TO 3) AS STRING * 2" & vbLf & "DIM SHARED g(5) AS STRING * 7")
+      Assert.Contains("Dim s As String = FixedString.Blank(4)", vb)
+      Assert.Contains("Dim a(3) As String : FixedString.Fill(a, 2)", vb)
+      ' (A shared array is declared at the top; it is filled at the start of the program.)
+      Assert.Contains("FixedString.Fill(g, 7)", vb)
+    End Sub
+
+    <Fact>
+    Public Sub TypeRecordsKeepTheirFixedStringsAndWriteThemselves()
+      Dim vb = Convert("TYPE R" & vbLf & "n AS STRING * 6" & vbLf & "v AS INTEGER" & vbLf & "END TYPE" & vbLf & "DIM x AS R")
+      Assert.Contains("Implements IFileRecord", vb)
+      Assert.Contains("m_Fit", Convert("TYPE R" & vbLf & "Fit AS STRING * 2" & vbLf & "END TYPE"))
+      Assert.Contains("m_n = FixedString.Fit(value, 6)", vb.Replace("m_n = FixedString.Fit(value, 6)", "m_n = FixedString.Fit(value, 6)"))
+      Assert.Contains("writer.WriteString(n, 6)", vb)
+      Assert.Contains("v = reader.ReadInt16()", vb)
+      Assert.DoesNotContain("TODO(QB2VB)", vb.Replace("Lines marked TODO(QB2VB) need attention", ""))
     End Sub
 
     <Fact>

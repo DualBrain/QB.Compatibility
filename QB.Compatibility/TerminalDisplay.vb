@@ -225,7 +225,7 @@ Namespace Global.QB
 
     Public Sub WriteChar(code As Integer) Implements ITextOutput.WriteChar
       If m_mode = Mode.Full Then Return
-      Write(Cp437.ToChar(CByte(code And 255)).ToString)
+      Write(If(code = 0, " ", Cp437.ToChar(CByte(code And 255)).ToString))   ' (CHR$(0) is blank on screen)
     End Sub
 
     Public Sub NewLine() Implements ITextOutput.NewLine

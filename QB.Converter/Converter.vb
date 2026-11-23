@@ -313,6 +313,7 @@ Namespace QB2VB
     ' ---- Output -----------------------------------------------------------------------------------------
 
     Private ReadOnly m_hoisted As New List(Of String)
+    Private ReadOnly m_mainPrologue As New List(Of String)   ' statements at the start of Main (arrays of fixed-length strings are filled there)
     Private ReadOnly m_mainLines As New List(Of String)
     Private ReadOnly m_procLines As New List(Of String)
     Private m_target As List(Of String)
@@ -368,6 +369,9 @@ Namespace QB2VB
         sb.AppendLine("    QB.SdlBackend.Use()")
         sb.AppendLine("#End If")
       End If
+      For Each l In m_mainPrologue
+        sb.AppendLine("    " & l)
+      Next
       If EmptyLoopMicroseconds.HasValue Then sb.AppendLine("    EmptyLoopMicroseconds = " & EmptyLoopMicroseconds.Value.ToString(Globalization.CultureInfo.InvariantCulture))
       For Each l In m_mainDecls
         sb.AppendLine("    " & l)

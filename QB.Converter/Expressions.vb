@@ -18,6 +18,8 @@ Namespace QB2VB
     Public Atom As Boolean
     ''' <summary>A variable or array element (can be passed by reference).</summary>
     Public IsLValue As Boolean
+    ''' <summary>For a variable or array element that is a STRING * n: n.</summary>
+    Public FixedLen As Integer
     Public IsLiteral As Boolean
     Public LiteralValue As Double
     Public Sub New()
@@ -523,6 +525,7 @@ Namespace QB2VB
         If emptyParens Then Return New E(VarText(v), v.Qt, v.Qt, True) With {.IsLValue = False}
         Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a) Coerce(a, QT.Long))) & ")", v.Qt, v.Qt, True)
         e.IsLValue = True
+        e.FixedLen = v.FixedLen
         Return Members(e, v.UserType)
       End If
 
@@ -582,6 +585,7 @@ Namespace QB2VB
         Dim v = m_ctx.ResolveVariable(name, True)
         Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a) Coerce(a, QT.Long))) & ")", v.Qt, v.Qt, True)
         e.IsLValue = True
+        e.FixedLen = v.FixedLen
         Return Members(e, v.UserType)
       End If
 
@@ -591,6 +595,7 @@ Namespace QB2VB
       Dim variable = m_ctx.ResolveVariable(name, False)
       Dim ve = New E(VarText(variable), variable.Qt, variable.Qt, True)
       ve.IsLValue = True
+      ve.FixedLen = variable.FixedLen
       ' A constant's value is known (arrays can be sized by it).
       Return ve
 

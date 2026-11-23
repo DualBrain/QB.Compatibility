@@ -17,11 +17,21 @@ Imports QB.Video
 Module NIBBLES
 
   Structure snakeBody
+    Implements IFileRecord
     Public row As Short
     Public col As Short
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.Write(row)
+      writer.Write(col)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      row = reader.ReadInt16()
+      col = reader.ReadInt16()
+    End Sub
   End Structure
   
   Structure snaketype
+    Implements IFileRecord
     Public head As Short
     Public length As Short
     Public row As Short
@@ -31,12 +41,45 @@ Module NIBBLES
     Public score As Short
     Public scolor As Short
     Public alive As Short
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.Write(head)
+      writer.Write(length)
+      writer.Write(row)
+      writer.Write(col)
+      writer.Write(direction)
+      writer.Write(lives)
+      writer.Write(score)
+      writer.Write(scolor)
+      writer.Write(alive)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      head = reader.ReadInt16()
+      length = reader.ReadInt16()
+      row = reader.ReadInt16()
+      col = reader.ReadInt16()
+      direction = reader.ReadInt16()
+      lives = reader.ReadInt16()
+      score = reader.ReadInt16()
+      scolor = reader.ReadInt16()
+      alive = reader.ReadInt16()
+    End Sub
   End Structure
   
   Structure arenaType
+    Implements IFileRecord
     Public realRow As Short
     Public acolor As Short
     Public sister As Short
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.Write(realRow)
+      writer.Write(acolor)
+      writer.Write(sister)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      realRow = reader.ReadInt16()
+      acolor = reader.ReadInt16()
+      sister = reader.ReadInt16()
+    End Sub
   End Structure
   
   Const [TRUE] As Short = -1

@@ -17,8 +17,25 @@ Imports QB.Video
 Module GetPutFile
 
   Structure TestRecord
-    <VBFixedString(20)> Public Student As String
+    Implements IFileRecord
+    Private m_Student As String
+    Public Property Student As String
+      Get
+        Return If(m_Student, FixedString.Blank(20))
+      End Get
+      Set(value As String)
+        m_Student = FixedString.Fit(value, 20)
+      End Set
+    End Property
     Public Score As Single
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.WriteString(Student, 20)
+      writer.Write(Score)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      Student = reader.ReadString(20)
+      Score = reader.ReadSingle()
+    End Sub
   End Structure
   
 

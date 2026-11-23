@@ -335,7 +335,9 @@ Namespace QB2VB
           Case "READ"
             Dim items As New List(Of String)
             For Each part In SplitTopLevel(t, s + 1, e)
-              items.Add("READ(" & Expr(part, 0, part.Count).Text & ")")
+              Dim target = Expr(part, 0, part.Count)
+              items.Add("READ(" & target.Text & ")")
+              If target.FixedLen > 0 Then items.Add(FitStatement(target))
             Next
             Return String.Join(" : ", items)
 
@@ -566,6 +568,8 @@ Namespace QB2VB
       End If
       Dim lhs = Expr(t, s, eq)
       Dim target = lhs.Vb
+      ' STRING * n: what is assigned is padded or cut to n characters.
+      If lhs.FixedLen > 0 Then Return lhs.Text & " = FixedString.Fit(" & ExprParser.Coerce(rhs, target) & ", " & lhs.FixedLen & ")"
       Return lhs.Text & " = " & ExprParser.Coerce(rhs, target)
     End Function
 
@@ -1025,10 +1029,12 @@ Namespace QB2VB
       End If
 
       Dim vars As New List(Of String)
+      Dim fits As New List(Of String)
       For Each part In SplitTopLevel(t, p, e)
         If part.Count = 0 Then Continue For
         Dim x = Expr(part, 0, part.Count)
         vars.Add(x.Text)
+        If x.FixedLen > 0 Then fits.Add(FitStatement(x))
       Next
       Dim args As New List(Of String)
       If fileNum <> "" Then args.Add(fileNum)
@@ -1038,7 +1044,12 @@ Namespace QB2VB
       If fileNum = "" AndAlso prompt = "" AndAlso keep Then
         args.Insert(0, """""") : args.Add("False") : args.Add("True")
       End If
-      Return "INPUT(" & String.Join(", ", args) & ")"
+      Return "INPUT(" & String.Join(", ", args) & ")" & String.Concat(fits.Select(Function(f) " : " & f))
+    End Function
+
+    ' After a statement that reads into a STRING * n variable: the text is padded or cut to n characters.
+    Private Shared Function FitStatement(target As E) As String
+      Return target.Text & " = FixedString.Fit(" & target.Text & ", " & target.FixedLen & ")"
     End Function
 
     Private Function LineInput(t As List(Of Token), s As Integer, e As Integer) As String
@@ -1063,7 +1074,7 @@ Namespace QB2VB
       If fileNum <> "" Then args.Add(fileNum)
       If prompt <> "" Then args.Add(prompt)
       args.Add(v.Text)
-      Return "LINE_INPUT(" & String.Join(", ", args) & ")"
+      Return "LINE_INPUT(" & String.Join(", ", args) & ")" & If(v.FixedLen > 0, " : " & FitStatement(v), "")
     End Function
 
     Private Function OpenStatement(t As List(Of Token), s As Integer, e As Integer) As String

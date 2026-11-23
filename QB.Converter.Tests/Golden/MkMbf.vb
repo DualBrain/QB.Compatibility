@@ -17,8 +17,33 @@ Imports QB.Video
 Module MkMbf
 
   Structure Buffer
-    <VBFixedString(4)> Public SngNum As String
-    <VBFixedString(8)> Public DblNum As String
+    Implements IFileRecord
+    Private m_SngNum As String
+    Public Property SngNum As String
+      Get
+        Return If(m_SngNum, FixedString.Blank(4))
+      End Get
+      Set(value As String)
+        m_SngNum = FixedString.Fit(value, 4)
+      End Set
+    End Property
+    Private m_DblNum As String
+    Public Property DblNum As String
+      Get
+        Return If(m_DblNum, FixedString.Blank(8))
+      End Get
+      Set(value As String)
+        m_DblNum = FixedString.Fit(value, 8)
+      End Set
+    End Property
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.WriteString(SngNum, 4)
+      writer.WriteString(DblNum, 8)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      SngNum = reader.ReadString(4)
+      DblNum = reader.ReadString(8)
+    End Sub
   End Structure
   
 

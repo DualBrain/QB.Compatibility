@@ -17,8 +17,17 @@ Imports QB.Graphics
 Module GORILLA
 
   Structure XYPoint
+    Implements IFileRecord
     Public XCoor As Short
     Public YCoor As Short
+    Public Sub WriteTo(writer As RecordWriter) Implements IFileRecord.WriteTo
+      writer.Write(XCoor)
+      writer.Write(YCoor)
+    End Sub
+    Public Sub ReadFrom(reader As RecordReader) Implements IFileRecord.ReadFrom
+      XCoor = reader.ReadInt16()
+      YCoor = reader.ReadInt16()
+    End Sub
   End Structure
   
   Const SPEEDCONST As Short = 500
