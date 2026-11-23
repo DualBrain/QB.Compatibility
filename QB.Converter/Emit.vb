@@ -232,6 +232,7 @@ Namespace QB2VB
         k += 1
       Loop
       Flush(m_target)
+      EmitNeededHandlers("Exit Sub")
       m_procLines.Add("End Sub")
       m_procLines.Add("")
       m_inGosub = False
@@ -339,36 +340,38 @@ Namespace QB2VB
       Next
       m_procLines.InsertRange(m_procDeclAt, decls)
 
-      ' Error handlers that are module-level in QBasic are copied in, so that Resume works in this procedure.
-      If m_neededHandlers.Count > 0 Then
-        m_procLines.Add("  " & If(m_curProc.IsFunction, "Exit Function", "Exit Sub"))
-        Dim done As New HashSet(Of Integer)
-        For Each label In m_neededHandlers
-          Dim start As Integer
-          If Not m_mainLabels.TryGetValue(label, start) Then Continue For
-          Dim [end] = HandlerRegionEnd(start)
-          If done.Contains(start) Then Continue For
-          For k = start To [end]
-            done.Add(k)
-            Dim hl = m_lines(k)
-            m_currentLine = hl.Number
-            Try
-              Dim saved = m_target
-              EmitLine(k)
-            Catch ex As ConvertException
-              Todo(hl, ex.Message)
-            End Try
-          Next
-        Next
-        Flush(m_target)
-        m_neededHandlers.Clear()
-      End If
+      EmitNeededHandlers(If(m_curProc.IsFunction, "Exit Function", "Exit Sub"))
 
       m_procLines.Add(ln.Indent & If(m_curProc.IsFunction, "End Function", "End Sub"))
       m_procLines.Add("")
       m_scope = m_main
       m_curProc = Nothing
       m_procStatic = False
+    End Sub
+
+    ' Error handlers that are module-level in QBasic are copied into the procedure (or GOSUB routine) that names them, so Resume works there.
+    Private Sub EmitNeededHandlers(exitText As String)
+      If m_neededHandlers.Count = 0 Then Return
+      m_procLines.Add("  " & exitText)
+      Dim done As New HashSet(Of Integer)
+      For Each label In m_neededHandlers.ToList()
+        Dim start As Integer
+        If Not m_mainLabels.TryGetValue(label, start) Then Continue For
+        Dim [end] = HandlerRegionEnd(start)
+        If done.Contains(start) Then Continue For
+        For k = start To [end]
+          done.Add(k)
+          Dim hl = m_lines(k)
+          m_currentLine = hl.Number
+          Try
+            EmitLine(k)
+          Catch ex As ConvertException
+            Todo(hl, ex.Message)
+          End Try
+        Next
+      Next
+      Flush(m_target)
+      m_neededHandlers.Clear()
     End Sub
 
     ' ---- Error handler regions ----------------------------------------------------------------------------------------
@@ -445,6 +448,7 @@ Namespace QB2VB
       Dim p = 1
       If p < t.Count AndAlso t(p).IsWord("SHARED") Then p += 1
       Dim items As New List(Of String)
+      Dim redims As New List(Of String)      ' REDIM of an array that already exists: resized, not declared again
       Dim savedScope = m_scope
       If hoist Then m_scope = m_module
       For Each part In SplitTopLevel(t, p, t.Count)
@@ -472,6 +476,13 @@ Namespace QB2VB
           q += 1
           asType = ParseAsType(part, q, userType, fixedLen)
         End If
+        If keyword = "ReDim" Then
+          Dim existing = FindVariable(m_scope, name)
+          If existing IsNot Nothing Then
+            redims.Add(ExprParser.VarText(existing) & "(" & String.Join(", ", dims) & ")")
+            Continue For
+          End If
+        End If
         Dim v = DeclareVariable(m_scope, name, isArray, asType, userType)
         v.Declared = True
         If isArray Then v.Dims = String.Join(", ", dims)
@@ -489,7 +500,10 @@ Namespace QB2VB
         End If
       Next
       m_scope = savedScope
-      Return keyword & " " & String.Join(", ", items)
+      Dim result As New List(Of String)
+      If redims.Count > 0 Then result.Add("ReDim " & String.Join(", ", redims))
+      If items.Count > 0 Then result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & String.Join(", ", items))
+      Return String.Join(" : ", result)
     End Function
 
     ' One dimension: "n" or "lo TO hi" (the array keeps a spare element when the lower bound is above 0).

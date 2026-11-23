@@ -156,10 +156,10 @@ Namespace QB2VB.Tests
     Public Sub UnsupportedStatementsAreFlaggedNotDropped()
       Dim notes As New List(Of String)
       Dim vb As String
-      Dim c As New Converter("DEF FNA(X) = X")
+      Dim c As New Converter("WRITE 1")
       vb = c.Convert("T")
       Assert.Contains("TODO(QB2VB)", vb)
-      Assert.Contains("DEF FNA(X) = X", vb)
+      Assert.Contains("WRITE 1", vb)
       Assert.NotEmpty(c.Notes)
     End Sub
 
@@ -185,6 +185,10 @@ Namespace QB2VB.Tests
           New Object() {"arrays of types", "TYPE P" & vbLf & "x AS INTEGER" & vbLf & "n AS STRING * 4" & vbLf & "END TYPE" & vbLf & "DIM ps(1 TO 3) AS P" & vbLf & "ps(2).x = ps(1).x + 1" & vbLf & "DECLARE SUB Fill (a() AS P, g() AS INTEGER)" & vbLf & "DIM g(1 TO 2, 1 TO 2) AS INTEGER" & vbLf & "Fill ps(), g()" & vbLf &
                                           "SUB Fill (a() AS P, g() AS INTEGER)" & vbLf & "a(1).x = g(1, 2)" & vbLf & "END SUB"},
           New Object() {"memory and view", "DEF SEG = 0" & vbLf & "POKE 1047, 0" & vbLf & "DEF SEG" & vbLf & "VIEW PRINT 3 TO 10" & vbLf & "VIEW PRINT" & vbLf & "PLAY ""O2CDE"""},
+          New Object() {"graphics", "SCREEN 9" & vbLf & "DIM a%(200)" & vbLf & "PSET (10, 10), 4" & vbLf & "PSET STEP(1, 1)" & vbLf & "LINE (1, 1)-(50, 50), 3, BF" & vbLf & "LINE -(60, 60)" & vbLf & "LINE (1, 1)-STEP(5, 5), 2, B" & vbLf &
+                                  "CIRCLE (100, 100), 20, 5, , , .5" & vbLf & "CIRCLE (100, 100), 20, 5, 0, 3.14" & vbLf & "PAINT (100, 100), 5, 3" & vbLf & "GET (1, 1)-(30, 30), a%" & vbLf & "PUT (40, 40), a%, PSET" & vbLf & "PUT (40, 40), a%(5), XOR" & vbLf & "VIEW (1, 1)-(100, 100), 1, 2" & vbLf & "WINDOW (0, 0)-(10, 10)"},
+          New Object() {"def fn", "DEF FnTwice (x) = x * 2" & vbLf & "DEF FnHalf! (x!) = x! / 2" & vbLf & "PRINT FnTwice(4); FnHalf!(3)"},
+          New Object() {"error handler in a gosub routine", "GOSUB Init" & vbLf & "END" & vbLf & "Init:" & vbLf & "ON ERROR GOTO Bad" & vbLf & "SCREEN 9" & vbLf & "ON ERROR GOTO 0" & vbLf & "RETURN" & vbLf & "Bad:" & vbLf & "RESUME NEXT"},
           New Object() {"files", "OPEN ""t.txt"" FOR OUTPUT AS #1" & vbLf & "PRINT #1, ""hi""" & vbLf & "CLOSE #1" & vbLf & "OPEN ""t.txt"" FOR INPUT AS #1" & vbLf & "LINE INPUT #1, a$" & vbLf & "CLOSE" & vbLf & "PRINT a$"}
         }
       End Get
@@ -213,6 +217,57 @@ Namespace QB2VB.Tests
       Dim m = Main("FOR i = 1 TO 5" & vbLf & "' wait" & vbLf & "NEXT")
       Assert.Contains("For i = 1 To 5 : EMPTYLOOP()", m)
       Assert.DoesNotContain("EMPTYLOOP()", String.Join(vbLf, Main("FOR i = 1 TO 5" & vbLf & "PRINT i" & vbLf & "NEXT")))
+    End Sub
+
+    <Fact>
+    Public Sub GraphicsStatementsKeepTheirShape()
+      AssertMain("LINE (1, 2)-(3, 4), 5, BF", "LINE(1, 2, 3, 4, 5, LineOption.BF)")
+      AssertMain("LINE (1, 2)-STEP(3, 4)", "LINE(False, 1, 2, [STEP], 3, 4)")
+      AssertMain("PSET (1, 2), 3", "PSET(1, 2, 3)")
+      AssertMain("CIRCLE (5, 6), 7, 1, , , .5", "CIRCLE(5, 6, 7, 1, Nothing, Nothing, .5!)")
+      AssertMain("DIM g&(9)" & vbLf & "GET (1, 1)-(2, 2), g&" & vbLf & "PUT (3, 3), g&, PSET", "[GET](1, 1, 2, 2, g%)", "PUT(3, 3, g%, PutOption.PUT_PSET)")
+    End Sub
+
+    <Fact>
+    Public Sub RedimOfASharedArrayResizesIt()
+      Dim vb = Convert("DIM SHARED a%(3)" & vbLf & "SUB Grow" & vbLf & "REDIM a%(9)" & vbLf & "END SUB")
+      Assert.Contains("ReDim a(9)", vb)
+      Assert.DoesNotContain("Dim a(9) As", vb)
+    End Sub
+
+    <Fact>
+    Public Sub ModRoundsItsOperandsLikeQBasic()
+      Dim m = Main("DEFINT A-Z" & vbLf & "t# = 1.5" & vbLf & "r = (t# * 10) MOD 4")
+      Assert.Contains("r = CShort(CInt((t# * 10)) Mod 4)", m)
+    End Sub
+
+    <Fact>
+    Public Sub LoopsThatPollTimerGetADelay()
+      Dim m = Main("s! = TIMER" & vbLf & "DO" & vbLf & "i! = i! + 1" & vbLf & "LOOP UNTIL TIMER - s! >= .5" & vbLf & "WHILE TIMER < 5" & vbLf & "WEND")
+      Assert.Contains("EMPTYLOOP() : Loop Until (Timer - s!) >= .5!", m)
+      Assert.Contains("While Timer < 5 : EMPTYLOOP()", m)
+    End Sub
+
+    <Fact>
+    Public Sub EmptyLoopTimeCanBeSet()
+      Dim c As New Converter("PRINT 1") With {.EmptyLoopMicroseconds = 400}
+      Assert.Contains("EmptyLoopMicroseconds = 400", c.Convert("T"))
+    End Sub
+
+    <Fact>
+    Public Sub DefFnBecomesAFunction()
+      Dim vb = Convert("DEFINT A-Z" & vbLf & "DEF FnTwice (x) = x * 2" & vbLf & "PRINT FnTwice(4)")
+      Assert.Contains("Function FnTwice(ByVal x As Short) As Short", vb)
+      Assert.Contains("FnTwice(4)", vb)
+    End Sub
+
+    <Fact>
+    Public Sub GorillaConvertsWithoutNotesAndCompiles()
+      Dim c As New Converter(IO.File.ReadAllText(FindSample("GORILLA.BAS"), Text.Encoding.Latin1))
+      Dim vb = c.Convert("GORILLA")
+      Assert.Empty(c.Notes)
+      Dim errors = VbCompiler.Compile(vb, "GORILLA")
+      Assert.True(errors = "", errors)
     End Sub
 
     <Fact>

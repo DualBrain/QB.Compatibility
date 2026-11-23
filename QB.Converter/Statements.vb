@@ -48,6 +48,14 @@ Namespace QB2VB
       Return ExprParser.AsBool(x)
     End Function
 
+    ' A loop whose condition reads TIMER waits for the clock (or counts while it does): each pass gets EMPTYLOOP's time, so counts are measurable.
+    Private Shared Function PollsTimer(t As List(Of Token), s As Integer, e As Integer) As Boolean
+      For k = s To e - 1
+        If t(k).IsWord("TIMER") Then Return True
+      Next
+      Return False
+    End Function
+
     Private Function Expr(t As List(Of Token), s As Integer, e As Integer) As E
       Dim ep As New ExprParser(t.GetRange(s, e - s), 0, Me)
       Dim x = ep.ParseExpr()
@@ -97,18 +105,18 @@ Namespace QB2VB
             Return "Next" & If(names.Count > 0, " " & String.Join(", ", names), "")
 
           Case "WHILE"
-            Return "While " & Cond(t, s + 1, e)
+            Return "While " & Cond(t, s + 1, e) & If(PollsTimer(t, s + 1, e), " : EMPTYLOOP()", "")
           Case "WEND"
             Return "End While"
 
           Case "DO"
             If n = 1 Then Return "Do"
-            If t(s + 1).IsWord("WHILE") Then Return "Do While " & Cond(t, s + 2, e)
-            If t(s + 1).IsWord("UNTIL") Then Return "Do Until " & Cond(t, s + 2, e)
+            If t(s + 1).IsWord("WHILE") Then Return "Do While " & Cond(t, s + 2, e) & If(PollsTimer(t, s + 2, e), " : EMPTYLOOP()", "")
+            If t(s + 1).IsWord("UNTIL") Then Return "Do Until " & Cond(t, s + 2, e) & If(PollsTimer(t, s + 2, e), " : EMPTYLOOP()", "")
           Case "LOOP"
             If n = 1 Then Return "Loop"
-            If t(s + 1).IsWord("WHILE") Then Return "Loop While " & Cond(t, s + 2, e)
-            If t(s + 1).IsWord("UNTIL") Then Return "Loop Until " & Cond(t, s + 2, e)
+            If t(s + 1).IsWord("WHILE") Then Return If(PollsTimer(t, s + 2, e), "EMPTYLOOP() : ", "") & "Loop While " & Cond(t, s + 2, e)
+            If t(s + 1).IsWord("UNTIL") Then Return If(PollsTimer(t, s + 2, e), "EMPTYLOOP() : ", "") & "Loop Until " & Cond(t, s + 2, e)
 
           Case "SELECT"
             If n > 1 AndAlso t(s + 1).IsWord("CASE") Then
@@ -155,9 +163,11 @@ Namespace QB2VB
               If n = 2 Then Return "DEF_SEG()"
               If n > 3 AndAlso t(s + 2).Is_("=") Then Return "DEF_SEG(" & ExprParser.Coerce(Expr(t, s + 3, e), QT.Long) & ")"
             End If
-            Throw New ConvertException("DEF FN isn't converted yet")
+            If FindProcCore(t(s + 1).Text) IsNot Nothing AndAlso FindProcCore(t(s + 1).Text).IsDefFn Then Return EmitDefFn(FindProcCore(t(s + 1).Text))
+            Throw New ConvertException("this form of DEF isn't converted yet")
 
           Case "VIEW"
+            If n >= 2 AndAlso Not t(s + 1).IsWord("PRINT") AndAlso Not t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("VIEW", t, s, e)
             If n >= 2 AndAlso t(s + 1).IsWord("PRINT") Then
               If n = 2 Then Return "VIEW_PRINT()"
               Dim toIdx = FindWord(t, s, e, "TO")
@@ -208,6 +218,18 @@ Namespace QB2VB
 
           Case "LINE"
             If n > 1 AndAlso t(s + 1).IsWord("INPUT") Then Return LineInput(t, s, e)
+            Return LineStatement(t, s, e)
+          Case "PSET", "PRESET"
+            Return PointStatement(t, s, e)
+          Case "CIRCLE"
+            Return CircleStatement(t, s, e)
+          Case "PAINT"
+            Return PaintStatement(t, s, e)
+          Case "GET", "PUT"
+            Return GetPutStatement(t, s, e)
+          Case "PALETTE"
+            If n > 1 AndAlso t(s + 1).IsWord("USING") Then Return "PALETTE_USING(" & ArrayArgs(t.GetRange(s + 2, n - 2)) & ")"
+            Return LibraryStatement(t, s, e)
 
           Case "OPEN"
             Return OpenStatement(t, s, e)
@@ -238,10 +260,15 @@ Namespace QB2VB
             ' MID$(s$, p[, n]) = x$
             If n > 1 AndAlso t(s + 1).Is_("(") Then Return Assignment(t, s, e)
 
+          Case "WINDOW"
+            If n >= 2 AndAlso Not t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("WINDOW", t, s, e)
+            If n >= 2 Then Throw New ConvertException("WINDOW SCREEN isn't converted yet")
+            Return "WINDOW()"
+
           Case "SHARED", "STATIC", "DIM", "REDIM", "COMMON"
             If w = "SHARED" Then Return ""
             If w = "STATIC" Then Return DimText(t, "Static", False)
-            Return DimText(t, "Dim", False)
+            Return DimText(t, If(w = "REDIM", "ReDim", "Dim"), False)
 
           Case Else
             ' A call to a procedure, a library statement, or an assignment.
@@ -295,7 +322,7 @@ Namespace QB2VB
 
     ' A label used by GOTO and friends.  A module-level label that a procedure's ON ERROR names has its handler copied in.
     Private Function NeedLabel(tok As Token, Optional handler As Boolean = False) As String
-      If handler AndAlso m_curProc IsNot Nothing AndAlso m_mainLabels.ContainsKey(tok.Text) AndAlso Not m_neededHandlers.Contains(tok.Text, StringComparer.OrdinalIgnoreCase) Then
+      If handler AndAlso (m_curProc IsNot Nothing OrElse m_inGosub) AndAlso m_mainLabels.ContainsKey(tok.Text) AndAlso Not m_neededHandlers.Contains(tok.Text, StringComparer.OrdinalIgnoreCase) Then
         m_neededHandlers.Add(tok.Text)
       End If
       Return tok.Text
@@ -483,11 +510,251 @@ Namespace QB2VB
         Case Else
       End Select
       Select Case name
-        Case "LINE", "PSET", "PRESET", "CIRCLE", "PAINT", "GET", "PUT", "VIEW", "WINDOW", "DRAW", "WRITE", "FIELD", "LSET", "RSET", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
+        Case "WRITE", "FIELD", "LSET", "RSET", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
           Throw New ConvertException(name & " isn't converted yet")
       End Select
       If p >= e Then Return name & "()"
       Return name & "(" & ArgList(t, p, e) & ")"
+    End Function
+
+    ' ---- Graphics ---------------------------------------------------------------------------------------
+
+    ''' <summary>[STEP] (x, y) starting at token <paramref name="p"/>; leaves p after the closing parenthesis.</summary>
+    Private Function ParseCoord(t As List(Of Token), ByRef p As Integer, e As Integer, ByRef isStep As Boolean, ByRef x As String, ByRef y As String) As Boolean
+      isStep = False
+      If p < e AndAlso t(p).IsWord("STEP") Then isStep = True : p += 1
+      If p >= e OrElse Not t(p).Is_("(") Then Return False
+      Dim depth = 0
+      Dim q = p
+      Do While q < e
+        If t(q).Is_("(") Then depth += 1
+        If t(q).Is_(")") Then depth -= 1
+        If depth = 0 Then Exit Do
+        q += 1
+      Loop
+      Dim parts = SplitTopLevel(t, p + 1, q)
+      If parts.Count <> 2 Then Throw New ConvertException("a coordinate needs (x, y)")
+      x = Expr(parts(0), 0, parts(0).Count).Text
+      y = Expr(parts(1), 0, parts(1).Count).Text
+      p = q + 1
+      Return True
+    End Function
+
+    ' The arguments after the coordinates, split at top-level commas, keeping empty ones.
+    Private Function TailParts(t As List(Of Token), p As Integer, e As Integer) As List(Of List(Of Token))
+      If p < e AndAlso t(p).Is_(",") Then p += 1 Else If p >= e Then Return New List(Of List(Of Token))
+      Return SplitTopLevel(t, p, e)
+    End Function
+
+    Private Function TailExpr(parts As List(Of List(Of Token)), index As Integer) As E
+      If index >= parts.Count OrElse parts(index).Count = 0 Then Return Nothing
+      Return Expr(parts(index), 0, parts(index).Count)
+    End Function
+
+    Private Function IntText(x As E, Optional empty As String = "-1") As String
+      If x Is Nothing Then Return empty
+      Return ExprParser.Coerce(x, QT.Long)
+    End Function
+
+    Private Shared Function Trimmed(args As List(Of String), emptyValue As String) As List(Of String)
+      Dim n = args.Count
+      Do While n > 0 AndAlso args(n - 1) = emptyValue
+        n -= 1
+      Loop
+      Return args.GetRange(0, n)
+    End Function
+
+    Private Function PointStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim p = s + 1
+      Dim st As Boolean, x As String = "", y As String = ""
+      If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException(t(s).Text & " needs (x, y)")
+      Dim parts = TailParts(t, p, e)
+      Dim args As New List(Of String)
+      If st Then args.Add("[STEP]")
+      args.Add(x) : args.Add(y)
+      If parts.Count > 0 AndAlso parts(0).Count > 0 Then args.Add(IntText(TailExpr(parts, 0)))
+      Return t(s).Upper() & "(" & String.Join(", ", args) & ")"
+    End Function
+
+    Private Function LineStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim p = s + 1
+      Dim st1 As Boolean, x1 As String = "", y1 As String = ""
+      Dim hasFirst = ParseCoord(t, p, e, st1, x1, y1)
+      If p >= e OrElse Not t(p).Is_("-") Then Throw New ConvertException("LINE needs -(x, y)")
+      p += 1
+      Dim st2 As Boolean, x2 As String = "", y2 As String = ""
+      If Not ParseCoord(t, p, e, st2, x2, y2) Then Throw New ConvertException("LINE needs -(x, y)")
+      Dim parts = TailParts(t, p, e)
+      Dim args As New List(Of String)
+      If hasFirst Then
+        If st1 OrElse st2 Then args.Add(If(st1, "[STEP]", "False"))
+        args.Add(x1) : args.Add(y1)
+      End If
+      If st2 Then args.Add("[STEP]") Else If hasFirst AndAlso st1 Then args.Add("False")
+      args.Add(x2) : args.Add(y2)
+      Dim opt = "LineOption.None"
+      If parts.Count > 1 AndAlso parts(1).Count = 1 Then
+        Select Case parts(1)(0).Upper()
+          Case "B" : opt = "LineOption.B"
+          Case "BF" : opt = "LineOption.BF"
+          Case Else : Throw New ConvertException("unknown LINE option " & parts(1)(0).Text)
+        End Select
+      End If
+      Dim tail As New List(Of String) From {IntText(TailExpr(parts, 0)), opt, If(parts.Count > 2 AndAlso parts(2).Count > 0, IntText(TailExpr(parts, 2)), "&HFFFF")}
+      If tail(2) = "&HFFFF" Then tail.RemoveAt(2)
+      If tail.Count = 1 AndAlso tail(0) = "-1" Then tail.Clear()
+      If tail.Count = 2 AndAlso tail(1) = "LineOption.None" Then tail.RemoveAt(1) : If tail(0) = "-1" Then tail.Clear()
+      args.AddRange(tail)
+      Return "LINE(" & String.Join(", ", args) & ")"
+    End Function
+
+    Private Function CircleStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim p = s + 1
+      Dim st As Boolean, x As String = "", y As String = ""
+      If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException("CIRCLE needs (x, y)")
+      Dim parts = TailParts(t, p, e)
+      If parts.Count = 0 OrElse parts(0).Count = 0 Then Throw New ConvertException("CIRCLE needs a radius")
+      Dim args As New List(Of String)
+      If st Then args.Add("[STEP]")
+      args.Add(x) : args.Add(y) : args.Add(TailExpr(parts, 0).Text)
+      args.Add(IntText(TailExpr(parts, 1)))
+      For i = 2 To 4
+        Dim v = TailExpr(parts, i)
+        args.Add(If(v Is Nothing, "Nothing", v.Text))
+      Next
+      Dim n = args.Count
+      Do While n > 0 AndAlso (args(n - 1) = "Nothing" OrElse (n = args.Count AndAlso False))
+        n -= 1
+      Loop
+      args = args.GetRange(0, n)
+      If args.Count > 0 AndAlso args(args.Count - 1) = "-1" AndAlso args.Count = If(st, 5, 4) Then args.RemoveAt(args.Count - 1)
+      Return "CIRCLE(" & String.Join(", ", args) & ")"
+    End Function
+
+    Private Function PaintStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim p = s + 1
+      Dim st As Boolean, x As String = "", y As String = ""
+      If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException("PAINT needs (x, y)")
+      Dim parts = TailParts(t, p, e)
+      Dim args As New List(Of String)
+      If st Then args.Add("[STEP]")
+      args.Add(x) : args.Add(y)
+      Dim paintE = TailExpr(parts, 0)
+      If paintE IsNot Nothing Then
+        args.Add(If(paintE.Qt = QT.String, paintE.Text, IntText(paintE)))
+        Dim border = TailExpr(parts, 1)
+        Dim back = TailExpr(parts, 2)
+        If border IsNot Nothing OrElse back IsNot Nothing Then args.Add(IntText(border))
+        If back IsNot Nothing Then args.Add(back.Text)
+      End If
+      Return "PAINT(" & String.Join(", ", args) & ")"
+    End Function
+
+    ''' <summary>An array argument of GET, PUT and PALETTE USING: the array name (QBasic names the array without parentheses), or an element, which becomes the start index.</summary>
+    Private Function ArrayArgs(part As List(Of Token)) As String
+      If part.Count = 0 Then Throw New ConvertException("an array is needed")
+      If part(0).Kind = TokKind.Ident Then
+        Dim v = ResolveVariableCore(part(0).Text, True)
+        If part.Count = 1 Then Return ExprParser.VarText(v)
+        If part(1).Is_("(") AndAlso part(part.Count - 1).Is_(")") Then
+          Dim idx = Expr(part, 2, part.Count - 1)
+          Return ExprParser.VarText(v) & ", " & ExprParser.Coerce(idx, QT.Long)
+        End If
+      End If
+      Throw New ConvertException("unrecognized array argument")
+    End Function
+
+    Private Function GetPutStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim isGet = t(s).IsWord("GET")
+      Dim p = s + 1
+      Dim isGraphic = p < e AndAlso (t(p).Is_("(") OrElse t(p).IsWord("STEP"))
+      If Not isGraphic Then
+        ' GET/PUT [#]filenum, [record], variable
+        If p < e AndAlso t(p).Is_("#") Then p += 1
+        Dim parts = SplitTopLevel(t, p, e)
+        If parts.Count < 2 Then Throw New ConvertException(t(s).Text & " needs a file number and a variable")
+        Dim num = ExprParser.Coerce(Expr(parts(0), 0, parts(0).Count), QT.Long)
+        Dim rec = If(parts.Count > 2 AndAlso parts(1).Count > 0, ExprParser.Coerce(Expr(parts(1), 0, parts(1).Count), QT.Long), "")
+        Dim target = parts(parts.Count - 1)
+        Dim v = Expr(target, 0, target.Count)
+        Return If(isGet, "[GET]", "PUT") & "(" & num & If(rec <> "", ", " & rec, "") & ", " & v.Text & ")"
+      End If
+
+      Dim st1 As Boolean, x1 As String = "", y1 As String = ""
+      ParseCoord(t, p, e, st1, x1, y1)
+      Dim st2 As Boolean, x2 As String = "", y2 As String = ""
+      Dim args As New List(Of String)
+      If isGet Then
+        If p >= e OrElse Not t(p).Is_("-") Then Throw New ConvertException("GET needs (x1, y1)-(x2, y2)")
+        p += 1
+        If Not ParseCoord(t, p, e, st2, x2, y2) Then Throw New ConvertException("GET needs (x1, y1)-(x2, y2)")
+        If st1 OrElse st2 Then args.Add(If(st1, "[STEP]", "False")) : args.Add(x1) : args.Add(y1) : args.Add(If(st2, "[STEP]", "False")) : args.Add(x2) : args.Add(y2) Else args.AddRange({x1, y1, x2, y2})
+        Dim parts = TailParts(t, p, e)
+        If parts.Count = 0 Then Throw New ConvertException("GET needs an array")
+        args.Add(ArrayArgs(parts(0)))
+        Return "[GET](" & String.Join(", ", args) & ")"
+      End If
+
+      If st1 Then args.Add("[STEP]")
+      args.Add(x1) : args.Add(y1)
+      Dim tail = TailParts(t, p, e)
+      If tail.Count = 0 Then Throw New ConvertException("PUT needs an array")
+      Dim arrayParts = ArrayArgs(tail(0)).Split({", "}, 2, StringSplitOptions.None)
+      args.Add(arrayParts(0))
+      Dim action = ""
+      If tail.Count > 1 AndAlso tail(1).Count = 1 Then
+        Select Case tail(1)(0).Upper()
+          Case "PSET" : action = "PutOption.PUT_PSET"
+          Case "PRESET" : action = "PutOption.PUT_PRESET"
+          Case "AND" : action = "PutOption.PUT_AND"
+          Case "OR" : action = "PutOption.PUT_OR"
+          Case "XOR" : action = "PutOption.PUT_XOR"
+          Case Else : Throw New ConvertException("unknown PUT action " & tail(1)(0).Text)
+        End Select
+      End If
+      If action <> "" OrElse arrayParts.Length > 1 Then args.Add(If(action <> "", action, "PutOption.PUT_XOR"))
+      If arrayParts.Length > 1 Then args.Add(arrayParts(1))
+      Return "PUT(" & String.Join(", ", args) & ")"
+    End Function
+
+    ' VIEW (x1, y1)-(x2, y2)[, color[, border]]  and  WINDOW (x1, y1)-(x2, y2)
+    Private Function ViewWindowStatement(name As String, t As List(Of Token), s As Integer, e As Integer) As String
+      Dim p = s + 1
+      Dim st As Boolean, x1 As String = "", y1 As String = "", x2 As String = "", y2 As String = ""
+      If Not ParseCoord(t, p, e, st, x1, y1) OrElse p >= e OrElse Not t(p).Is_("-") Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
+      p += 1
+      If Not ParseCoord(t, p, e, st, x2, y2) Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
+      Dim args As New List(Of String) From {x1, y1, x2, y2}
+      If name = "VIEW" Then
+        Dim parts = TailParts(t, p, e)
+        If parts.Count > 0 Then args.Add(IntText(TailExpr(parts, 0)))
+        If parts.Count > 1 Then args.Add(IntText(TailExpr(parts, 1)))
+      End If
+      Return name & "(" & String.Join(", ", args) & ")"
+    End Function
+
+    ' DEF FNname (params) = expression: a function, with its parameters by value.
+    Private Function EmitDefFn(sym As ProcSym) As String
+      Dim scope = m_procScopes(sym.QbName)
+      Dim savedScope = m_scope, savedProc = m_curProc
+      m_scope = scope : m_curProc = sym
+      Try
+        Dim parms As New List(Of String)
+        For Each prm In sym.Params
+          Dim v = DeclareVariable(scope, prm.QbName & If(prm.HasSuffix, Types.Suffix(prm.Qt), ""), prm.IsArray, If(prm.HasSuffix, QT.Unknown, If(prm.Qt <> QT.Unknown, prm.Qt, QT.Unknown)), prm.UserType, True)
+          parms.Add(ParamText(v, prm).Replace("ByRef ", "ByVal "))
+        Next
+        Dim body = Expr(sym.DefBody, 0, sym.DefBody.Count)
+        Dim head = "Function " & ExprParser.ProcName(sym) & "(" & String.Join(", ", parms) & ")" & If(sym.HasSuffix, "", " As " & Types.VbName(sym.RetQt))
+        Flush(m_procLines)
+        m_procLines.Add(head)
+        m_procLines.Add("  Return " & ExprParser.Coerce(body, sym.RetQt))
+        m_procLines.Add("End Function")
+        m_procLines.Add("")
+      Finally
+        m_scope = savedScope : m_curProc = savedProc
+      End Try
+      Return "' " & m_lines(sym.HeaderLine).Raw.Trim()
     End Function
 
     ' ---- PRINT / INPUT / OPEN -------------------------------------------------------------------------------

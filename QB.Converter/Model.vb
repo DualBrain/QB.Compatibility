@@ -125,6 +125,8 @@ Namespace QB2VB
 
   Friend Class ProcSym
     Public QbName As String = ""
+    Public IsDefFn As Boolean             ' DEF FNname: a one-line function (parameters by value)
+    Public DefBody As List(Of Token)      ' the expression of a DEF FN
     Public IsFunction As Boolean
     Public RetQt As QT
     Public HasSuffix As Boolean

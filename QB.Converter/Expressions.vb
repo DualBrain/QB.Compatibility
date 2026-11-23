@@ -327,6 +327,11 @@ Namespace QB2VB
 
     Private Shared Function Arith(op As String, l As E, r As E) As E
       Dim a = Numeric(l), b = Numeric(r)
+      ' QBasic's MOD rounds its operands to integers first (VB's Mod works on the floating point numbers).
+      If op = "Mod" Then
+        If Types.Rank(a.Vb) > Types.Rank(QT.Long) Then a = New E("CInt(" & a.Text & ")", QT.Long, QT.Long, True)
+        If Types.Rank(b.Vb) > Types.Rank(QT.Long) Then b = New E("CInt(" & b.Text & ")", QT.Long, QT.Long, True)
+      End If
       If a.Qt = QT.String OrElse b.Qt = QT.String Then
         ' String concatenation.
         Return New E(Paren(a) & " " & op & " " & Paren(b), QT.String, QT.String, False)

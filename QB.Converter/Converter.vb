@@ -36,6 +36,9 @@ Namespace QB2VB
     Private m_currentLine As Integer
 
     ''' <summary>Things the converter couldn't convert or wants checked (also written as TODO comments in the output).</summary>
+    ''' <summary>When set, the program starts by setting QB.Core.EmptyLoopMicroseconds to this (how long an empty loop pass takes).</summary>
+    Public Property EmptyLoopMicroseconds As Double?
+
     Public ReadOnly Property Notes As List(Of String)
       Get
         Return m_notes
@@ -214,6 +217,19 @@ Namespace QB2VB
       Return v
     End Function
 
+    ''' <summary>An existing variable of this name that the scope can see (null when there isn't one).</summary>
+    Private Function FindVariable(scope As Scope, name As String) As VarSym
+      Dim hasSuffix As Boolean, bare As String = ""
+      Dim saved = m_scope
+      m_scope = scope
+      Try
+        Dim qty = ResolveType(name, hasSuffix, bare)
+        Return Lookup(scope, KeyOf(bare, qty))
+      Finally
+        m_scope = saved
+      End Try
+    End Function
+
     Private Function FindRecord(recName As String) As VarSym
       Dim hasSuffix As Boolean, bare As String = ""
       Dim t = TypeOfName(recName, hasSuffix, bare)
@@ -324,6 +340,7 @@ Namespace QB2VB
       If m_hoisted.Count > 0 Then sb.AppendLine()
       sb.AppendLine("  Public Sub Main()")
       sb.AppendLine("    QB.Video.WaitForKeyAtExit = True")
+      If EmptyLoopMicroseconds.HasValue Then sb.AppendLine("    EmptyLoopMicroseconds = " & EmptyLoopMicroseconds.Value.ToString(Globalization.CultureInfo.InvariantCulture))
       For Each l In m_mainDecls
         sb.AppendLine("    " & l)
       Next

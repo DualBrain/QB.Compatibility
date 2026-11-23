@@ -814,6 +814,8 @@ Namespace Global.QB
 
     Private Shared m_cursorRow As Integer = 1
     Private Shared m_cursorCol As Integer = 1
+    ' Printing in the last column of the last row doesn't scroll until the next character (QBasic's cursor waits there).
+    Private Shared m_wrapPending As Boolean
     Private Shared m_textH As Integer = 16
     Private Shared m_textW As Integer = 8
     Private Shared m_scaleX As Integer = 1                ' 2 when 40 columns are shown (double-wide cells)
@@ -824,7 +826,7 @@ Namespace Global.QB
     Private Shared m_visualPage As Integer
     Private Shared m_viewTop As Integer = 1               ' Text viewport (VIEW PRINT).
     Private Shared m_viewBottom As Integer = 25
-    Private Shared m_cursorVisible As Boolean = True
+    Private Shared m_cursorVisible As Boolean         ' off while a program runs (as in QBasic); INPUT shows it, LOCATE ,,1 turns it on
     Private Shared m_cursorStart As Integer = 14          ' Cursor scan lines.
     Private Shared m_cursorStop As Integer = 15
     Private Shared m_hasBlink As Boolean
@@ -1076,7 +1078,9 @@ Namespace Global.QB
       If m_visualPage <> m_activePage Then Return
       If m_cursorRow < 1 OrElse m_cursorRow > TextRows OrElse m_cursorCol < 1 OrElse m_cursorCol > TextCols Then Return
       Dim cw = m_textW * m_scaleX
-      Dim color = m_palette(m_fgColor And 255)
+      ' In text mode the hardware cursor takes the foreground color of the cell it sits on (not the current COLOR).
+      Dim fg = If(m_mode = 0, CInt(m_attrs(m_cursorRow - 1, m_cursorCol - 1) And &HFF), m_fgColor And 255)
+      Dim color = m_palette(fg And 255)
       For scan = m_cursorStart To Math.Min(m_cursorStop, m_textH - 1)
         Dim y = (m_cursorRow - 1) * m_textH + scan
         For x = (m_cursorCol - 1) * cw To m_cursorCol * cw - 1
@@ -1101,9 +1105,9 @@ Namespace Global.QB
         m_activePage = 0 : m_visualPage = 0
         BindActivePage()
         m_viewTop = 1 : m_viewBottom = rows
-        m_cursorRow = 1 : m_cursorCol = 1
+        m_cursorRow = 1 : m_cursorCol = 1 : m_wrapPending = False
         m_cursorStart = th - 2 : m_cursorStop = th - 1
-        m_cursorVisible = (mode = 0)
+        m_cursorVisible = False
         m_hasBlink = False
         ResetGraphics()
         If m_bgColor <> 0 Then
@@ -1175,10 +1179,12 @@ Namespace Global.QB
       If row <> -1 Then
         If row < 1 OrElse row > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(row))
         m_cursorRow = row
+        m_wrapPending = False
       End If
       If column <> -1 Then
         If column < 1 OrElse column > TextCols Then Throw New ArgumentOutOfRangeException(NameOf(column))
         m_cursorCol = column
+        m_wrapPending = False
       End If
       If cursor <> -1 Then m_cursorVisible = (cursor <> 0)
       If start <> -1 Then
@@ -1199,7 +1205,7 @@ Namespace Global.QB
     ''' <summary>Resets the text viewport to the whole screen.</summary>
     Public Shared Sub VIEW_PRINT()
       m_viewTop = 1 : m_viewBottom = TextRows
-      m_cursorRow = 1 : m_cursorCol = 1
+      m_cursorRow = 1 : m_cursorCol = 1 : m_wrapPending = False
       Touch()
     End Sub
 
@@ -1207,7 +1213,7 @@ Namespace Global.QB
     Public Shared Sub VIEW_PRINT(top%, bottom%)
       If top < 1 OrElse bottom < top OrElse bottom > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(top))
       m_viewTop = top : m_viewBottom = bottom
-      m_cursorRow = top : m_cursorCol = 1
+      m_cursorRow = top : m_cursorCol = 1 : m_wrapPending = False
       Touch()
     End Sub
 
@@ -2280,7 +2286,7 @@ allplotted:
           Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask))
           ClearCells(1, TextRows)
           m_hasBlink = False
-          m_cursorRow = m_viewTop : m_cursorCol = 1
+          m_cursorRow = m_viewTop : m_cursorCol = 1 : m_wrapPending = False
         Case 1
           RawRect(m_vx1, m_vy1, m_vx2, m_vy2, m_bgColor, True)
           ResetLastPoint()
@@ -2288,7 +2294,7 @@ allplotted:
           Dim y0 = (m_viewTop - 1) * m_textH
           Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask), y0 * m_width, (m_viewBottom - m_viewTop + 1) * m_textH * m_width)
           ClearCells(m_viewTop, m_viewBottom)
-          m_cursorRow = m_viewTop : m_cursorCol = 1
+          m_cursorRow = m_viewTop : m_cursorCol = 1 : m_wrapPending = False
         Case Else
           Throw New ArgumentException
       End Select
@@ -2706,6 +2712,7 @@ allplotted:
     End Function
 
     Private Shared Sub NewLine()
+      m_wrapPending = False
       m_cursorCol = 1
       If m_cursorRow >= m_viewBottom Then
         ScrollUp()
@@ -2788,10 +2795,17 @@ allplotted:
         code = If(AscW(ch) < 256, AscW(ch), AscW("?"c))
       End If
 
+      If m_wrapPending Then NewLine()
       DrawCell(code)
 
       m_cursorCol += 1
-      If m_cursorCol > TextCols Then NewLine()
+      If m_cursorCol > TextCols Then
+        If m_cursorRow >= m_viewBottom Then
+          m_cursorCol = TextCols : m_wrapPending = True   ' scrolls when the next character comes
+        Else
+          NewLine()
+        End If
+      End If
 
     End Sub
 
@@ -2814,7 +2828,7 @@ allplotted:
           ElseIf k = ChrW(8) Then
             If sb.Length > 0 AndAlso m_cursorCol > 1 Then
               sb.Length -= 1
-              m_cursorCol -= 1
+              If m_wrapPending Then m_wrapPending = False Else m_cursorCol -= 1
               DrawCell(32)
               Touch()
             End If

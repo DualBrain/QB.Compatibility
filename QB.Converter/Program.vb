@@ -13,13 +13,16 @@ Namespace QB2VB
 
       Dim input = ""
       Dim output = ""
+      Dim emptyLoop As Double? = Nothing
       Dim i = 0
       Do While i < args.Length
         Dim a = args(i)
         If a = "-o" AndAlso i + 1 < args.Length Then
           output = args(i + 1) : i += 2
+        ElseIf a = "--empty-loop-us" AndAlso i + 1 < args.Length Then
+          emptyLoop = Double.Parse(args(i + 1), Globalization.CultureInfo.InvariantCulture) : i += 2
         ElseIf a = "-h" OrElse a = "--help" Then
-          Console.WriteLine("qb2vb input.bas [-o output.vb]    converts a QBasic program to VB that uses QB.Compatibility")
+          Console.WriteLine("qb2vb input.bas [-o output.vb]    converts a QBasic program to VB that uses QB.Compatibility" & vbLf & "  --empty-loop-us N   start the program with QB.Core.EmptyLoopMicroseconds = N (the time of one pass of a delay loop; 400 by default)")
           Return 0
         Else
           input = a : i += 1
@@ -40,7 +43,7 @@ Namespace QB2VB
       moduleName = sb.ToString
       If moduleName = "" OrElse Char.IsDigit(moduleName(0)) Then moduleName = "Program_" & moduleName
 
-      Dim conv As New Converter(source)
+      Dim conv As New Converter(source) With {.EmptyLoopMicroseconds = emptyLoop}
       Dim vb = conv.Convert(moduleName)
       If output = "" Then output = Path.ChangeExtension(input, ".vb")
       File.WriteAllText(output, vb, New UTF8Encoding(False))

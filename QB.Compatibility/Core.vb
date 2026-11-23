@@ -461,7 +461,7 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>How long one pass through an empty FOR loop takes, in microseconds (see <see cref="EMPTYLOOP"/>).</summary>
-    Public Shared Property EmptyLoopMicroseconds As Double = 10
+    Public Shared Property EmptyLoopMicroseconds As Double = 400
 
     ''' <summary>
     ''' Stands in for the time an empty loop (FOR i = 1 TO n: NEXT) took in QBasic.  Programs use such loops as delays, and measure

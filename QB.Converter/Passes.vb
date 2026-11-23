@@ -82,6 +82,24 @@ Namespace QB2VB
             Case "DEFINT", "DEFSNG", "DEFDBL", "DEFLNG", "DEFSTR"
               ParseDef(t, first)
 
+            Case "DEF"
+              If t.Count > 3 AndAlso Not t(1).IsWord("SEG") Then
+                Dim eq = -1
+                Dim depth = 0
+                For k = 2 To t.Count - 1
+                  If t(k).Is_("(") Then depth += 1
+                  If t(k).Is_(")") Then depth -= 1
+                  If depth = 0 AndAlso t(k).Is_("=") Then eq = k : Exit For
+                Next
+                If eq > 0 Then
+                  Dim sym = ParseProcHeader(t.GetRange(0, eq), 1, True)
+                  sym.IsDefFn = True : sym.HeaderLine = i
+                  sym.DefBody = t.GetRange(eq + 1, t.Count - eq - 1)
+                  m_procs(sym.QbName) = sym
+                  m_procScopes(sym.QbName) = New Scope(m_module) With {.Proc = sym}
+                End If
+              End If
+
             Case "DECLARE"
               If t.Count > 2 Then
                 Dim isFn = t(1).IsWord("FUNCTION")
@@ -121,7 +139,7 @@ Namespace QB2VB
 
             Case "DIM", "REDIM", "COMMON", "STATIC"
               Dim scope As Scope = If(inProc IsNot Nothing, procScope, m_main)
-              RegisterDims(t, scope, first = "STATIC")
+              RegisterDims(t, scope, first = "STATIC", first = "REDIM")
 
           End Select
         Catch ex As ConvertException
@@ -242,7 +260,7 @@ Namespace QB2VB
       Next
     End Sub
 
-    Private Sub RegisterDims(t As List(Of Token), scope As Scope, isStatic As Boolean)
+    Private Sub RegisterDims(t As List(Of Token), scope As Scope, isStatic As Boolean, Optional isRedim As Boolean = False)
       Dim p = 1
       Dim isShared = False
       If p < t.Count AndAlso t(p).IsWord("SHARED") Then
@@ -270,6 +288,8 @@ Namespace QB2VB
           q += 1
           asType = ParseAsType(part, q, userType, fixedLen)
         End If
+        ' REDIM of an array that is already declared (a shared one, say) resizes it.
+        If isRedim AndAlso FindVariable(scope, name) IsNot Nothing Then Continue For
         Dim v = DeclareVariable(target, name, isArray, asType, userType)
         If isShared Then v.IsShared = True
         If fixedLen <> 0 Then v.FixedLen = fixedLen
