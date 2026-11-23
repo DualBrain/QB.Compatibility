@@ -21,6 +21,9 @@ Module OnTimer
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/ON%20TIMER.htm
     ON_TIMER(1, AddressOf TimeUpdate)
     TIMER_ON()

@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module StrigFunction
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/STRIG.htm
     PRINT("Press Esc to exit.")
     Do

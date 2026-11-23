@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Circle_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/CIRCLE.htm
     SCREEN(2)
     CIRCLE(320, 100, 200)

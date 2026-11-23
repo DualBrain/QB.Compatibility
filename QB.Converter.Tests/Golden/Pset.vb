@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Pset_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     Dim i As Short
     Dim delay As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/PSET.htm

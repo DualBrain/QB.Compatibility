@@ -954,7 +954,16 @@ Namespace Global.QB
         SyncLock m_sync
           If m_display Is Nothing Then
             Dim factory = DisplayFactory
-            Dim d As IDisplay = If(factory Is Nothing, New TerminalDisplay, factory())
+            If factory Is Nothing Then
+              If TerminalDisplay.HasOutput() Then
+                factory = Function() New TerminalDisplay
+              ElseIf GraphicsDisplayFactory IsNot Nothing Then
+                factory = GraphicsDisplayFactory   ' no console (a WinExe program): the window
+              Else
+                Throw New InvalidOperationException("This program has no console (it was built as WinExe) and no window to use instead: reference QB.Compatibility.Sdl and use QB.Graphics (or call QB.SdlBackend.Use()), or build the program as Exe.")
+              End If
+            End If
+            Dim d As IDisplay = factory()
             m_textOut = TryCast(d, ITextOutput)
             m_display = d
             d.Open(New FrameSource)

@@ -24,6 +24,9 @@ Module MkMbf
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim SNum As Single
     Dim DNum As Single
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/CVSMBF.htm

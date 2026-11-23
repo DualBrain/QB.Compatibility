@@ -18,6 +18,9 @@ Module InputFunction
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/INPUT%24.htm
     OPEN("TEST.DAT", OpenMode.Output, 1)
     PRINT(1, "The text")

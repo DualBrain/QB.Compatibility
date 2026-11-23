@@ -41,6 +41,9 @@ Module MONEY
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim KeyFlags As Short
     Dim a As Short
     DATA(0, 7, 15, 7, 0, 7, 0, 15, 0, 0)

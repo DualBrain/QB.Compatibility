@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Point_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     Dim y As Short
     Dim x As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/POINT.htm

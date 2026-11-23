@@ -18,6 +18,9 @@ Module Beep_Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim Response$
     Dim R$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/BEEP.htm

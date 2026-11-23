@@ -18,6 +18,9 @@ Module Sound_Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim i As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/SOUND.htm
     For i = 440 To 1000 Step 5

@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Pcopy_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/PCOPY.htm
     PCOPY(1, 3)
   End Sub

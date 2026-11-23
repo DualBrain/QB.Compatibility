@@ -18,6 +18,9 @@ Module Files_Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/FILES.htm
     MKDIR("C:\TEMP\TEST")
     CHDIR("C:\TEMP")

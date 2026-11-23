@@ -20,6 +20,19 @@ Namespace Global.QB
       Multimedia.AudioFactory = Function() New SdlAudio
     End Sub
 
+    ''' <summary>
+    ''' The same as <see cref="Video.WaitForKeyAtExit"/>; setting it first thing in a program (as the converter does) makes the window available
+    ''' from the start, for programs that print before they draw and have no console.
+    ''' </summary>
+    Public Shared Shadows Property WaitForKeyAtExit As Boolean
+      Get
+        Return Video.WaitForKeyAtExit
+      End Get
+      Set(value As Boolean)
+        Video.WaitForKeyAtExit = value
+      End Set
+    End Property
+
     ' The joystick and the pen come from the window.
     Private Shared Sub EnsureWindow()
       If Not (TypeOf Video.Display Is IGraphicsDisplay) Then Video.Display = New SdlDisplay

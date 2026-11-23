@@ -163,6 +163,12 @@ Namespace QB.Tests
     End Sub
 
     <Fact>
+    Public Sub ThereIsOutputWhereTheTestsRun()
+      ' (Only a Windows program built as WinExe, with no console and no redirection, has none.)
+      Assert.True(TerminalDisplay.HasOutput())
+    End Sub
+
+    <Fact>
     Public Sub KeysCanBeQueued()
       Dim d = Open(False, New IO.StringWriter).Item1
       d.EnqueueKey("a")

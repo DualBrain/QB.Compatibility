@@ -16,7 +16,7 @@ Namespace QB2VB.Tests
       Dim lines = vb.Replace(vbCrLf, vbLf).Split(vbLf(0)).Select(Function(l) l.Trim()).ToList()
       Dim s = lines.IndexOf("Public Sub Main()")
       Dim e = lines.IndexOf("End Sub", s)
-      Return lines.GetRange(s + 1, e - s - 1).Where(Function(l) l <> "" AndAlso Not l.StartsWith("QB.Video.WaitForKey", StringComparison.Ordinal) AndAlso Not l.StartsWith("Dim ", StringComparison.Ordinal)).ToList()
+      Return lines.GetRange(s + 1, e - s - 1).Where(Function(l) l <> "" AndAlso Not l.Contains(".WaitForKeyAtExit") AndAlso l <> "#If QB_WINDOW Then" AndAlso l <> "QB.SdlBackend.Use()" AndAlso l <> "#End If" AndAlso Not l.StartsWith("Dim ", StringComparison.Ordinal)).ToList()
     End Function
 
     Private Shared Function Convert(source As String) As String
@@ -328,13 +328,29 @@ Namespace QB2VB.Tests
     End Sub
 
     <Fact>
+    Public Sub TextProgramsShowTheirScreenInAWindowWhenQB_WINDOWIsDefined()
+      Dim vb = New Converter("PRINT 1").Convert("T").Replace(vbCrLf, vbLf)
+      Assert.Contains("#If QB_WINDOW Then" & vbLf & "    QB.SdlBackend.Use()" & vbLf & "#End If", vb)
+      Assert.DoesNotContain("QB_WINDOW", New Converter("SCREEN 9").Convert("T"))
+    End Sub
+
+    <Fact>
+    Public Sub GraphicsProgramsStartByTouchingQBGraphics()
+      ' (This is what makes the window available from the first PRINT in a program that has no console.)
+      Assert.Contains("QB.Graphics.WaitForKeyAtExit = True", New Converter("SCREEN 9").Convert("T"))
+      Assert.Contains("QB.Video.WaitForKeyAtExit = True", New Converter("PRINT 1").Convert("T"))
+    End Sub
+
+    <Fact>
     Public Sub TheProjectReferencesTheSdlAssemblyOnlyWhenNeeded()
       Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False, False)
       Assert.Contains("QB.Compatibility.vbproj", text)
-      Assert.DoesNotContain("QB.Compatibility.Sdl", text)
+      ' A text program only gets the SDL assembly (and QB_WINDOW) when its project is changed to WinExe.
+      Assert.Contains("QB.Compatibility.Sdl.vbproj"" Condition=""'$(OutputType)' == 'WinExe'""", text)
+      Assert.Contains("<DefineConstants>QB_WINDOW</DefineConstants>", text)
       Assert.DoesNotContain("PublishAot", text)
       Dim withSdl = Program.ProjectText("T", "T.vb", "/work/T", "/lib", True, True, True)
-      Assert.Contains("QB.Compatibility.Sdl.vbproj", withSdl)
+      Assert.Contains("QB.Compatibility.Sdl.vbproj"" />", withSdl)
       Assert.Contains("<PublishAot>true</PublishAot>", withSdl)
       Assert.Contains("QB.Compatibility.Ports.vbproj", withSdl)
       Assert.DoesNotContain("QB.Compatibility.Ports", text)

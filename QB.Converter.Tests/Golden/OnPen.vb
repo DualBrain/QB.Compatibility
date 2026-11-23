@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module OnPen
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/ON%20PEN.htm
         'This example requires a light pen.
         ON_PEN(AddressOf Handler)

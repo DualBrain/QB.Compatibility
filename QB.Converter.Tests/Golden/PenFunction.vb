@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module PenFunction
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     Dim P As Single
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/PEN.htm
     Do

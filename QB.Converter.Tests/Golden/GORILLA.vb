@@ -63,7 +63,7 @@ Module GORILLA
   Dim i As Short
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     DATA_LABEL("CGABanana")
     DATA(327686, -252645316, 60)
     DATA(196618, -1057030081, 49344)

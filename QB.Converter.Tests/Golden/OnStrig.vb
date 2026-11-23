@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module OnStrig
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/ON%20STRIG.htm
         'This example requires a joystick.
         ON_STRIG(0, AddressOf Handler)

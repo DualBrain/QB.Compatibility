@@ -31,10 +31,18 @@ Namespace QB2VB
         sb.AppendLine("    <InvariantGlobalization>true</InvariantGlobalization>")
       End If
       sb.AppendLine("  </PropertyGroup>")
+      ' Changing OutputType to WinExe (no console) is all it takes to show a text program's screen in a window.
+      sb.AppendLine("  <PropertyGroup Condition=" & q & "'$(OutputType)' == 'WinExe'" & q & ">")
+      sb.AppendLine("    <DefineConstants>QB_WINDOW</DefineConstants>")
+      sb.AppendLine("  </PropertyGroup>")
       sb.AppendLine("  <ItemGroup>")
       sb.AppendLine("    <Compile Include=" & q & sourceFile & q & " />")
       sb.AppendLine("    <ProjectReference Include=" & q & core & q & " />")
-      If needsSdl Then sb.AppendLine("    <ProjectReference Include=" & q & sdl & q & " />")
+      If needsSdl Then
+        sb.AppendLine("    <ProjectReference Include=" & q & sdl & q & " />")
+      Else
+        sb.AppendLine("    <ProjectReference Include=" & q & sdl & q & " Condition=" & q & "'$(OutputType)' == 'WinExe'" & q & " />")
+      End If
       If needsPorts Then sb.AppendLine("    <ProjectReference Include=" & q & ports & q & " />")
       sb.AppendLine("  </ItemGroup>")
       sb.AppendLine("</Project>")

@@ -18,6 +18,9 @@ Module LprintUsing
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim a As Single
     Dim a_Str$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/LPRINT%20USING.htm

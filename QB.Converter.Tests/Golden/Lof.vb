@@ -18,6 +18,9 @@ Module Lof_Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim f$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/LOF.htm
     INPUT("Enter filename: ", f$)

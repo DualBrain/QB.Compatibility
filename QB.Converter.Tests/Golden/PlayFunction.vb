@@ -18,6 +18,9 @@ Module PlayFunction
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim Music$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/PLAY.htm
     Music$ = "MBT180o2P2P8L8GGGL2E-P24P8L8FFFL2D"

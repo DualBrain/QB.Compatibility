@@ -18,6 +18,9 @@ Module Play_Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim scale$
     Dim i As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement%20%28Music%29/PLAY.htm

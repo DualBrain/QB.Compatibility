@@ -20,6 +20,9 @@ Module OnKey
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/ON%20KEY.htm
     'This example requires Caps Lock and Num Lock to be off.
     ' CONST ESC = 27

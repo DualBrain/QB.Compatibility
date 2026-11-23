@@ -56,6 +56,9 @@ Module NIBBLES
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     DATA_LABEL("mono")
     DATA(15, 7, 7, 0, 15, 0)
     DATA_LABEL("normal")

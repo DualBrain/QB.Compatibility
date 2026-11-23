@@ -18,6 +18,9 @@ Module LsetRset
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     Dim Fields1 As FieldRecord
     Dim Fields2 As FieldRecord
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/LSET.htm

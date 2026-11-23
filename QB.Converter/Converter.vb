@@ -361,7 +361,13 @@ Namespace QB2VB
       Next
       If m_hoisted.Count > 0 Then sb.AppendLine()
       sb.AppendLine("  Public Sub Main()")
-      sb.AppendLine("    QB.Video.WaitForKeyAtExit = True")
+      sb.AppendLine(If(m_usesGraphics, "    QB.Graphics.WaitForKeyAtExit = True", "    QB.Video.WaitForKeyAtExit = True"))
+      If Not m_usesGraphics Then
+        ' A text program built as WinExe has no console: its project defines QB_WINDOW (and references the SDL assembly), and the text screen is shown in a window.
+        sb.AppendLine("#If QB_WINDOW Then")
+        sb.AppendLine("    QB.SdlBackend.Use()")
+        sb.AppendLine("#End If")
+      End If
       If EmptyLoopMicroseconds.HasValue Then sb.AppendLine("    EmptyLoopMicroseconds = " & EmptyLoopMicroseconds.Value.ToString(Globalization.CultureInfo.InvariantCulture))
       For Each l In m_mainDecls
         sb.AppendLine("    " & l)

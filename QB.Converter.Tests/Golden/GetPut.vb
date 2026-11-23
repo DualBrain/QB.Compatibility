@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module GetPut
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     Dim x1 As Short
     Dim x2 As Short
     Dim y1 As Short

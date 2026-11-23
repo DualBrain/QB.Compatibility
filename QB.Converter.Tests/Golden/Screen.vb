@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Screen_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/SCREEN.htm
     'This example requires a color graphics adapter.
     SCREEN(1)  '320 x 200 graphics

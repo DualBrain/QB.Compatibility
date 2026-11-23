@@ -17,7 +17,7 @@ Imports QB.Graphics
 Module Pmap_Program
 
   Public Sub Main()
-    QB.Video.WaitForKeyAtExit = True
+    QB.Graphics.WaitForKeyAtExit = True
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/PMAP.htm
     'This example requires a graphics adapter that supports screen mode 1.
     SCREEN(1)

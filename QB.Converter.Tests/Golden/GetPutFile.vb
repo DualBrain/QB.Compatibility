@@ -24,6 +24,9 @@ Module GetPutFile
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
+#If QB_WINDOW Then
+    QB.SdlBackend.Use()
+#End If
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement%20%28File%20I%C2%A7O%29/GET.htm
     ' TYPE TestRecord (see the Structure at the top)
     Dim [MyClass] As TestRecord

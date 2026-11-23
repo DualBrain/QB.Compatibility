@@ -1,4 +1,4 @@
-Option Explicit On
+﻿Option Explicit On
 Option Strict On
 Option Infer On
 
@@ -438,6 +438,20 @@ Namespace Global.QB
 
     <DllImport("kernel32.dll")>
     Private Shared Function SetConsoleMode(handle As IntPtr, mode As UInteger) As Boolean
+    End Function
+
+    ''' <summary>
+    ''' False when the program has nowhere to write text to: on Windows, a program built as WinExe (a GUI program) has no console and
+    ''' no redirected output.  Such a program has to use a window.  (Elsewhere there is always standard output.)
+    ''' </summary>
+    Friend Shared Function HasOutput() As Boolean
+      If Not OperatingSystem.IsWindows() Then Return True
+      Try
+        Dim h = GetStdHandle(-11)   ' STD_OUTPUT_HANDLE
+        Return h <> IntPtr.Zero AndAlso h <> New IntPtr(-1)
+      Catch ex As Exception
+        Return True
+      End Try
     End Function
 
     Private Shared Sub EnableVirtualTerminal()
