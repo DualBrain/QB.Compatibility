@@ -89,6 +89,18 @@ Namespace QB2VB
         If t.Length >= 2 AndAlso t.StartsWith(""", StringComparison.Ordinal) AndAlso t.EndsWith(""", StringComparison.Ordinal) Then t = t.Substring(1, t.Length - 2)
         Return ExprParser.Quote(t)
       End If
+      ' &H and &O numbers (16 bit unless they have more digits, as in QBasic).
+      If t.Length > 2 AndAlso t(0) = "&"c AndAlso "HhOo".IndexOf(t(1)) >= 0 Then
+        Try
+          Dim isHex = Char.ToUpperInvariant(t(1)) = "H"c
+          Dim digits = t.Substring(2).TrimEnd("&"c)
+          Dim value = System.Convert.ToInt64(digits, If(isHex, 16, 8))
+          If digits.Length <= If(isHex, 4, 6) AndAlso value > 32767 Then value -= 65536
+          If digits.Length > If(isHex, 4, 6) AndAlso value > Integer.MaxValue Then value -= 4294967296L
+          Return value.ToString(Globalization.CultureInfo.InvariantCulture)
+        Catch ex As FormatException
+        End Try
+      End If
       Dim d As Double
       If t <> "" AndAlso Double.TryParse(t, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) Then Return t
       Return ExprParser.Quote(t)
@@ -98,6 +110,7 @@ Namespace QB2VB
     Private Function EmitLine(i As Integer) As Integer
 
       Dim ln = m_lines(i)
+      m_emitIndex = i
 
       If ln.IsBlank Then
         m_pending.Add("")
@@ -111,6 +124,17 @@ Namespace QB2VB
       Dim t = ln.Tokens
       Dim first = If(t.Count > 0, t(0).Upper(), "")
       Dim labelPrefix = If(ln.Label <> "", ln.Label & ":", If(ln.LineNumber <> "", ln.LineNumber & ":", ""))
+
+      ' A label that a GOSUB in a SUB or FUNCTION calls: its routine becomes a lambda in the procedure.
+      If m_curProc IsNot Nothing AndAlso Not m_inGosub AndAlso m_inlineEnd < 0 AndAlso ((ln.Label <> "" AndAlso m_procGosubTargets.Contains(ln.Label)) OrElse (ln.LineNumber <> "" AndAlso m_procGosubTargets.Contains(ln.LineNumber))) Then
+        Dim target = If(ln.Label <> "", ln.Label, ln.LineNumber)
+        If m_inlineRoutines.Contains(target) Then
+          Flush(m_target)
+          m_target.Add(ln.Indent & "' " & target & ": (this routine is expanded where it is called, because it uses ON ERROR)")
+          Return HandlerRegionEnd(i) + 1
+        End If
+        Return EmitProcRoutine(i)
+      End If
 
       ' A label that a GOSUB calls: its routine becomes a procedure.
       If m_curProc Is Nothing AndAlso Not m_inGosub AndAlso ((ln.Label <> "" AndAlso m_gosubTargets.Contains(ln.Label)) OrElse (ln.LineNumber <> "" AndAlso m_gosubTargets.Contains(ln.LineNumber))) Then
@@ -196,6 +220,11 @@ Namespace QB2VB
         If nx < m_lines.Count AndAlso m_lines(nx).Tokens.Count > 0 AndAlso m_lines(nx).Tokens(0).IsWord("NEXT") AndAlso m_lines(nx).Label = "" Then statements.Add("EMPTYLOOP()")
       End If
 
+      If statements.Count = 1 AndAlso statements(0).StartsWith(InlineMarker, StringComparison.Ordinal) Then
+        Return ExpandInline(i, statements(0).Substring(InlineMarker.Length), labelPrefix)
+      End If
+      If statements.Any(Function(x) x.Contains(InlineMarker)) Then Throw New ConvertException("this GOSUB needs to be expanded inline, which only works for a GOSUB on a line of its own")
+
       Flush(m_target)
       Dim text = ln.Indent & labelPrefix & If(labelPrefix <> "", " ", "") & String.Join(" : ", statements)
       If ln.Comment <> "" Then text &= "  " & VbComment(ln.Comment)
@@ -205,6 +234,7 @@ Namespace QB2VB
     End Function
 
     Private m_gosubStart As Integer
+    Private m_emitIndex As Integer
 
     ' The routine that starts at a label that a GOSUB calls: lines up to its RETURN become a Sub (module-level variables are shared).
     Private Function EmitGosubRoutine(i As Integer) As Integer
@@ -243,7 +273,7 @@ Namespace QB2VB
     ' ---- Procedures ---------------------------------------------------------------------------------------------
 
     Private Function ParamText(v As VarSym, prm As ParamSym) As String
-      Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+      Dim name = v.VbName & If(prm.CopyIn, "_Arg", "") & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
       Dim sb As New StringBuilder("ByRef " & name)
       If prm.IsArray Then sb.Append("(" & New String(","c, prm.Rank - 1) & ")")
       If Not v.HasSuffix Then
@@ -271,9 +301,18 @@ Namespace QB2VB
 
       Dim parms As New List(Of String)
       SetArrayRanks(i, sym)
+      PrepareProcRoutines(i, sym)
       For Each prm In sym.Params
         Dim v = DeclareVariable(scope, prm.QbName & If(prm.HasSuffix, Types.Suffix(prm.Qt), ""), prm.IsArray, If(prm.HasSuffix, QT.Unknown, If(prm.UserType <> "" OrElse prm.Qt <> QT.Unknown, prm.Qt, QT.Unknown)), prm.UserType, True)
         parms.Add(ParamText(v, prm))
+        If prm.CopyIn Then
+          Dim local = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+          Dim arg = v.VbName & "_Arg" & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+          Dim dims = If(prm.IsArray, "(" & New String(","c, prm.Rank - 1) & ")", "")
+          Dim asType = If(v.HasSuffix, "", " As " & If(v.UserType <> "", v.UserType, Types.VbName(v.Qt)))
+          m_prologue.Add("  Dim " & local & dims & asType & " = " & arg)
+          m_copyBack.Add(arg & " = " & local)
+        End If
       Next
       Dim head = If(sym.IsFunction, "Function ", "Sub ") & ExprParser.ProcName(sym) & "(" & String.Join(", ", parms) & ")"
       If sym.IsFunction AndAlso Not sym.HasSuffix Then head &= " As " & Types.VbName(sym.RetQt)
@@ -320,7 +359,7 @@ Namespace QB2VB
     ' A declaration (without the keyword) of a variable found by use.
     Private Shared Function DeclItem(v As VarSym) As String
       Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
-      Dim dims = If(v.IsArray, "(" & If(v.Dims <> "", v.Dims, "10") & ")", "")
+      Dim dims = If(v.IsArray, "(" & If(v.DeferRank > 0, New String(","c, v.DeferRank - 1), If(v.Dims <> "", v.Dims, "10")) & ")", "")
       If v.UserType <> "" Then Return name & dims & " As " & v.UserType
       If v.HasSuffix Then Return name & dims
       Return name & dims & " As " & Types.VbName(v.Qt)
@@ -338,7 +377,18 @@ Namespace QB2VB
           v.Declared = True
         End If
       Next
+      ' The copies of ByRef parameters that GOSUB routines use, then the routines themselves (lambdas, so they share the locals).
+      Dim after As New List(Of String)
+      after.AddRange(m_prologue)
+      For Each name In m_routineNames.Values
+        after.Add("  Dim " & name & " As Action")
+      Next
+      For Each r In m_routines
+        after.AddRange(r)
+      Next
+      decls.AddRange(after)
       m_procLines.InsertRange(m_procDeclAt, decls)
+      m_procLines.AddRange(m_copyBack.Select(Function(c) "  " & c))
 
       EmitNeededHandlers(If(m_curProc.IsFunction, "Exit Function", "Exit Sub"))
 
@@ -347,7 +397,141 @@ Namespace QB2VB
       m_scope = m_main
       m_curProc = Nothing
       m_procStatic = False
+      m_procGosubTargets.Clear() : m_routines.Clear() : m_routineNames.Clear() : m_copyBack.Clear() : m_prologue.Clear() : m_inlineRoutines.Clear()
     End Sub
+
+    ' GOSUB X where X uses ON ERROR: the routine's lines are written here instead of the call.
+    Private Function ExpandInline(callLine As Integer, label As String, labelPrefix As String) As Integer
+      Dim ln = m_lines(callLine)
+      Dim start As Integer
+      If Not m_procLabelLine.TryGetValue(label, start) Then Throw New ConvertException("GOSUB to an unknown label " & label)
+      Dim [end] = HandlerRegionEnd(start)
+      Flush(m_target)
+      m_target.Add(ln.Indent & labelPrefix & If(labelPrefix <> "", " ", "") & "' GOSUB " & label & ": the routine, expanded")
+      Dim savedEnd = m_inlineEnd, savedLabel = m_inlineLabel, savedUsed = m_inlineUsedLabel, savedIndex = m_emitIndex
+      m_inlineCount += 1
+      m_inlineEnd = [end] : m_inlineLabel = label & "_Return" & m_inlineCount : m_inlineUsedLabel = False
+      For k = start + 1 To [end]
+        m_currentLine = m_lines(k).Number
+        Try
+          EmitLine(k)
+        Catch ex As ConvertException
+          Todo(m_lines(k), ex.Message)
+        End Try
+      Next
+      Flush(m_target)
+      If m_inlineUsedLabel Then m_target.Add(m_inlineLabel & ":")
+      m_inlineEnd = savedEnd : m_inlineLabel = savedLabel : m_inlineUsedLabel = savedUsed : m_emitIndex = savedIndex
+      Return callLine + 1
+    End Function
+
+    ' ---- GOSUB routines inside a SUB or FUNCTION -------------------------------------------------------
+
+    Private ReadOnly m_procGosubTargets As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly m_inlineRoutines As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private m_inlineEnd As Integer = -1          ' while a routine is expanded: the line of its last statement
+    Private m_inlineLabel As String = ""
+    Private m_inlineUsedLabel As Boolean
+    Private m_inlineCount As Integer
+    Private ReadOnly m_procLabelLine As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly m_routines As New List(Of List(Of String))
+    Private ReadOnly m_routineNames As New Dictionary(Of String, String)(StringComparer.OrdinalIgnoreCase)
+    Private ReadOnly m_copyBack As New List(Of String)
+    Private ReadOnly m_prologue As New List(Of String)
+
+    ' Finds the labels that GOSUBs in the procedure call and the parameters those routines use.
+    Private Sub PrepareProcRoutines(headerLine As Integer, sym As ProcSym)
+      m_procGosubTargets.Clear() : m_routines.Clear() : m_routineNames.Clear() : m_copyBack.Clear() : m_prologue.Clear() : m_inlineRoutines.Clear()
+      m_procLabelLine.Clear()
+      Dim labelLine As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
+      Dim k = headerLine + 1
+      Do While k < m_lines.Count
+        Dim ln = m_lines(k)
+        Dim t = ln.Tokens
+        If t.Count >= 2 AndAlso t(0).IsWord("END") AndAlso (t(1).IsWord("SUB") OrElse t(1).IsWord("FUNCTION")) Then Exit Do
+        If ln.Label <> "" Then labelLine(ln.Label) = k : m_procLabelLine(ln.Label) = k
+        If ln.LineNumber <> "" Then labelLine(ln.LineNumber) = k : m_procLabelLine(ln.LineNumber) = k
+        For q = 0 To t.Count - 1
+          If t(q).IsWord("GOSUB") Then
+            Dim r = q + 1
+            Do While r < t.Count AndAlso (t(r).Kind = TokKind.Ident OrElse t(r).Kind = TokKind.Number)
+              m_procGosubTargets.Add(t(r).Text)
+              r += 1
+              If r < t.Count AndAlso t(r).Is_(",") Then r += 1 Else Exit Do
+            Loop
+          End If
+        Next
+        k += 1
+      Loop
+      If m_procGosubTargets.Count = 0 Then Return
+
+      ' A lambda can't contain ON ERROR or RESUME: such a routine is expanded where it is called instead.
+      For Each target In m_procGosubTargets
+        Dim st As Integer
+        If Not labelLine.TryGetValue(target, st) Then Continue For
+        For q = st To HandlerRegionEnd(st)
+          For Each tok In m_lines(q).Tokens
+            If tok.IsWord("RESUME") OrElse (tok.IsWord("ERROR") AndAlso q > 0) Then m_inlineRoutines.Add(target)
+          Next
+        Next
+      Next
+
+      Dim used As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+      For Each target In m_procGosubTargets
+        Dim start As Integer
+        If Not labelLine.TryGetValue(target, start) Then Continue For
+        For q = start To HandlerRegionEnd(start)
+          For Each tok In m_lines(q).Tokens
+            If tok.Kind = TokKind.Ident Then
+              Dim name = tok.Text
+              Dim dot = name.IndexOf("."c)
+              If dot > 0 Then name = name.Substring(0, dot)
+              Dim hs As Boolean, bare As String = ""
+              TypeOfName(name, hs, bare)
+              used.Add(bare)
+            End If
+          Next
+        Next
+      Next
+      For Each prm In sym.Params
+        prm.CopyIn = used.Contains(prm.QbName)
+      Next
+    End Sub
+
+    ' The routine that starts at a label a GOSUB in this procedure calls: a lambda over the procedure's locals.
+    Private Function EmitProcRoutine(i As Integer) As Integer
+      Dim ln = m_lines(i)
+      Dim label = If(ln.Label <> "", ln.Label, ln.LineNumber)
+      Dim name = GosubName(label)
+      Dim [end] = HandlerRegionEnd(i)
+      Flush(m_target)
+      Dim saved = m_target
+      Dim buf As New List(Of String)
+      m_target = buf
+      buf.Add("  " & name & " = Sub()" & If(ln.Comment <> "", "  " & VbComment(ln.Comment), ""))
+      m_inGosub = True
+      m_gosubStart = i
+      Dim k = i
+      Do While k <= [end]
+        m_currentLine = m_lines(k).Number
+        Try
+          If k = i AndAlso m_lines(k).Tokens.Count = 0 Then
+            k += 1
+            Continue Do
+          End If
+          EmitLine(k)
+        Catch ex As ConvertException
+          Todo(m_lines(k), ex.Message)
+        End Try
+        k += 1
+      Loop
+      Flush(m_target)
+      buf.Add("  End Sub")
+      m_routines.Add(buf)
+      m_inGosub = False
+      m_target = saved
+      Return [end] + 1
+    End Function
 
     ' Error handlers that are module-level in QBasic are copied into the procedure (or GOSUB routine) that names them, so Resume works there.
     Private Sub EmitNeededHandlers(exitText As String)
@@ -378,8 +562,8 @@ Namespace QB2VB
 
     ' The last line of the handler that starts at a label in the module-level code: up to the point where flow can't continue.
     Private Function HandlerRegionEnd(start As Integer) As Integer
-      Dim depth = 0
       Dim blocks As New Stack(Of (HasElse As Boolean, AllTerm As Boolean, CurTerm As Boolean))
+      Dim open = 0     ' open SELECT, DO, FOR and WHILE blocks
       Dim last = start
       For k = start To m_lines.Count - 1
         Dim ln = m_lines(k)
@@ -390,6 +574,9 @@ Namespace QB2VB
         Dim first = t(0).Upper()
         Dim terminal = first = "RESUME" OrElse first = "RETURN" OrElse first = "GOTO" OrElse (first = "END" AndAlso t.Count = 1) OrElse first = "SYSTEM"
         Dim isBlockIf = first = "IF" AndAlso t(t.Count - 1).IsWord("THEN")
+
+        open += BlockDelta(t)
+        If open < 0 Then open = 0
 
         If isBlockIf Then
           blocks.Push((False, True, False))
@@ -404,18 +591,43 @@ Namespace QB2VB
           Dim allTerm = b.AllTerm AndAlso b.CurTerm
           Dim blockTerminates = b.HasElse AndAlso allTerm
           If blocks.Count = 0 Then
-            If blockTerminates Then Return k
+            If blockTerminates AndAlso open = 0 Then Return k
           ElseIf blockTerminates Then
             Dim parent = blocks.Pop()
             blocks.Push((parent.HasElse, parent.AllTerm, True))
           End If
         ElseIf terminal Then
-          If blocks.Count = 0 Then Return k
-          Dim b = blocks.Pop()
-          blocks.Push((b.HasElse, b.AllTerm, True))
+          If blocks.Count = 0 Then
+            If open = 0 Then Return k
+          Else
+            Dim b = blocks.Pop()
+            blocks.Push((b.HasElse, b.AllTerm, True))
+          End If
         End If
       Next
       Return last
+    End Function
+
+    ' How many SELECT, DO, FOR and WHILE blocks a line opens (minus those it closes).
+    Private Shared Function BlockDelta(t As List(Of Token)) As Integer
+      Dim delta = 0
+      For q = 0 To t.Count - 1
+        If q > 0 AndAlso Not (t(q - 1).Is_(":") OrElse t(q - 1).IsWord("THEN") OrElse t(q - 1).IsWord("ELSE")) Then Continue For
+        Select Case t(q).Upper()
+          Case "FOR", "DO", "WHILE" : delta += 1
+          Case "SELECT" : If q + 1 < t.Count AndAlso t(q + 1).IsWord("CASE") Then delta += 1
+          Case "LOOP", "WEND" : delta -= 1
+          Case "END" : If q + 1 < t.Count AndAlso t(q + 1).IsWord("SELECT") Then delta -= 1
+          Case "NEXT"
+            Dim names = 1
+            For r = q + 1 To t.Count - 1
+              If t(r).Is_(":") Then Exit For
+              If t(r).Is_(",") Then names += 1
+            Next
+            delta -= names
+        End Select
+      Next
+      Return delta
     End Function
 
     ' ---- Declarations -------------------------------------------------------------------------------------------------
@@ -478,7 +690,7 @@ Namespace QB2VB
         End If
         If keyword = "ReDim" Then
           Dim existing = FindVariable(m_scope, name)
-          If existing IsNot Nothing Then
+          If existing IsNot Nothing AndAlso (existing.IsShared OrElse existing.Declared OrElse Not m_scope.Locals.Contains(existing)) Then
             redims.Add(ExprParser.VarText(existing) & "(" & String.Join(", ", dims) & ")")
             Continue For
           End If
@@ -486,6 +698,15 @@ Namespace QB2VB
         Dim v = DeclareVariable(m_scope, name, isArray, asType, userType)
         v.Declared = True
         If isArray Then v.Dims = String.Join(", ", dims)
+        ' GOSUB routines are lambdas at the top of the procedure: its locals must be declared there too, and sized where the DIM was.
+        If m_curProc IsNot Nothing AndAlso m_procGosubTargets.Count > 0 AndAlso Not hoist AndAlso Not m_procStatic Then
+          v.Declared = False
+          If isArray Then
+            v.DeferRank = dims.Count
+            redims.Add(ExprParser.VarText(v) & "(" & String.Join(", ", dims) & ")")
+          End If
+          Continue For
+        End If
         Dim vbName = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
         Dim dimSuffix = If(isArray, "(" & String.Join(", ", dims) & ")", "")
         If v.UserType <> "" Then

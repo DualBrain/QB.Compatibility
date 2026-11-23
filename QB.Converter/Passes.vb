@@ -100,6 +100,9 @@ Namespace QB2VB
                 End If
               End If
 
+            Case "FIELD"
+              RegisterField(i, t, If(inProc IsNot Nothing, procScope, m_main))
+
             Case "DECLARE"
               If t.Count > 2 Then
                 Dim isFn = t(1).IsWord("FUNCTION")
@@ -257,6 +260,33 @@ Namespace QB2VB
         Dim v = DeclareVariable(m_module, part(0).Text, False)
         v.IsConst = True : v.IsShared = True
         m_module.Locals.Remove(v)
+      Next
+    End Sub
+
+    ' FIELD #n, w AS a$, ...: a FieldRecord variable holds the buffer, and each name is one of its fields.
+    Private ReadOnly m_fieldRecords As New Dictionary(Of Integer, String)
+
+    Private Sub RegisterField(lineIndex As Integer, t As List(Of Token), scope As Scope)
+      Dim n = 1
+      Dim recName As String
+      Do
+        recName = "Fields" & n
+        n += 1
+      Loop While scope.Names.Contains(recName.ToLowerInvariant()) OrElse m_module.Names.Contains(recName.ToLowerInvariant())
+      scope.Names.Add(recName.ToLowerInvariant())
+      m_fieldRecords(lineIndex) = recName
+      Dim rec As New VarSym With {.QbName = recName, .Qt = QT.Unknown, .UserType = "FieldRecord", .VbName = recName}
+      scope.Locals.Add(rec)
+      Dim parts = SplitTopLevel(t, 1, t.Count)
+      Dim index = 0
+      For k = 1 To parts.Count - 1
+        Dim part = parts(k)
+        If part.Count < 3 OrElse Not part(part.Count - 2).IsWord("AS") Then Continue For
+        Dim v = DeclareVariable(scope, part(part.Count - 1).Text, False)
+        scope.Locals.Remove(v)
+        v.FieldVar = recName : v.FieldIndex = index
+        v.VbName = recName & "(" & index & ")" : v.HasSuffix = False : v.Declared = True
+        index += 1
       Next
     End Sub
 

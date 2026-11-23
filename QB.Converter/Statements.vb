@@ -141,8 +141,8 @@ Namespace QB2VB
           Case "EXIT"
             If n = 2 Then
               Select Case t(s + 1).Upper()
-                Case "SUB" : Return "Exit Sub"
-                Case "FUNCTION" : Return "Exit Function"
+                Case "SUB" : Return CopyBackText() & "Exit Sub"
+                Case "FUNCTION" : Return CopyBackText() & "Exit Function"
                 Case "DO" : Return "Exit Do"
                 Case "FOR" : Return "Exit For"
               End Select
@@ -152,9 +152,15 @@ Namespace QB2VB
             Return "GoTo " & NeedLabel(t(s + 1))
 
           Case "GOSUB"
-            If m_curProc IsNot Nothing Then Throw New ConvertException("GOSUB inside a SUB or FUNCTION isn't converted yet")
+            If m_curProc IsNot Nothing AndAlso Not m_procGosubTargets.Contains(t(s + 1).Text) Then Throw New ConvertException("GOSUB to a label outside the procedure")
+            If m_curProc IsNot Nothing AndAlso m_inlineRoutines.Contains(t(s + 1).Text) Then Return InlineMarker & t(s + 1).Text
             Return GosubName(t(s + 1).Text) & "()"
           Case "RETURN"
+            If m_inlineEnd >= 0 AndAlso n = 1 Then
+              If m_emitIndex = m_inlineEnd Then Return ""
+              m_inlineUsedLabel = True
+              Return "GoTo " & m_inlineLabel
+            End If
             If Not m_inGosub OrElse n <> 1 Then Throw New ConvertException("RETURN outside a converted GOSUB routine")
             Return "Return"
 
@@ -187,7 +193,7 @@ Namespace QB2VB
             Dim isGosub = False
             If jump < 0 Then jump = FindWord(t, s, e, "GOSUB") : isGosub = True
             If jump > 0 Then
-              If isGosub AndAlso m_curProc IsNot Nothing Then Throw New ConvertException("GOSUB inside a SUB or FUNCTION isn't converted yet")
+              If isGosub AndAlso m_curProc IsNot Nothing AndAlso Not m_procGosubTargets.Contains(t(s + 3).Text) AndAlso False Then Throw New ConvertException("GOSUB to a label outside the procedure")
               Dim sel = ExprParser.Coerce(Expr(t, s + 1, jump), QT.Long)
               Dim sb = New StringBuilder("Select Case " & sel)
               Dim idx = 1
@@ -234,7 +240,37 @@ Namespace QB2VB
           Case "OPEN"
             Return OpenStatement(t, s, e)
 
+          Case "FIELD"
+            Dim recName As String = Nothing
+            If Not m_fieldRecords.TryGetValue(m_emitIndex, recName) Then Throw New ConvertException("FIELD in an unexpected place")
+            Dim fparts = SplitTopLevel(t, s + 1, e)
+            Dim fnum = fparts(0)
+            If fnum.Count > 0 AndAlso fnum(0).Is_("#") Then fnum = fnum.GetRange(1, fnum.Count - 1)
+            Dim args As New List(Of String) From {ExprParser.Coerce(Expr(fnum, 0, fnum.Count), QT.Long)}
+            For fk = 1 To fparts.Count - 1
+              Dim fp = fparts(fk)
+              Dim asAt = FindWord(fp, 0, fp.Count, "AS")
+              If asAt < 0 Then Throw New ConvertException("FIELD needs width AS name")
+              args.Add(ExprParser.Coerce(Expr(fp, 0, asAt), QT.Long))
+            Next
+            Return recName & " = FIELD(" & String.Join(", ", args) & ")"
+
+          Case "LSET", "RSET"
+            Dim eqAt = -1
+            For k = s + 1 To e - 1
+              If t(k).Is_("=") Then eqAt = k : Exit For
+            Next
+            If eqAt < 0 Then Throw New ConvertException(w & " needs =")
+            Dim target = ResolveVariableCore(t(s + 1).Text, False)
+            Dim value = Expr(t, eqAt + 1, e).Text
+            If target.FieldVar <> "" Then Return target.FieldVar & "." & w & "(" & target.FieldIndex & ", " & value & ")"
+            Return w & "(" & Expr(t, s + 1, eqAt).Text & ", " & value & ")"
+
+          Case "LPRINT"
+            Return PrintStatement(t, s, e, True)
+
           Case "CLOSE"
+            If n = 1 Then Return "CLOSE()"
             Return "CLOSE(" & ArgList(t, s + 1, e) & ")"
 
           Case "NAME"
@@ -301,10 +337,30 @@ Namespace QB2VB
 
     ' The VB name of the procedure that a GOSUB label becomes.
     Private Function GosubName(label As String) As String
+      If m_curProc IsNot Nothing Then
+        Dim existing As String = Nothing
+        If m_routineNames.TryGetValue(label, existing) Then Return existing
+        Dim rn = If(Char.IsDigit(label(0)), "L" & label, label)
+        If Keywords.IsVbReserved(rn) Then rn = "[" & rn & "]"
+        Do While m_scope.Names.Contains(rn.ToLowerInvariant()) OrElse m_module.Names.Contains(rn.ToLowerInvariant()) OrElse m_procs.ContainsKey(rn)
+          rn &= "_Sub"
+        Loop
+        m_scope.Names.Add(rn.ToLowerInvariant())
+        m_routineNames(label) = rn
+        Return rn
+      End If
       Dim n = If(Char.IsDigit(label(0)), "L" & label, label)
       If Keywords.IsVbReserved(n) Then n = "[" & n & "]"
       If m_procs.ContainsKey(n) OrElse m_module.Names.Contains(n.ToLowerInvariant()) OrElse m_main.Names.Contains(n.ToLowerInvariant()) Then n &= "_Sub"
       Return n
+    End Function
+
+    Friend Const InlineMarker As String = ChrW(1) & "INLINE:"
+
+    ' Before leaving a procedure whose GOSUB routines use copies of its parameters, the copies go back.
+    Private Function CopyBackText() As String
+      If m_copyBack.Count = 0 OrElse m_inGosub Then Return ""
+      Return String.Join(" : ", m_copyBack) & " : "
     End Function
 
     Private m_selectType As QT
@@ -450,6 +506,9 @@ Namespace QB2VB
         End If
       End If
 
+      If eq = s + 1 AndAlso t(s).Kind = TokKind.Ident AndAlso ResolveVariableCore(t(s).Text, False).FieldVar <> "" Then
+        Throw New ConvertException("assigning to a FIELD variable unbinds it in QBasic; use LSET or RSET")
+      End If
       Dim lhs = Expr(t, s, eq)
       Dim target = lhs.Vb
       Return lhs.Text & " = " & ExprParser.Coerce(rhs, target)
@@ -510,7 +569,7 @@ Namespace QB2VB
         Case Else
       End Select
       Select Case name
-        Case "WRITE", "FIELD", "LSET", "RSET", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
+        Case "WRITE", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
           Throw New ConvertException(name & " isn't converted yet")
       End Select
       If p >= e Then Return name & "()"
@@ -672,10 +731,13 @@ Namespace QB2VB
         ' GET/PUT [#]filenum, [record], variable
         If p < e AndAlso t(p).Is_("#") Then p += 1
         Dim parts = SplitTopLevel(t, p, e)
-        If parts.Count < 2 Then Throw New ConvertException(t(s).Text & " needs a file number and a variable")
         Dim num = ExprParser.Coerce(Expr(parts(0), 0, parts(0).Count), QT.Long)
-        Dim rec = If(parts.Count > 2 AndAlso parts(1).Count > 0, ExprParser.Coerce(Expr(parts(1), 0, parts(1).Count), QT.Long), "")
-        Dim target = parts(parts.Count - 1)
+        Dim rec = If(parts.Count > 1 AndAlso parts(1).Count > 0, ExprParser.Coerce(Expr(parts(1), 0, parts(1).Count), QT.Long), "")
+        If parts.Count < 3 Then
+          ' GET #n [, record]: the FIELD buffer.
+          Return If(isGet, "GET_FIELD", "PUT_FIELD") & "(" & num & If(rec <> "", ", " & rec, "") & ")"
+        End If
+        Dim target = parts(2)
         Dim v = Expr(target, 0, target.Count)
         Return If(isGet, "[GET]", "PUT") & "(" & num & If(rec <> "", ", " & rec, "") & ", " & v.Text & ")"
       End If
@@ -759,7 +821,8 @@ Namespace QB2VB
 
     ' ---- PRINT / INPUT / OPEN -------------------------------------------------------------------------------
 
-    Private Function PrintStatement(t As List(Of Token), s As Integer, e As Integer) As String
+    Private Function PrintStatement(t As List(Of Token), s As Integer, e As Integer, Optional toPrinter As Boolean = False) As String
+      Dim stmt = If(toPrinter, "LPRINT", "PRINT")
       Dim p = s + 1
       Dim fileNum = ""
       If p < e AndAlso t(p).Is_("#") Then
@@ -784,9 +847,9 @@ Namespace QB2VB
           Next
         End If
         Dim trailing = t(e - 1).Is_(";")
-        Return "PRINT_USING(" & If(fileNum <> "", fileNum & ", ", "") & fmt & If(vals.Count > 0, ", " & String.Join(", ", vals), "") & ")"
+        Return stmt & "_USING(" & If(fileNum <> "", fileNum & ", ", "") & fmt & If(vals.Count > 0, ", " & String.Join(", ", vals), "") & ")"
       End If
-      If p >= e Then Return "PRINT(" & fileNum & ")"
+      If p >= e Then Return stmt & "(" & fileNum & ")"
 
       ' items separated by ; or ,
       Dim sb As New StringBuilder
@@ -827,7 +890,7 @@ Namespace QB2VB
       Loop
       Dim body = sb.ToString
       If body = "" Then body = """"""
-      Return "PRINT(" & If(fileNum <> "", fileNum & ", ", "") & body & If(noCr, ", True", "") & ")"
+      Return stmt & "(" & If(fileNum <> "", fileNum & ", ", "") & body & If(noCr, ", True", "") & ")"
     End Function
 
     Private Shared Function SplitTopLevelBy(t As List(Of Token), s As Integer, e As Integer, sep As String) As List(Of List(Of Token))

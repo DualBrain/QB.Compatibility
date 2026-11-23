@@ -189,6 +189,11 @@ Namespace QB2VB.Tests
                                   "CIRCLE (100, 100), 20, 5, , , .5" & vbLf & "CIRCLE (100, 100), 20, 5, 0, 3.14" & vbLf & "PAINT (100, 100), 5, 3" & vbLf & "GET (1, 1)-(30, 30), a%" & vbLf & "PUT (40, 40), a%, PSET" & vbLf & "PUT (40, 40), a%(5), XOR" & vbLf & "VIEW (1, 1)-(100, 100), 1, 2" & vbLf & "WINDOW (0, 0)-(10, 10)"},
           New Object() {"def fn", "DEF FnTwice (x) = x * 2" & vbLf & "DEF FnHalf! (x!) = x! / 2" & vbLf & "PRINT FnTwice(4); FnHalf!(3)"},
           New Object() {"error handler in a gosub routine", "GOSUB Init" & vbLf & "END" & vbLf & "Init:" & vbLf & "ON ERROR GOTO Bad" & vbLf & "SCREEN 9" & vbLf & "ON ERROR GOTO 0" & vbLf & "RETURN" & vbLf & "Bad:" & vbLf & "RESUME NEXT"},
+          New Object() {"gosub in a sub", "DECLARE SUB Run (n%)" & vbLf & "Run 3" & vbLf & "SUB Run (n%)" & vbLf & "DIM a$(5)" & vbLf & "GOSUB Show" & vbLf & "n% = n% + 1" & vbLf & "GOSUB Show" & vbLf & "EXIT SUB" & vbLf & "Show:" & vbLf & "a$(1) = STR$(n%)" & vbLf & "PRINT a$(1)" & vbLf & "RETURN" & vbLf & "END SUB"},
+          New Object() {"gosub with on error in a sub", "DECLARE SUB Run ()" & vbLf & "Run" & vbLf & "END" & vbLf & "Trap:" & vbLf & "RESUME NEXT" & vbLf & "SUB Run" & vbLf & "GOSUB P" & vbLf & "GOSUB P" & vbLf & "EXIT SUB" & vbLf & "P:" & vbLf & "ON ERROR GOTO Trap" & vbLf & "LPRINT" & vbLf & "ON ERROR GOTO 0" & vbLf & "RETURN" & vbLf & "END SUB"},
+          New Object() {"field", "OPEN ""f.dat"" FOR RANDOM AS #1 LEN = 20" & vbLf & "FIELD #1, 8 AS d$, 12 AS e$" & vbLf & "LSET d$ = ""x""" & vbLf & "RSET e$ = MKD$(1)" & vbLf & "PUT #1, 1" & vbLf & "GET #1, 1" & vbLf & "PRINT d$" & vbLf & "CLOSE" & vbLf & "end$ = ""e""" & vbLf & "PRINT end$"},
+          New Object() {"lprint", "u$ = ""\ \""" & vbLf & "LPRINT USING u$; ""ab""; 1" & vbLf & "LPRINT TAB(5); ""x"";" & vbLf & "LPRINT"},
+          New Object() {"data in hex", "READ a, b" & vbLf & "DATA &HFF, &H10"},
           New Object() {"files", "OPEN ""t.txt"" FOR OUTPUT AS #1" & vbLf & "PRINT #1, ""hi""" & vbLf & "CLOSE #1" & vbLf & "OPEN ""t.txt"" FOR INPUT AS #1" & vbLf & "LINE INPUT #1, a$" & vbLf & "CLOSE" & vbLf & "PRINT a$"}
         }
       End Get
@@ -252,6 +257,37 @@ Namespace QB2VB.Tests
     Public Sub EmptyLoopTimeCanBeSet()
       Dim c As New Converter("PRINT 1") With {.EmptyLoopMicroseconds = 400}
       Assert.Contains("EmptyLoopMicroseconds = 400", c.Convert("T"))
+    End Sub
+
+    <Fact>
+    Public Sub FieldVariablesAreFieldsOfARecord()
+      Dim vb = Convert("OPEN ""f"" FOR RANDOM AS #1 LEN = 10" & vbLf & "FIELD #1, 4 AS a$, 6 AS b$" & vbLf & "LSET b$ = ""x""" & vbLf & "GET #1, 2" & vbLf & "PRINT a$")
+      Assert.Contains("Fields1 = FIELD(1, 4, 6)", vb)
+      Assert.Contains("Fields1.LSET(1, ""x"")", vb)
+      Assert.Contains("GET_FIELD(1, 2)", vb)
+      Assert.Contains("PRINT(Fields1(0))", vb)
+    End Sub
+
+    <Fact>
+    Public Sub NamesWithASuffixAreNeverStatements()
+      Dim m = Main("end$ = ""a""" & vbLf & "PRINT end$")
+      Assert.Equal({"end_$ = ""a""", "PRINT(end_$)"}, m.Where(Function(l) l.Contains("end")).ToList())
+    End Sub
+
+    <Fact>
+    Public Sub CloseWithoutNumbersClosesAll()
+      AssertMain("CLOSE", "CLOSE()")
+    End Sub
+
+    <Fact>
+    Public Sub MoneyConvertsAndCompiles()
+      Dim c As New Converter(IO.File.ReadAllText(FindSample("MONEY.BAS"), Text.Encoding.Latin1))
+      Dim vb = c.Convert("MONEY")
+      ' Only CALL ABSOLUTE (machine code) is left.
+      Assert.Equal(2, c.Notes.Count)
+      Assert.All(c.Notes, Sub(n) Assert.Contains("Absolute", n))
+      Dim errors = VbCompiler.Compile(vb, "MONEY")
+      Assert.True(errors = "", errors)
     End Sub
 
     <Fact>

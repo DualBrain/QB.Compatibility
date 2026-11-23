@@ -555,7 +555,12 @@ Namespace Global.QB
 
       Dim record As Long
       Dim start = StartOf(e, hasPosition, position, record)
-      If start >= e.Stream.Length AndAlso size > 0 Then QBError.Raise(62, "Input past end of file")
+      If start >= e.Stream.Length AndAlso size > 0 Then
+        ' A random file's GET past the end isn't an error (the variable keeps what it had); a binary file's is.
+        If e.Mode <> OpenMode.Random Then QBError.Raise(62, "Input past end of file")
+        e.LastRecord = record : e.NextRecord = record + 1
+        Return
+      End If
 
       e.Position = start
       Dim buf(size - 1) As Byte
@@ -624,7 +629,10 @@ Namespace Global.QB
       Dim e = FieldEntry(filenum)
       If record < 1 Then QBError.Raise(63, "Bad record number")
       Dim start = (record - 1) * e.RecordLength
-      If start >= e.Stream.Length Then QBError.Raise(62, "Input past end of file")
+      If start >= e.Stream.Length Then
+        e.LastRecord = record : e.NextRecord = record + 1   ' (past the end: the buffer keeps what it had)
+        Return
+      End If
       e.Position = start
       Dim got = 0
       Do While got < e.RecordLength

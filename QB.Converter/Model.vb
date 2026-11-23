@@ -112,6 +112,9 @@ Namespace QB2VB
     Public UserType As String = ""
     Public Dims As String = ""           ' for implicit arrays: the bounds text
     Public FixedLen As Integer           ' STRING * n
+    Public DeferRank As Integer          ' an array whose DIM is in a procedure with GOSUB routines: declared at the top without bounds, sized by ReDim where the DIM was
+    Public FieldVar As String = ""       ' a FIELD variable: the FieldRecord that holds it, and its index in it
+    Public FieldIndex As Integer
   End Class
 
   Friend Class ParamSym
@@ -121,6 +124,7 @@ Namespace QB2VB
     Public HasSuffix As Boolean
     Public UserType As String = ""
     Public Rank As Integer = 1            ' dimensions of an array parameter (from how the body indexes it)
+    Public CopyIn As Boolean              ' used by a GOSUB routine, which is a lambda and can't capture a ByRef parameter: the body works on a copy
   End Class
 
   Friend Class ProcSym
@@ -157,7 +161,8 @@ Namespace QB2VB
       "WAIT", "WEND", "WHILE", "WIDTH", "WINDOW", "WRITE"}
 
     Friend Shared Function IsStatementWord(word As String) As Boolean
-      Return s_statements.Contains(word.TrimEnd("$"c, "%"c, "&"c, "!"c, "#"c))
+      If word.Length > 0 AndAlso "$%&!#".IndexOf(word(word.Length - 1)) >= 0 Then Return False   ' a name with a suffix is a variable (end$)
+      Return s_statements.Contains(word)
     End Function
 
     Private Shared ReadOnly s_vbReserved As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {
