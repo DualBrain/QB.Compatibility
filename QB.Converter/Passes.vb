@@ -10,6 +10,7 @@ Namespace QB2VB
 
     Private ReadOnly m_mainDecls As New List(Of String)
     Private ReadOnly m_sharedNames As New List(Of String)
+    Private ReadOnly m_commonNames As New List(Of String)    ' the scalar COMMON variables, in the order they are declared (the order CHAIN passes them)
     Private ReadOnly m_mainLabels As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
     Private ReadOnly m_neededHandlers As New List(Of String)
     Private m_procDeclAt As Integer
@@ -50,7 +51,54 @@ Namespace QB2VB
       Return t
     End Function
 
+    Private Shared ReadOnly s_notVariables As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {
+      "AS", "TO", "THEN", "ELSE", "AND", "OR", "XOR", "NOT", "MOD", "EQV", "IMP", "STEP", "INTEGER", "LONG", "SINGLE", "DOUBLE", "STRING", "IS", "CASE", "UNTIL", "OUTPUT", "APPEND", "BINARY", "RANDOM", "ANY"}
+
+    ' DEF FNname(...) with no = after it opens a block that ends with END DEF: it is read as a FUNCTION.
+    Private Function NormalizeDefBlocks() As HashSet(Of Integer)
+      Dim result As New HashSet(Of Integer)
+      Dim inBlock = False
+      For i = 0 To m_lines.Count - 1
+        Dim t = m_lines(i).Tokens
+        If t.Count < 2 Then Continue For
+        If t(0).IsWord("DEF") AndAlso t(1).Kind = TokKind.Ident AndAlso t(1).Text.StartsWith("FN", StringComparison.OrdinalIgnoreCase) Then
+          Dim depth = 0, hasEq = False
+          For k = 2 To t.Count - 1
+            If t(k).Is_("(") Then depth += 1
+            If t(k).Is_(")") Then depth -= 1
+            If depth = 0 AndAlso t(k).Is_("=") Then hasEq = True : Exit For
+          Next
+          If Not hasEq Then
+            t(0).Text = "FUNCTION" : result.Add(i) : inBlock = True
+          End If
+        ElseIf inBlock AndAlso t(0).IsWord("END") AndAlso t(1).IsWord("DEF") Then
+          t(1).Text = "FUNCTION" : inBlock = False
+        ElseIf inBlock AndAlso t(0).IsWord("EXIT") AndAlso t(1).IsWord("DEF") Then
+          t(1).Text = "FUNCTION"
+        End If
+      Next
+      Return result
+    End Function
+
+    ' A DEF FN works on the program's variables: every name in it that isn't a parameter is shared.
+    Private Sub ShareDefVariables(t As List(Of Token), start As Integer, sym As ProcSym)
+      For k = start To t.Count - 1
+        Dim tk = t(k)
+        If tk.Kind <> TokKind.Ident Then Continue For
+        If k > 0 AndAlso t(k - 1).Is_(".") Then Continue For
+        Dim hasSuffix As Boolean, bare As String = ""
+        TypeOfName(tk.Text, hasSuffix, bare)
+        If Keywords.IsStatementWord(tk.Text) OrElse s_notVariables.Contains(bare) OrElse Builtins.Table.ContainsKey(tk.Text) OrElse Builtins.LibraryNames.Contains(tk.Text) Then Continue For
+        If bare.StartsWith("FN", StringComparison.OrdinalIgnoreCase) OrElse m_procs.ContainsKey(bare) OrElse m_types.ContainsKey(bare) Then Continue For
+        If sym.Params.Any(Function(prm) prm.QbName.Equals(bare, StringComparison.OrdinalIgnoreCase)) Then Continue For
+        If k + 1 < t.Count AndAlso t(k + 1).Is_(".") Then Continue For
+        If k > 0 AndAlso t(k - 1).IsWord("AS") Then Continue For
+        m_sharedNames.Add(tk.Text & If(k + 1 < t.Count AndAlso t(k + 1).Is_("("), "()", ""))
+      Next
+    End Sub
+
     Private Sub Pass1()
+      Dim defBlocks = NormalizeDefBlocks()
 
       Dim inProc As ProcSym = Nothing
       Dim procScope As Scope = Nothing
@@ -78,6 +126,7 @@ Namespace QB2VB
           Next
         End If
 
+        If inProc IsNot Nothing AndAlso inProc.IsDefBlock Then ShareDefVariables(t, 0, inProc)
         Try
           Select Case first
             Case "DEFINT", "DEFSNG", "DEFDBL", "DEFLNG", "DEFSTR"
@@ -96,6 +145,7 @@ Namespace QB2VB
                   Dim sym = ParseProcHeader(t.GetRange(0, eq), 1, True)
                   sym.IsDefFn = True : sym.HeaderLine = i
                   sym.DefBody = t.GetRange(eq + 1, t.Count - eq - 1)
+                  ShareDefVariables(sym.DefBody, 0, sym)
                   m_procs(sym.QbName) = sym
                   m_procScopes(sym.QbName) = New Scope(m_module) With {.Proc = sym}
                 End If
@@ -115,6 +165,7 @@ Namespace QB2VB
               If t.Count > 1 Then
                 Dim sym = ParseProcHeader(t, 1, first = "FUNCTION")
                 sym.HeaderLine = i
+                sym.IsDefBlock = defBlocks.Contains(i)
                 m_procs(sym.QbName) = sym
                 inProc = sym
                 procScope = New Scope(m_module) With {.Proc = sym}
@@ -142,6 +193,12 @@ Namespace QB2VB
               End If
 
             Case "DIM", "REDIM", "COMMON", "STATIC"
+              If first = "COMMON" Then
+                For Each part In SplitTopLevel(t, If(t.Count > 1 AndAlso t(1).IsWord("SHARED"), 2, 1), t.Count)
+                  ' (a block name /name/ is left out; so are arrays, which can't be passed)
+                  If part.Count > 0 AndAlso part(0).Kind = TokKind.Ident AndAlso (part.Count = 1 OrElse Not part(1).Is_("(")) Then m_commonNames.Add(part(0).Text)
+                Next
+              End If
               Dim scope As Scope = If(inProc IsNot Nothing, procScope, m_main)
               RegisterDims(t, scope, first = "STATIC", first = "REDIM")
 
@@ -353,6 +410,24 @@ Namespace QB2VB
         If isRedim AndAlso FindVariable(scope, name, True) IsNot Nothing Then Continue For
         Dim v = DeclareVariable(target, name, isArray, asType, userType)
         If isShared Then v.IsShared = True
+        If isArray AndAlso q > 0 Then
+          ' the lower bounds, so that uses that come before the DIM in the text (a procedure that is written first) already know them
+          Dim lowers As New List(Of Integer)
+          Dim openAt = part.FindIndex(1, Function(tk) tk.Is_("("))
+          If openAt > 0 Then
+            Dim closeAt = openAt, d2 = 0
+            Do While closeAt < part.Count
+              If part(closeAt).Is_("(") Then d2 += 1
+              If part(closeAt).Is_(")") Then d2 -= 1
+              If d2 = 0 Then Exit Do
+              closeAt += 1
+            Loop
+            For Each dimPart In SplitTopLevel(part, openAt + 1, closeAt)
+              lowers.Add(LowerBoundOf(dimPart))
+            Next
+            If lowers.Any(Function(x) x <> 0) Then v.LowerBounds = lowers
+          End If
+        End If
         If fixedLen <> 0 Then v.FixedLen = fixedLen
       Next
     End Sub
@@ -365,7 +440,25 @@ Namespace QB2VB
       Do While i < m_lines.Count
         Dim t = m_lines(i).Tokens
         If t.Count >= 2 AndAlso t(0).IsWord("END") AndAlso t(1).IsWord("TYPE") Then Exit Do
-        If t.Count >= 3 AndAlso t(1).IsWord("AS") Then
+        If t.Count >= 6 AndAlso t(1).Is_("(") Then
+          ' an array field: Name(lo TO hi) AS type
+          Dim asAt = t.FindIndex(2, Function(tk) tk.IsWord("AS"))
+          If asAt > 0 Then
+            Dim dimToks = t.GetRange(2, asAt - 3)
+            Dim hiTok = dimToks(dimToks.Count - 1)
+            Dim hi As Integer
+            If dimToks.Count <= 3 AndAlso Integer.TryParse(hiTok.Text, hi) AndAlso (dimToks.Count = 1 OrElse (dimToks.Count = 3 AndAlso dimToks(0).Text = "0" OrElse dimToks(0).Text = "1")) Then
+              Dim p2 = asAt + 1
+              Dim ut2 As String = "", fl2 As Integer
+              Dim qty2 = ParseAsType(t, p2, ut2, fl2)
+              ts.Fields.Add((t(0).Text, qty2, fl2, ut2))
+              ts.ArrayHi(t(0).Text) = hi
+              ts.ArrayLo(t(0).Text) = If(dimToks.Count = 3 AndAlso dimToks(0).Text = "1", 1, 0)
+            Else
+              Note("an array inside a TYPE needs literal bounds (0 or 1 TO n): " & t(0).Text & " was left out")
+            End If
+          End If
+        ElseIf t.Count >= 3 AndAlso t(1).IsWord("AS") Then
           Dim p = 2
           Dim ut As String = "", fl As Integer
           Dim qty = ParseAsType(t, p, ut, fl)

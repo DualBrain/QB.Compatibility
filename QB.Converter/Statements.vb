@@ -375,6 +375,11 @@ Namespace QB2VB
             ' (The statement is the tokens s to e: several DIMs can be on one line.)
             Dim dimTokens = t.GetRange(s, e - s)
             If w = "STATIC" Then Return DimText(dimTokens, "Static", False)
+            If w = "COMMON" Then
+              Dim declared = DimText(dimTokens, "Dim", False)
+              Dim loads = CommonLoads(dimTokens)
+              Return If(loads.Count = 0, declared, declared & " : " & String.Join(" : ", loads))
+            End If
             Return DimText(dimTokens, If(w = "REDIM", "ReDim", "Dim"), False)
 
           Case Else
@@ -658,11 +663,48 @@ Namespace QB2VB
         Case Else
       End Select
       Select Case name
-        Case "WRITE", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
+        Case "CHAIN", "RUN"
+          Return ChainStatement(name, t, p, e)
+        Case "WRITE", "DEF", "KEY", "ON", "ERASE", "COMMON"
           Throw New ConvertException(name & " isn't converted yet")
       End Select
       If p >= e Then Return name & "()"
       Return name & "(" & ArgList(t, p, e) & ")"
+    End Function
+
+    ' CHAIN "program" (RUN "program"): the converted program of that name is started, with the COMMON variables for CHAIN.
+    Private Function ChainStatement(name As String, t As List(Of Token), p As Integer, e As Integer) As String
+      If p >= e Then Throw New ConvertException(name & " without a program name restarts the program: not converted")
+      Dim commaAt = -1
+      For k = p To e - 1
+        If t(k).Is_(",") Then commaAt = k : Exit For
+      Next
+      If commaAt >= 0 Then Throw New ConvertException(name & " with a line number or options (ALL, MERGE, DELETE) isn't converted")
+      Dim file = Expr(t, p, e)
+      If file.Qt <> QT.String Then Throw New ConvertException(name & " needs a program name")
+      Dim args As New List(Of String) From {file.Text}
+      If name = "CHAIN" Then
+        For Each common In m_commonNames
+          Dim v = FindVariable(m_scope, common)
+          If v Is Nothing Then v = FindVariable(m_main, common)
+          If v IsNot Nothing AndAlso Not v.IsArray Then args.Add(ExprParser.VarText(v))
+        Next
+      End If
+      Return name & "(" & String.Join(", ", args) & ")"
+    End Function
+
+    ' name = COMMON_VALUE(index, name): a program that was CHAINed to picks up what was passed.
+    Private Function CommonLoads(t As List(Of Token)) As List(Of String)
+      Dim result As New List(Of String)
+      For Each part In SplitTopLevel(t, If(t.Count > 1 AndAlso t(1).IsWord("SHARED"), 2, 1), t.Count)
+        If part.Count = 0 OrElse part(0).Kind <> TokKind.Ident OrElse (part.Count > 1 AndAlso part(1).Is_("(")) Then Continue For
+        Dim index = m_commonNames.IndexOf(part(0).Text)
+        Dim v = FindVariable(m_scope, part(0).Text)
+        If index < 0 OrElse v Is Nothing Then Continue For
+        Dim vt = ExprParser.VarText(v)
+        result.Add(vt & " = COMMON_VALUE(" & index & ", " & vt & ")")
+      Next
+      Return result
     End Function
 
     ' ---- Graphics ---------------------------------------------------------------------------------------

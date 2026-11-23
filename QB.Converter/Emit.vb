@@ -196,6 +196,7 @@ Namespace QB2VB
         Case "DIM", "COMMON"
           If m_curProc Is Nothing AndAlso t.Count > 1 AndAlso t(1).IsWord("SHARED") Then
             m_hoisted.Add(DimText(t, "Dim", True))
+            If first = "COMMON" Then m_mainPrologue.AddRange(CommonLoads(t))
             Flush(m_target)
             m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
             Return i + 1
@@ -309,7 +310,7 @@ Namespace QB2VB
       PrepareProcRoutines(i, sym)
       For Each prm In sym.Params
         Dim v = DeclareVariable(scope, prm.QbName & If(prm.HasSuffix, Types.Suffix(prm.Qt), ""), prm.IsArray, If(prm.HasSuffix, QT.Unknown, If(prm.UserType <> "" OrElse prm.Qt <> QT.Unknown, prm.Qt, QT.Unknown)), prm.UserType, True)
-        parms.Add(ParamText(v, prm))
+        parms.Add(If(sym.IsDefBlock, ParamText(v, prm).Replace("ByRef ", "ByVal "), ParamText(v, prm)))
         If prm.CopyIn Then
           Dim local = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
           Dim arg = v.VbName & "_Arg" & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
@@ -790,12 +791,22 @@ Namespace QB2VB
       End If
       Dim lo = New ExprParser(toks.GetRange(0, toIdx), 0, Me).ParseExpr()
       Dim hi = New ExprParser(toks.GetRange(toIdx + 1, toks.Count - toIdx - 1), 0, Me).ParseExpr()
-      If Not lo.IsLiteral OrElse lo.LiteralValue <> 0 Then
-        If Not lo.IsLiteral OrElse lo.LiteralValue < 0 Then
-          Note("an array with a lower bound that isn't 0 or a small positive number: check the indexes")
-        End If
+      If lo.IsLiteral AndAlso lo.LiteralValue < 0 Then
+        ' (indexes are moved up by the lower bound where the array is used)
+        Return If(hi.IsLiteral, CStr(CLng(hi.LiteralValue) - CLng(lo.LiteralValue)), ExprParser.Coerce(hi, QT.Long) & " + " & (-CLng(lo.LiteralValue)))
+      ElseIf Not lo.IsLiteral Then
+        Note("an array whose lower bound isn't a number the converter knows: check the indexes")
       End If
       Return ExprParser.Coerce(hi, QT.Long)
+    End Function
+
+    Private Shared Function ReaderCall(qty As QT) As String
+      Select Case qty
+        Case QT.Long : Return "ReadInt32()"
+        Case QT.Single : Return "ReadSingle()"
+        Case QT.Double : Return "ReadDouble()"
+        Case Else : Return "ReadInt16()"
+      End Select
     End Function
 
     Private Function EmitTypeBlock(i As Integer) As Integer
@@ -811,6 +822,36 @@ Namespace QB2VB
         Dim hasSuffix As Boolean, bare As String = ""
         TypeOfName(f.Name, hasSuffix, bare)
         Dim fname = If(Keywords.IsVbReserved(bare), "[" & bare & "]", bare)
+        Dim arrayHi As Integer
+        If ts.ArrayHi.TryGetValue(f.Name, arrayHi) Then
+          ' An array field: made when first used (a Structure has no constructor to do it), one spare element so that 1 TO n works.
+          Dim backing = "m_" & bare
+          Dim elem = If(f.Qt = QT.String, "String", ftype)
+          lines.Add("  Private " & backing & "() As " & elem)
+          lines.Add("  Public ReadOnly Property " & fname & " As " & elem & "()")
+          lines.Add("    Get")
+          lines.Add("      If " & backing & " Is Nothing Then")
+          lines.Add("        " & backing & " = New " & elem & "(" & arrayHi & ") {}")
+          If f.Qt = QT.String Then lines.Add("        FixedString.Fill(" & backing & ", " & If(f.Length > 0, f.Length, 0) & ")")
+          lines.Add("      End If")
+          lines.Add("      Return " & backing)
+          lines.Add("    End Get")
+          lines.Add("  End Property")
+          Dim itemRef = fname & "(i)"
+          writes.Add("    For i = " & ts.ArrayLo(f.Name) & " To " & arrayHi)
+          reads.Add("    For i = " & ts.ArrayLo(f.Name) & " To " & arrayHi)
+          If f.UserType <> "" Then
+            writes.Add("      writer.Write(" & itemRef & ")") : reads.Add("      reader.Read(Of " & f.UserType & ")(" & fname & "(i))")
+          ElseIf f.Qt = QT.String Then
+            writes.Add("      writer.WriteString(" & itemRef & ", " & f.Length & ")") : reads.Add("      " & itemRef & " = reader.ReadString(" & f.Length & ")")
+          Else
+            writes.Add("      writer.Write(" & itemRef & ")")
+            reads.Add("      " & itemRef & " = reader." & ReaderCall(f.Qt))
+          End If
+          writes.Add("    Next") : reads.Add("    Next")
+          Note("a TYPE with an array field (" & ts.QbName & "." & bare & "): assigning one record to another shares the array")
+          Continue For
+        End If
         If f.Qt = QT.String AndAlso f.Length > 0 Then
           ' A fixed-length string: the property keeps it STRING * n (padded or cut when assigned; CHR$(0)s until then).
           Dim backing = "m_" & bare

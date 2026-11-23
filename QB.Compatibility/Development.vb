@@ -10,10 +10,56 @@ Namespace Global.QB
 
     ' DOS and program management
 
-    ''' <summary>RUN program: starts another program (QBasic would replace the running one).</summary>
+    ''' <summary>
+    ''' RUN program: the converted program of that name (next to this one) replaces the running one, as far as a separate process can:
+    ''' it runs to its end and then this one ends too.  RUN does not pass variables.
+    ''' </summary>
     Public Shared Sub RUN(path$)
-      Process.Start(path$)
+      CHAIN(path$)
     End Sub
+
+    ''' <summary>
+    ''' CHAIN program: as RUN, but passes the values of the COMMON variables (in the order they were declared) to the program, which
+    ''' receives them in its own COMMON statement (see COMMON_VALUE).
+    ''' </summary>
+    Public Shared Sub CHAIN(path$, ParamArray common() As Object)
+      Dim stem = IO.Path.GetFileNameWithoutExtension(path$)
+      Dim dir = AppContext.BaseDirectory
+      Dim exe As String = Nothing, dll As String = Nothing
+      For Each f In IO.Directory.EnumerateFiles(dir)
+        Dim name = IO.Path.GetFileName(f)
+        If name.Equals(stem, StringComparison.OrdinalIgnoreCase) OrElse name.Equals(stem & ".exe", StringComparison.OrdinalIgnoreCase) Then exe = f
+        If name.Equals(stem & ".dll", StringComparison.OrdinalIgnoreCase) Then dll = f
+      Next
+      If exe Is Nothing AndAlso dll Is Nothing Then Throw New IO.FileNotFoundException("File not found", path$)
+      Dim info As New ProcessStartInfo(If(exe, "dotnet")) With {.UseShellExecute = False}
+      If exe Is Nothing Then info.ArgumentList.Add(dll)
+      Dim items As New List(Of String)
+      For Each c In common
+        Dim text = If(c Is Nothing, "", Global.System.Convert.ToString(c, Globalization.CultureInfo.InvariantCulture))
+        items.Add(Global.System.Convert.ToBase64String(Global.System.Text.Encoding.UTF8.GetBytes(text)))
+      Next
+      info.Environment("QB_COMMON") = String.Join(",", items)
+      Dim code = 0
+      Using p = Process.Start(info)
+        p.WaitForExit()
+        code = p.ExitCode
+      End Using
+      Environment.Exit(code)
+    End Sub
+
+    Private Shared s_common As String()
+
+    ''' <summary>COMMON: the value that the program that CHAINed here passed for this position (current when there is none).</summary>
+    Public Shared Function COMMON_VALUE(Of T)(index%, current As T) As T
+      If s_common Is Nothing Then
+        Dim raw = Environment.GetEnvironmentVariable("QB_COMMON")
+        s_common = If(String.IsNullOrEmpty(raw), Array.Empty(Of String)(), raw.Split(","c))
+      End If
+      If index < 0 OrElse index >= s_common.Length Then Return current
+      Dim text = Global.System.Text.Encoding.UTF8.GetString(Global.System.Convert.FromBase64String(s_common(index)))
+      Return CType(Global.System.Convert.ChangeType(text, GetType(T), Globalization.CultureInfo.InvariantCulture), T)
+    End Function
 
     ''' <summary>SHELL command: runs an operating system command through the command interpreter and waits for it.</summary>
     Public Shared Sub SHELL(command$)

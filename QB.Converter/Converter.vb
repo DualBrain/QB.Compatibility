@@ -287,7 +287,29 @@ Namespace QB2VB
       Dim hasSuffix As Boolean, bare As String = ""
       Dim qty = ResolveType(name, hasSuffix, bare)
       Dim v = Lookup(m_scope, KeyOf(bare, qty, True))
-      Return v IsNot Nothing AndAlso v.IsArray
+      If v IsNot Nothing Then Return v.IsArray
+      ' rec.field where the field is an array of the record's TYPE
+      Dim dot = name.LastIndexOf("."c)
+      If dot > 0 Then
+        Dim rv = FindRecord(name.Substring(0, name.IndexOf("."c)))
+        If rv IsNot Nothing Then
+          Dim ut = rv.UserType
+          Dim parts = name.Split("."c)
+          For k = 1 To parts.Length - 1
+            Dim ts As TypeSym = Nothing
+            If ut = "" OrElse Not m_types.TryGetValue(ut, ts) Then Return False
+            If k = parts.Length - 1 Then
+              Dim fh As Boolean, fb As String = ""
+              TypeOfName(parts(k), fh, fb)
+              Return ts.ArrayHi.ContainsKey(fb)
+            End If
+            Dim fq As QT, fut As String = ""
+            If Not FieldOfCore(ut, parts(k), fq, fut) Then Return False
+            ut = fut
+          Next
+        End If
+      End If
+      Return False
     End Function
 
     Private Function FindProcCore(name As String) As ProcSym Implements IContext.FindProc

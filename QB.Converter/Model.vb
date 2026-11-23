@@ -131,6 +131,7 @@ Namespace QB2VB
   Friend Class ProcSym
     Public QbName As String = ""
     Public IsDefFn As Boolean             ' DEF FNname: a one-line function (parameters by value)
+    Public IsDefBlock As Boolean          ' DEF FNname ... END DEF: written as a FUNCTION whose parameters are by value and whose other variables are the program's
     Public DefBody As List(Of Token)      ' the expression of a DEF FN
     Public IsFunction As Boolean
     Public RetQt As QT
@@ -143,6 +144,8 @@ Namespace QB2VB
   Friend Class TypeSym
     Public QbName As String = ""
     Public Fields As New List(Of (Name As String, Qt As QT, Length As Integer, UserType As String))
+    Public ArrayLo As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)   ' ... and its lowest (0 or 1)
+    Public ArrayHi As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)   ' a field that is an array: its highest index
   End Class
 
   ''' <summary>The statement words of QBasic (so that a label isn't mistaken for one) and the words VB reserves.</summary>

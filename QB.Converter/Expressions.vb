@@ -517,7 +517,17 @@ Namespace QB2VB
         Return lit
       End If
       Dim text = If(isLower, "LBound(", "UBound(") & VarText(v) & If(dimension IsNot Nothing, ", " & Coerce(dimension, QT.Long), "") & ")"
+      If Not isLower AndAlso d >= 1 AndAlso d <= v.LowerBounds.Count AndAlso v.LowerBounds(d - 1) < 0 Then text &= " - " & (-v.LowerBounds(d - 1)).ToString(CultureInfo.InvariantCulture)
       Return New E(text, QT.Long, QT.Long, True)
+    End Function
+
+    ' An index into an array whose lower bound is below 0: VB arrays start at 0, so the index is moved up by that much.
+    Private Shared Function ShiftIndex(a As E, v As VarSym, dimIndex As Integer) As String
+      Dim text = Coerce(a, QT.Long)
+      If dimIndex >= v.LowerBounds.Count OrElse v.LowerBounds(dimIndex) >= 0 Then Return text
+      Dim shift = -v.LowerBounds(dimIndex)
+      If a.IsLiteral Then Return CStr(CLng(a.LiteralValue) + shift)
+      Return text & " + " & shift.ToString(CultureInfo.InvariantCulture)
     End Function
 
     Private Function ParseName() As E
@@ -563,7 +573,7 @@ Namespace QB2VB
       If m_ctx.IsArray(name) AndAlso (hasParen OrElse False) Then
         Dim v = m_ctx.ResolveVariable(name, True)
         If emptyParens Then Return New E(VarText(v), v.Qt, v.Qt, True) With {.IsLValue = False}
-        Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a) Coerce(a, QT.Long))) & ")", v.Qt, v.Qt, True)
+        Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a, k) ShiftIndex(a, v, k))) & ")", v.Qt, v.Qt, True)
         e.IsLValue = True
         e.FixedLen = v.FixedLen
         Return Members(e, v.UserType)

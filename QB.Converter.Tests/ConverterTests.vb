@@ -154,12 +154,10 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub UnsupportedStatementsAreFlaggedNotDropped()
-      Dim notes As New List(Of String)
-      Dim vb As String
-      Dim c As New Converter("CHAIN ""x""")
-      vb = c.Convert("T")
+      Dim c As New Converter("RUN")
+      Dim vb = c.Convert("T")
       Assert.Contains("TODO(QB2VB)", vb)
-      Assert.Contains("CHAIN ""x""", vb)
+      Assert.Contains("RUN", vb)
       Assert.NotEmpty(c.Notes)
     End Sub
 
@@ -551,6 +549,48 @@ Namespace QB2VB.Tests
       Dim vb = Convert("SCREEN 12" & vbLf & "VIEW" & vbLf & "LINE -(10, 10), (3 - 1)" & vbLf & "X = PMAP(5, 0)")
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub MultiLineDefFnIsAFunctionOverTheProgramsVariables()
+      Dim vb = Convert("Total = 10" & vbLf & "DEF FNMax (A, B)" & vbLf & "  IF A > B THEN FNMax = A ELSE FNMax = B" & vbLf & "  Total = Total + 1" & vbLf & "END DEF" & vbLf & "PRINT FNMax(3, 4)")
+      Assert.Contains("Function FNMax(ByVal A As Single, ByVal B As Single) As Single", vb)
+      Assert.Contains("Dim Total As Single", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub NegativeLowerBoundsMoveTheIndexes()
+      Dim vb = Convert("DIM A(-2 TO 2)" & vbLf & "A(-2) = 5" & vbLf & "FOR I = -2 TO 2: PRINT A(I): NEXT" & vbLf & "PRINT UBOUND(A)")
+      Assert.Contains("Dim A(4) As Single", vb)
+      Assert.Contains("A(0) = 5", vb)
+      Assert.Contains("A(CInt(I) + 2)", vb)
+      Assert.Contains("UBound(A) - 2", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub ArraysInsideATypeAreKept()
+      Dim vb = Convert("TYPE R" & vbLf & "  N AS INTEGER" & vbLf & "  V(1 TO 3) AS INTEGER" & vbLf & "END TYPE" & vbLf & "DIM X AS R" & vbLf & "X.V(2) = 4" & vbLf & "PRINT X.V(2)")
+      Assert.Contains("Public ReadOnly Property V As Short()", vb)
+      Assert.Contains("For i = 1 To 3", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub ChainPassesTheCommonVariablesAndAChildPicksThemUp()
+      Dim parent = Convert("COMMON SHARED N, Name$" & vbLf & "N = 5" & vbLf & "CHAIN ""P2""")
+      Assert.Contains("CHAIN(""P2"", N, Name$)", parent)
+      Assert.Contains("N = COMMON_VALUE(0, N)", parent)
+      Dim child = Convert("COMMON N, Name$" & vbLf & "PRINT N")
+      Assert.Contains("Name$ = COMMON_VALUE(1, Name$)", child)
+      For Each vb In {parent, child}
+        Dim errors = VbCompiler.Compile(vb, "T")
+        Assert.True(errors = "", errors)
+      Next
     End Sub
 
     <Fact>
