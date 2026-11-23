@@ -68,6 +68,7 @@ Namespace QB2VB.Tests
         Next
         psi.ArgumentList.Add("-r:" & GetType(QB.Video).Assembly.Location)
         psi.ArgumentList.Add("-r:" & GetType(QB.Graphics).Assembly.Location)
+        psi.ArgumentList.Add("-r:" & GetType(QB.Serial).Assembly.Location)
         For Each file In sources
           psi.ArgumentList.Add(file)
         Next

@@ -21,6 +21,7 @@ QB.Compatibility targets .NET 10 and runs on Windows, Linux and macOS (no WinFor
 | text only: `PRINT`, `INPUT`, `LOCATE`, `COLOR`, `CLS`, files, errors, `BEEP` | `QB.Video` | `QB.Compatibility` | the terminal |
 | graphics (`SCREEN` 1 and up, `PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`/`PUT`, `DRAW`, `PALETTE`, `VIEW`, `WINDOW`), the joystick or the pen | `QB.Graphics` (instead of `QB.Video`) | plus `QB.Compatibility.Sdl` | an SDL2 window |
 | `SOUND` and `PLAY` | `QB.Speaker` (instead of `QB.Multimedia`) | plus `QB.Compatibility.Sdl` | SDL2 audio |
+| a serial port (`OPEN "COM1:..."`, `ON COM`) | `QB.Serial` (instead of `QB.File`) | plus `QB.Compatibility.Ports` | the port |
 
 Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` installs the audio.  A program that uses neither doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project DIR` chooses the imports and writes a project that references only what the program needs.
 
@@ -55,7 +56,7 @@ nothing from the library has to call `Poll()`.  While a handler runs its event i
 **Joysticks and the pen** (`QB.Devices`): `STICK(n)` (0 to 200, 100 is the center), `STRIG(n)` and `PEN(n)` read the first two joysticks SDL finds (A and B; button 0
 is the lower trigger, 1 the upper) and the mouse, which is the light pen (left button = pen switch; coordinates are screen pixels of the current mode).
 
-**Serial ports**: `OPEN("COM1:9600,N,8,1", OpenMode.Random, 1)` opens a port (`System.IO.Ports`; COM1 is `/dev/ttyS0` off Windows, and a device path such as
+**Serial ports** (`Imports QB.Serial` instead of `QB.File`, which needs the `QB.Compatibility.Ports` assembly; the other programs don't carry `System.IO.Ports`): `OPEN("COM1:9600,N,8,1", OpenMode.Random, 1)` opens a port (`System.IO.Ports`; COM1 is `/dev/ttyS0` off Windows, and a device path such as
 `/dev/ttyUSB0:9600,N,8,1` works too).  `PRINT #`, `INPUT #`, `LINE INPUT #`, `INPUT$`, `EOF` (nothing waiting), `LOC` (bytes waiting), `LOF` (free transmit
 space) and `CLOSE` work on it.  The handshake and time-out options are accepted and ignored.
 

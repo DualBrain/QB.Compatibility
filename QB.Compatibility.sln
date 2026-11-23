@@ -15,6 +15,8 @@ Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "QB.Compatibility.Sdl", "QB.
 EndProject
 Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "QB.Compatibility.Tests", "QB.Compatibility.Tests\QB.Compatibility.Tests.vbproj", "{C8D99EAF-F6BC-453C-9851-B9FEAC470622}"
 EndProject
+Project("{F184B08F-C81C-45F6-A57F-5ABD9991F28F}") = "QB.Compatibility.Ports", "QB.Compatibility.Ports\QB.Compatibility.Ports.vbproj", "{F91DABC6-DBCD-48BA-843F-61C19EF8C272}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{C8D99EAF-F6BC-453C-9851-B9FEAC470622}.Release|x64.Build.0 = Release|Any CPU
 		{C8D99EAF-F6BC-453C-9851-B9FEAC470622}.Release|x86.ActiveCfg = Release|Any CPU
 		{C8D99EAF-F6BC-453C-9851-B9FEAC470622}.Release|x86.Build.0 = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|x64.Build.0 = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Debug|x86.Build.0 = Debug|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|x64.ActiveCfg = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|x64.Build.0 = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|x86.ActiveCfg = Release|Any CPU
+		{F91DABC6-DBCD-48BA-843F-61C19EF8C272}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

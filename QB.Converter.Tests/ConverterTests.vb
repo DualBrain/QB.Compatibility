@@ -311,15 +311,33 @@ Namespace QB2VB.Tests
       Assert.DoesNotContain(If(graphics, "Imports QB.Video", "Imports QB.Graphics"), vb)
     End Sub
 
+    <Theory>
+    <InlineData("OPEN ""COM1:9600,N,8,1"" FOR RANDOM AS #1", True)>
+    <InlineData("OPEN ""com2:"" FOR INPUT AS #1", True)>
+    <InlineData("OPEN ""/dev/ttyUSB0:9600"" FOR RANDOM AS #1", True)>
+    <InlineData("COM(1) ON", True)>
+    <InlineData("ON COM(1) GOSUB H" & vbLf & "END" & vbLf & "H:" & vbLf & "RETURN", True)>
+    <InlineData("OPEN ""data.txt"" FOR OUTPUT AS #1", False)>
+    <InlineData("OPEN ""LPT1:"" FOR OUTPUT AS #1", False)>
+    Public Sub SerialPortsNeedTheSerialImport(source As String, serial As Boolean)
+      Dim c As New Converter(source)
+      Dim vb = c.Convert("T")
+      Assert.Equal(serial, c.UsesSerial)
+      Assert.Contains(If(serial, "Imports QB.Serial", "Imports QB.File"), vb)
+      Assert.DoesNotContain(If(serial, "Imports QB.File", "Imports QB.Serial"), vb)
+    End Sub
+
     <Fact>
     Public Sub TheProjectReferencesTheSdlAssemblyOnlyWhenNeeded()
-      Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False)
+      Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False, False)
       Assert.Contains("QB.Compatibility.vbproj", text)
       Assert.DoesNotContain("QB.Compatibility.Sdl", text)
       Assert.DoesNotContain("PublishAot", text)
-      Dim withSdl = Program.ProjectText("T", "T.vb", "/work/T", "/lib", True, True)
+      Dim withSdl = Program.ProjectText("T", "T.vb", "/work/T", "/lib", True, True, True)
       Assert.Contains("QB.Compatibility.Sdl.vbproj", withSdl)
       Assert.Contains("<PublishAot>true</PublishAot>", withSdl)
+      Assert.Contains("QB.Compatibility.Ports.vbproj", withSdl)
+      Assert.DoesNotContain("QB.Compatibility.Ports", text)
     End Sub
 
     <Fact>

@@ -308,6 +308,7 @@ Namespace QB2VB
             Return LibraryStatement(t, s, e)
           Case "STRIG", "COM"
             If w = "STRIG" Then m_usesGraphics = True
+            If w = "COM" Then m_usesSerial = True
             If n >= 4 AndAlso t(s + 1).Is_("(") AndAlso {"ON", "OFF", "STOP"}.Contains(t(e - 1).Upper()) Then Return w & "_" & t(e - 1).Upper() & "(" & ExprParser.Coerce(Expr(t, s + 2, e - 2), QT.Long) & ")"
             Return LibraryStatement(t, s, e)
           Case "KEY"
@@ -866,6 +867,7 @@ Namespace QB2VB
     Private Function OnEventStatement(t As List(Of Token), s As Integer, e As Integer) As String
       Dim kind = t(s + 1).Upper()
       If kind = "PEN" OrElse kind = "STRIG" Then m_usesGraphics = True
+      If kind = "COM" Then m_usesSerial = True
       If kind = "PLAY" Then m_usesSound = True
       Dim gosubAt = FindWord(t, s, e, "GOSUB")
       If gosubAt < 0 Then Throw New ConvertException("ON " & kind & " needs GOSUB")
@@ -1069,6 +1071,7 @@ Namespace QB2VB
       Dim asIdx = FindWord(t, s, e, "AS")
       If forIdx < 0 OrElse asIdx < 0 Then Throw New ConvertException("this form of OPEN isn't converted yet")
       Dim fileName = Expr(t, s + 1, forIdx).Text
+      If System.Text.RegularExpressions.Regex.IsMatch(fileName, "^\s*""(COM[0-9]|/dev/)", System.Text.RegularExpressions.RegexOptions.IgnoreCase) Then m_usesSerial = True
       Dim mode = t(forIdx + 1).Upper()
       Dim vbMode As String
       Select Case mode

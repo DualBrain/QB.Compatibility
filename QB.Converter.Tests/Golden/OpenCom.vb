@@ -9,7 +9,7 @@ Imports QB.Core
 Imports QB.Development
 Imports QB.Devices
 Imports QB.Events
-Imports QB.File
+Imports QB.Serial
 Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video

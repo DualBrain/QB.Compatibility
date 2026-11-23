@@ -12,20 +12,20 @@ Namespace Global.QB
   ''' <summary>
   ''' Sequential file I/O: OPEN, CLOSE, EOF, LOF, LOC, SEEK, FREEFILE, KILL, NAME, MKDIR, RMDIR and CHDIR.
   ''' (PRINT #, WRITE #, INPUT #, LINE INPUT # and INPUT$ are overloads of PRINT, WRITE, INPUT, LINE_INPUT
-  ''' and INPUT$ in Video and Console, because VB can't import one name from two classes.)
+  ''' and INPUT$ in Video, because VB can't import one name from two classes.)
   ''' Files hold code page 437 text with CR LF line ends, as QBasic wrote them.  Random files (OPEN ... LEN = n) and
   ''' binary files are read and written with GET and PUT, which are overloads in Video.)
   ''' </summary>
-  Public NotInheritable Class File
+  Public MustInherit Class File
 
-    Private Sub New()
+    Protected Sub New()
     End Sub
 
     Friend NotInheritable Class FileEntry
 
       Friend ReadOnly Mode As OpenMode
       Friend ReadOnly Stream As Stream
-      Friend ReadOnly Port As IO.Ports.SerialPort      ' Serial ports (OPEN "COM1:..."); Nothing for files.
+      Friend ReadOnly Port As ISerialPort      ' Serial ports (OPEN "COM1:..."); Nothing for files.
       Friend ReadOnly ComNumber As Integer
       Friend Column As Integer = 1       ' Print column, for TAB and print zones.
       Friend Width As Integer = 0        ' Line width for WIDTH #n (0 = no wrapping).
@@ -46,7 +46,7 @@ Namespace Global.QB
         Me.Mode = mode
       End Sub
 
-      Friend Sub New(port As IO.Ports.SerialPort, number As Integer, mode As OpenMode)
+      Friend Sub New(port As ISerialPort, number As Integer, mode As OpenMode)
         Me.Port = port
         Me.Stream = port.BaseStream
         Me.ComNumber = number
@@ -180,7 +180,7 @@ Namespace Global.QB
       For Each n In numbers
         Dim e As FileEntry = Nothing
         If m_files.TryGetValue(n, e) Then
-          If e.Port IsNot Nothing Then e.Port.Dispose() Else e.Stream.Dispose()
+          If e.Port IsNot Nothing Then e.Port.Close() Else e.Stream.Dispose()
           If e.IsPrinter Then Printer.Flush()
           m_files.Remove(n)
         End If
@@ -301,51 +301,49 @@ Namespace Global.QB
       Return name
     End Function
 
-    Private Shared Function OpenPort(spec As String, ByRef number As Integer) As IO.Ports.SerialPort
+    ''' <summary>Creates the serial port for OPEN "COMn:...".  Assigned by QB.Compatibility.Ports (<c>Imports QB.Serial</c> uses it).</summary>
+    Public Shared Property SerialPortFactory As Func(Of SerialSettings, ISerialPort)
+
+    Private Shared Function OpenPort(spec As String, ByRef number As Integer) As ISerialPort
 
       Dim colon = spec.IndexOf(":"c)
       Dim portName = File.PortName(spec.Substring(0, colon), number)
       Dim options = spec.Substring(colon + 1).Split(","c).Select(Function(o) o.Trim()).ToList()
 
       ' QBasic's defaults: 300 baud, even parity, 7 data bits, 1 stop bit.
-      Dim baud = 300, parity = IO.Ports.Parity.Even, data = 7, stopBits = IO.Ports.StopBits.One
-      Dim readBuffer = 4096, writeBuffer = 2048
+      Dim settings As New SerialSettings With {.PortName = portName}
 
-      If options.Count > 0 AndAlso options(0) <> "" Then baud = Integer.Parse(options(0), CultureInfo.InvariantCulture)
+      If options.Count > 0 AndAlso options(0) <> "" Then settings.BaudRate = Integer.Parse(options(0), CultureInfo.InvariantCulture)
       If options.Count > 1 AndAlso options(1) <> "" Then
         Select Case options(1).ToUpperInvariant()
-          Case "N" : parity = IO.Ports.Parity.None
-          Case "E", "PE" : parity = IO.Ports.Parity.Even
-          Case "O" : parity = IO.Ports.Parity.Odd
-          Case "S" : parity = IO.Ports.Parity.Space
-          Case "M" : parity = IO.Ports.Parity.Mark
+          Case "N" : settings.Parity = "N"c
+          Case "E", "PE" : settings.Parity = "E"c
+          Case "O" : settings.Parity = "O"c
+          Case "S" : settings.Parity = "S"c
+          Case "M" : settings.Parity = "M"c
           Case Else : QBError.Raise(64, "Bad file name")
         End Select
       End If
-      If options.Count > 2 AndAlso options(2) <> "" Then data = Integer.Parse(options(2), CultureInfo.InvariantCulture)
+      If options.Count > 2 AndAlso options(2) <> "" Then settings.DataBits = Integer.Parse(options(2), CultureInfo.InvariantCulture)
       If options.Count > 3 AndAlso options(3) <> "" Then
         Select Case options(3)
-          Case "1" : stopBits = IO.Ports.StopBits.One
-          Case "1.5" : stopBits = IO.Ports.StopBits.OnePointFive
-          Case "2" : stopBits = IO.Ports.StopBits.Two
+          Case "1", "1.5", "2" : settings.StopBits = options(3)
           Case Else : QBError.Raise(64, "Bad file name")
         End Select
-      ElseIf baud <= 110 Then
-        stopBits = IO.Ports.StopBits.Two
+      ElseIf settings.BaudRate <= 110 Then
+        settings.StopBits = "2"
       End If
 
       ' The less-often-used options: buffer sizes are used; the handshake and timeout options are accepted and ignored.
       For i = 4 To options.Count - 1
         Dim o = options(i).ToUpperInvariant()
-        If o.StartsWith("RB", StringComparison.Ordinal) AndAlso o.Length > 2 Then readBuffer = Math.Max(1, Integer.Parse(o.Substring(2), CultureInfo.InvariantCulture))
-        If o.StartsWith("TB", StringComparison.Ordinal) AndAlso o.Length > 2 Then writeBuffer = Math.Max(1, Integer.Parse(o.Substring(2), CultureInfo.InvariantCulture))
+        If o.StartsWith("RB", StringComparison.Ordinal) AndAlso o.Length > 2 Then settings.ReadBufferSize = Math.Max(1, Integer.Parse(o.Substring(2), CultureInfo.InvariantCulture))
+        If o.StartsWith("TB", StringComparison.Ordinal) AndAlso o.Length > 2 Then settings.WriteBufferSize = Math.Max(1, Integer.Parse(o.Substring(2), CultureInfo.InvariantCulture))
       Next
 
-      Dim port As New IO.Ports.SerialPort(portName, baud, parity, data, stopBits) With {
-        .ReadBufferSize = readBuffer, .WriteBufferSize = writeBuffer,
-        .ReadTimeout = IO.Ports.SerialPort.InfiniteTimeout, .WriteTimeout = IO.Ports.SerialPort.InfiniteTimeout}
-      port.Open()
-      Return port
+      Dim factory = SerialPortFactory
+      If factory Is Nothing Then QBError.Raise(68, "Device unavailable: serial ports need QB.Compatibility.Ports (Imports QB.Serial)")
+      Return factory(settings)
 
     End Function
 

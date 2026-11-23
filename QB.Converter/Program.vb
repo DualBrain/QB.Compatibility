@@ -10,9 +10,10 @@ Namespace QB2VB
   Friend Module Program
 
     ''' <summary>A project file for a converted program: text programs reference only QB.Compatibility; the SDL assembly is added for graphics and sound.</summary>
-    Friend Function ProjectText(moduleName As String, sourceFile As String, projectDir As String, libDir As String, needsSdl As Boolean, aot As Boolean) As String
+    Friend Function ProjectText(moduleName As String, sourceFile As String, projectDir As String, libDir As String, needsSdl As Boolean, needsPorts As Boolean, aot As Boolean) As String
       Dim core = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility", "QB.Compatibility.vbproj"))
       Dim sdl = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility.Sdl", "QB.Compatibility.Sdl.vbproj"))
+      Dim ports = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility.Ports", "QB.Compatibility.Ports.vbproj"))
       Dim q = ChrW(34)
       Dim sb As New StringBuilder
       sb.AppendLine("<Project Sdk=" & q & "Microsoft.NET.Sdk" & q & ">")
@@ -34,6 +35,7 @@ Namespace QB2VB
       sb.AppendLine("    <Compile Include=" & q & sourceFile & q & " />")
       sb.AppendLine("    <ProjectReference Include=" & q & core & q & " />")
       If needsSdl Then sb.AppendLine("    <ProjectReference Include=" & q & sdl & q & " />")
+      If needsPorts Then sb.AppendLine("    <ProjectReference Include=" & q & ports & q & " />")
       sb.AppendLine("  </ItemGroup>")
       sb.AppendLine("</Project>")
       Return sb.ToString
@@ -72,7 +74,7 @@ Namespace QB2VB
         ElseIf a = "--aot" Then
           aot = True : i += 1
         ElseIf a = "-h" OrElse a = "--help" Then
-          Console.WriteLine("qb2vb input.bas [-o output.vb]    converts a QBasic program to VB that uses QB.Compatibility" & vbLf & "  --project DIR       also write a .vbproj that references the QB.Compatibility projects under DIR (QB.Compatibility.Sdl only if the program draws, plays sound or reads the joystick)" & vbLf & "  --aot               with --project: publish as a Native AOT program" & vbLf & "  --empty-loop-us N   start the program with QB.Core.EmptyLoopMicroseconds = N (the time of one pass of a delay loop; 400 by default)")
+          Console.WriteLine("qb2vb input.bas [-o output.vb]    converts a QBasic program to VB that uses QB.Compatibility" & vbLf & "  --project DIR       also write a .vbproj that references the QB.Compatibility projects under DIR (QB.Compatibility.Sdl only if the program draws, plays sound or reads the joystick; QB.Compatibility.Ports only if it opens a serial port)" & vbLf & "  --aot               with --project: publish as a Native AOT program" & vbLf & "  --empty-loop-us N   start the program with QB.Core.EmptyLoopMicroseconds = N (the time of one pass of a delay loop; 400 by default)")
           Return 0
         Else
           input = a : i += 1
@@ -96,8 +98,8 @@ Namespace QB2VB
       If libDir <> "" Then
         Dim projectPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), moduleName & ".vbproj")
         Dim needsSdl = conv.UsesGraphics OrElse conv.UsesSound
-        File.WriteAllText(projectPath, ProjectText(moduleName, Path.GetFileName(output), Path.GetDirectoryName(projectPath), libDir, needsSdl, aot), New UTF8Encoding(False))
-        Console.WriteLine($"{projectPath}  (references QB.Compatibility{If(needsSdl, " and QB.Compatibility.Sdl", "")})")
+        File.WriteAllText(projectPath, ProjectText(moduleName, Path.GetFileName(output), Path.GetDirectoryName(projectPath), libDir, needsSdl, conv.UsesSerial, aot), New UTF8Encoding(False))
+        Console.WriteLine($"{projectPath}  (references QB.Compatibility{If(needsSdl, " and QB.Compatibility.Sdl", "")}{If(conv.UsesSerial, " and QB.Compatibility.Ports", "")})")
       End If
       For Each n In conv.Notes
         Console.WriteLine("  " & n)

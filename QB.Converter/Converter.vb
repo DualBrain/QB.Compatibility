@@ -62,8 +62,13 @@ Namespace QB2VB
     Friend Sub Feature(kind As String) Implements IContext.Feature
       If kind = "graphics" Then m_usesGraphics = True
       If kind = "sound" Then m_usesSound = True
+      If kind = "serial" Then m_usesSerial = True
     End Sub
 
+    ''' <summary>The program opens a serial port (OPEN "COM1:...", COM(n) events): it needs QB.Serial.</summary>
+    Public ReadOnly Property UsesSerial As Boolean
+
+    Private m_usesSerial As Boolean
     Private m_usesGraphics As Boolean
     Private m_usesSound As Boolean
 
@@ -330,6 +335,7 @@ Namespace QB2VB
       Pass2()
       _UsesGraphics = m_usesGraphics
       _UsesSound = m_usesSound
+      _UsesSerial = m_usesSerial
 
       Dim sb As New StringBuilder
       sb.AppendLine("' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.")
@@ -343,7 +349,7 @@ Namespace QB2VB
       sb.AppendLine("Imports QB.Development")
       sb.AppendLine("Imports QB.Devices")
       sb.AppendLine("Imports QB.Events")
-      sb.AppendLine("Imports QB.File")
+      sb.AppendLine(If(m_usesSerial, "Imports QB.Serial", "Imports QB.File"))
       sb.AppendLine(If(m_usesSound, "Imports QB.Speaker", "Imports QB.Multimedia"))
       sb.AppendLine("Imports QB.Printer")
       sb.AppendLine(If(m_usesGraphics, "Imports QB.Graphics", "Imports QB.Video"))

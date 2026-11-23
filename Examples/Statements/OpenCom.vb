@@ -4,7 +4,7 @@
 ' environment variable to the whole open string to use another port.
 
 Imports QB
-Imports QB.File
+Imports QB.Serial
 Imports QB.Graphics
 
 Namespace Examples

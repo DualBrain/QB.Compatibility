@@ -21,5 +21,6 @@
     <ProjectReference Include="..\QB.Converter\QB.Converter.vbproj" />
     <ProjectReference Include="..\QB.Compatibility\QB.Compatibility.vbproj" />
     <ProjectReference Include="..\QB.Compatibility.Sdl\QB.Compatibility.Sdl.vbproj" />
+    <ProjectReference Include="..\QB.Compatibility.Ports\QB.Compatibility.Ports.vbproj" />
   </ItemGroup>
 </Project>

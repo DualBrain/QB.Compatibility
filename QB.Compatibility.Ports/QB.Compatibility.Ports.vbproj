@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>
+    </RootNamespace>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>QB.Compatibility.Ports</AssemblyName>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <OptionStrict>On</OptionStrict>
+    <LangVersion>latest</LangVersion>
+    <IsTrimmable>true</IsTrimmable>
+    <IsAotCompatible>true</IsAotCompatible>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.IO.Ports" Version="10.0.1" />
+    <ProjectReference Include="..\QB.Compatibility\QB.Compatibility.vbproj" />
+  </ItemGroup>
+</Project>
