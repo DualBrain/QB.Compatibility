@@ -460,38 +460,73 @@ Namespace Global.QB
       m_dataLabels(name) = m_data.Count
     End Sub
 
-    ' ---- VARPTR$ and the X command of DRAW and PLAY ---------------------------------------------------------------
+    ' ---- VARPTR$, and the X and = commands of DRAW and PLAY ---------------------------------------------------------------------
 
-    Private Shared ReadOnly s_stringsByPointer As New Dictionary(Of Integer, String)
+    Private Shared ReadOnly s_valuesByPointer As New Dictionary(Of Integer, Object)
     Private Shared s_nextPointer As Integer
 
-    ''' <summary>
-    ''' VARPTR$(text$): a three character token for a string, for the X (execute substring) command of DRAW and PLAY:
-    ''' <c>DRAW("C2 X" &amp; VARPTR$(triangle$))</c>.  (QBasic's token holds the address of the variable; here it names the text.)
-    ''' </summary>
-    Public Shared Function VARPTR$(value As String)
-      SyncLock s_stringsByPointer
+    ' The first character of a VARPTR$ token says what it points to (QBasic's holds the type of the variable the same way).
+    Private Const StringToken As Integer = 3
+    Private Shared ReadOnly s_tokenTypes As Char() = {ChrW(2), ChrW(3), ChrW(4), ChrW(5), ChrW(20)}
+
+    Private Shared Function Pointer(typeCode As Integer, value As Object) As String
+      SyncLock s_valuesByPointer
         s_nextPointer = (s_nextPointer + 1) And &HFFFF
-        s_stringsByPointer(s_nextPointer) = If(value, "")
-        Return ChrW(3) & ChrW(s_nextPointer And 255) & ChrW(s_nextPointer >> 8)
+        s_valuesByPointer(s_nextPointer) = value
+        Return ChrW(typeCode) & ChrW(s_nextPointer And 255) & ChrW(s_nextPointer >> 8)
       End SyncLock
     End Function
 
-    ''' <summary>Replaces each X plus VARPTR$ token in a DRAW or PLAY command string by the string it names.</summary>
+    ''' <summary>
+    ''' VARPTR$(text$): a three character token for a string, for the X (execute substring) command of DRAW and PLAY:
+    ''' <c>DRAW("C2 X" &amp; VARPTR$(triangle$))</c>.  (QBasic's token holds the address of the variable; here it holds the text at the
+    ''' moment VARPTR$ is called.)
+    ''' </summary>
+    Public Shared Function VARPTR$(value As String)
+      Return Pointer(StringToken, If(value, ""))
+    End Function
+
+    ''' <summary>VARPTR$(n%): a token for a number, for the = form of DRAW and PLAY commands: <c>DRAW("U=" &amp; VARPTR$(n) &amp; ";")</c>.</summary>
+    Public Shared Function VARPTR$(value As Short)
+      Return Pointer(2, CInt(value))
+    End Function
+
+    Public Shared Function VARPTR$(value As Integer)
+      Return Pointer(20, value)
+    End Function
+
+    Public Shared Function VARPTR$(value As Single)
+      Return Pointer(4, CDbl(value))
+    End Function
+
+    Public Shared Function VARPTR$(value As Double)
+      Return Pointer(5, value)
+    End Function
+
+    ''' <summary>
+    ''' Replaces each X plus string token in a DRAW or PLAY command string by the string it names, and each = plus number token by the number
+    ''' (a + or - in front of the = stays in front: <c>M+=x;,=y;</c> is a relative move by the values of x and y).
+    ''' </summary>
     Friend Shared Function ExpandExecute(commands As String) As String
-      If commands Is Nothing OrElse commands.IndexOf(ChrW(3)) < 0 Then Return commands
+      If commands Is Nothing OrElse commands.IndexOfAny(s_tokenTypes) < 0 Then Return commands
       Dim sb As New Global.System.Text.StringBuilder
       Dim i = 0
       Do While i < commands.Length
         Dim c = commands(i)
-        If (c = "X"c OrElse c = "x"c) AndAlso i + 3 < commands.Length AndAlso commands(i + 1) = ChrW(3) Then
-          Dim id = AscW(commands(i + 2)) + (AscW(commands(i + 3)) << 8)
-          Dim text As String = Nothing
-          SyncLock s_stringsByPointer
-            s_stringsByPointer.TryGetValue(id, text)
-          End SyncLock
-          If text Is Nothing Then Throw New ArgumentException("Illegal function call")
-          sb.Append(ExpandExecute(text))
+        Dim isToken = i + 3 < commands.Length AndAlso Array.IndexOf(s_tokenTypes, commands(i + 1)) >= 0
+        If isToken AndAlso (c = "X"c OrElse c = "x"c) AndAlso AscW(commands(i + 1)) = StringToken Then
+          sb.Append(ExpandExecute(CStr(Lookup(commands, i + 2))))
+          i += 4
+        ElseIf isToken AndAlso c = "="c AndAlso AscW(commands(i + 1)) <> StringToken Then
+          Dim number = CInt(Math.Round(Convert.ToDouble(Lookup(commands, i + 2), Global.System.Globalization.CultureInfo.InvariantCulture)))
+          ' (A sign in front of the = tells a relative move, and the value's own sign goes with it.)
+          If sb.Length > 0 AndAlso (sb(sb.Length - 1) = "+"c OrElse sb(sb.Length - 1) = "-"c) Then
+            Dim minus = (sb(sb.Length - 1) = "-"c) Xor (number < 0)
+            sb.Length -= 1
+            sb.Append(If(minus, "-", "+")).Append(Math.Abs(number).ToString(Global.System.Globalization.CultureInfo.InvariantCulture))
+          Else
+            sb.Append(number.ToString(Global.System.Globalization.CultureInfo.InvariantCulture))
+          End If
           i += 4
         Else
           sb.Append(c)
@@ -499,6 +534,16 @@ Namespace Global.QB
         End If
       Loop
       Return sb.ToString
+    End Function
+
+    Private Shared Function Lookup(commands As String, at As Integer) As Object
+      Dim id = AscW(commands(at)) + (AscW(commands(at + 1)) << 8)
+      Dim value As Object = Nothing
+      SyncLock s_valuesByPointer
+        s_valuesByPointer.TryGetValue(id, value)
+      End SyncLock
+      If value Is Nothing Then Throw New ArgumentException("Illegal function call")
+      Return value
     End Function
 
     ''' <summary>How long one pass through an empty FOR loop takes, in microseconds (see <see cref="EMPTYLOOP"/>).</summary>

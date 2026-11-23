@@ -1896,7 +1896,7 @@ allplotted:
         i += 1
       Loop
       If i < s.Length AndAlso s(i) = "="c Then
-        Throw New NotSupportedException("DRAW can't read variables with =; put the value into the command string.")
+        Throw New ArgumentException("Illegal function call: DRAW reads a variable with = only through VARPTR$ (U=" & "VARPTR$(n))")
       End If
       Dim start = i
       If i < s.Length AndAlso (s(i) = "+"c OrElse s(i) = "-"c) Then
@@ -1919,7 +1919,7 @@ allplotted:
     ''' Draws from the last point using QBasic's graphics macro language: U D L R E F G H (move up, down,
     ''' left, right and diagonally by n), M x,y (move to; with + or - relative), B (move without drawing),
     ''' N (draw then return), A n (angle 0 to 3), TA n (angle in degrees), C n (color), S n (scale, 4 = 1:1),
-    ''' P paint,border (fill), X with VARPTR$ (execute a string).  =variable arguments aren't supported.
+    ''' P paint,border (fill), X and = with VARPTR$ (execute a string, or read a variable: <c>DRAW("U=" &amp; VARPTR$(n) &amp; ";")</c>).
     ''' </summary>
     Friend Shared Sub DRAW(commands As String)
 

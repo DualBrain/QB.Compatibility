@@ -116,7 +116,7 @@ Namespace Global.QB
         i += 1
       Loop
       If i < s.Length AndAlso s(i) = "="c Then
-        Throw New NotSupportedException("PLAY can't read variables with =; put the value into the command string.")
+        Throw New ArgumentException("Illegal function call: PLAY reads a variable with = only through VARPTR$ (L=" & "VARPTR$(n))")
       End If
       Dim start = i
       Do While i < s.Length AndAlso Char.IsDigit(s(i))
@@ -171,7 +171,7 @@ Namespace Global.QB
     ''' Plays music written in QBasic's music macro language: A to G (with # + - and a length and dots),
     ''' O n (octave 0 to 6), &lt; and &gt; (octave down and up), N n (note 0 to 84), L n (length), P n (pause),
     ''' T n (tempo 32 to 255), MF and MB (foreground and background), MN, ML and MS (normal, legato,
-    ''' staccato).  Settings last until the next PLAY.  X works with VARPTR$ (it plays that string).  =variable arguments aren't supported.
+    ''' staccato).  Settings last until the next PLAY.  X and = work with VARPTR$ (X plays that string, = reads a variable).
     ''' </summary>
     Friend Shared Sub PLAY(commands As String)
 

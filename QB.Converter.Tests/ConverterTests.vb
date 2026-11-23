@@ -194,6 +194,7 @@ Namespace QB2VB.Tests
           New Object() {"field", "OPEN ""f.dat"" FOR RANDOM AS #1 LEN = 20" & vbLf & "FIELD #1, 8 AS d$, 12 AS e$" & vbLf & "LSET d$ = ""x""" & vbLf & "RSET e$ = MKD$(1)" & vbLf & "PUT #1, 1" & vbLf & "GET #1, 1" & vbLf & "PRINT d$" & vbLf & "CLOSE" & vbLf & "end$ = ""e""" & vbLf & "PRINT end$"},
           New Object() {"lprint", "u$ = ""\ \""" & vbLf & "LPRINT USING u$; ""ab""; 1" & vbLf & "LPRINT TAB(5); ""x"";" & vbLf & "LPRINT"},
           New Object() {"data in hex", "READ a, b" & vbLf & "DATA &HFF, &H10"},
+          New Object() {"draw variables", "SCREEN 1" & vbLf & "n% = 12" & vbLf & "s$ = ""R10""" & vbLf & "DRAW ""U="" + VARPTR$(n%) + "";"" + ""X"" + VARPTR$(s$)" & vbLf & "PLAY ""L="" + VARPTR$(n%) + "";"""},
           New Object() {"files", "OPEN ""t.txt"" FOR OUTPUT AS #1" & vbLf & "PRINT #1, ""hi""" & vbLf & "CLOSE #1" & vbLf & "OPEN ""t.txt"" FOR INPUT AS #1" & vbLf & "LINE INPUT #1, a$" & vbLf & "CLOSE" & vbLf & "PRINT a$"}
         }
       End Get
