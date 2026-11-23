@@ -2433,6 +2433,21 @@ allplotted:
 
     End Sub
 
+    ''' <summary>WIDTH #n, columns: the line width of an open file (or printer file); 255 means never wrap.</summary>
+    Public Shared Sub WIDTH_FILE(filenum%, columns%)
+      File.SetWidth(filenum, columns)
+    End Sub
+
+    ''' <summary>WIDTH "LPT1:", columns (or "SCRN:", which is the screen width).</summary>
+    Public Shared Sub WIDTH(device$, columns%)
+      Select Case If(device, "").ToUpperInvariant()
+        Case "LPT1:", "LPT2:", "LPT3:" : Printer.WIDTH_LPRINT(columns)
+        Case "SCRN:" : WIDTH(columns)
+        Case "COM1:", "COM2:", "COM3:", "COM4:" ' (Serial ports have no line width.)
+        Case Else : Throw New ArgumentException("Bad file name")
+      End Select
+    End Sub
+
     ''' <summary>Restores the default palette of the current screen mode.</summary>
     Public Shared Sub PALETTE()
       ResetPalette()

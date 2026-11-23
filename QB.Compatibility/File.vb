@@ -28,6 +28,9 @@ Namespace Global.QB
       Friend ReadOnly Port As IO.Ports.SerialPort      ' Serial ports (OPEN "COM1:..."); Nothing for files.
       Friend ReadOnly ComNumber As Integer
       Friend Column As Integer = 1       ' Print column, for TAB and print zones.
+      Friend Width As Integer = 0        ' Line width for WIDTH #n (0 = no wrapping).
+      Friend IsPrinter As Boolean        ' Opened on LPT1: to LPT3:.
+      Friend Field As FieldRecord        ' The FIELD buffer of a random file.
       Friend RecordLength As Integer = 128
       Friend NextRecord As Long = 1      ' Random files: the record the next GET or PUT uses.
       Friend LastRecord As Long = 0      ' Random files: the record last read or written.
@@ -108,6 +111,13 @@ Namespace Global.QB
       If filenum < 1 OrElse filenum > 255 Then Throw New ArgumentException("Bad file name or number")
       If m_files.ContainsKey(filenum) Then Throw New IOException("File already open")
 
+      If IsLptSpec(file) Then
+        If accessMode = OpenMode.Input Then Throw New IOException("Bad file mode")
+        Dim printerEntry As New FileEntry(New PrinterStream, accessMode) With {.IsPrinter = True}
+        m_files.Add(filenum, printerEntry)
+        Return
+      End If
+
       If IsComSpec(file) Then
         Dim number As Integer
         Dim port = OpenPort(file, number)
@@ -151,6 +161,7 @@ Namespace Global.QB
         Dim e As FileEntry = Nothing
         If m_files.TryGetValue(n, e) Then
           If e.Port IsNot Nothing Then e.Port.Dispose() Else e.Stream.Dispose()
+          If e.IsPrinter Then Printer.Flush()
           m_files.Remove(n)
         End If
       Next
@@ -214,6 +225,18 @@ Namespace Global.QB
     End Function
 
 #End Region
+
+    ''' <summary>True for the printer devices LPT1: to LPT3: (optionally followed by printer options, which are ignored).</summary>
+    Private Shared Function IsLptSpec(file As String) As Boolean
+      Return file.Length >= 5 AndAlso file.StartsWith("LPT", StringComparison.OrdinalIgnoreCase) AndAlso Char.IsDigit(file(3)) AndAlso file(4) = ":"c
+    End Function
+
+    ''' <summary>WIDTH #n, columns: the line width of an open file or device (1 to 255; 255 means never wrap).</summary>
+    Friend Shared Sub SetWidth(filenum%, columns%)
+      If columns < 1 OrElse columns > 255 Then Throw New ArgumentException("Illegal function call")
+      Dim e = GetEntry(filenum)
+      If e.IsPrinter Then Printer.WIDTH_LPRINT(columns) Else e.Width = If(columns = 255, 0, columns)
+    End Sub
 
 #Region "Serial ports: OPEN COM"
 
@@ -295,25 +318,11 @@ Namespace Global.QB
     ''' <summary>Writes text and a CR LF (unless <paramref name="noCr"/>), like PRINT #; TAB(n) and Tab characters work.</summary>
     Friend Shared Sub PRINT(filenum%, text$, Optional noCr As Boolean = False)
       Dim e = WritableEntry(filenum)
-      Dim sb As New StringBuilder
-      For Each c In If(text, "")
-        Dim code = AscW(c)
-        Select Case code
-          Case 13, 10
-            sb.Append(c) : e.Column = 1
-          Case 9 ' Next 14-column print zone.
-            Dim target = ((e.Column - 1) \ 14 + 1) * 14 + 1
-            sb.Append(" "c, target - e.Column) : e.Column = target
-          Case &HE001 To &HE0FF ' TAB(n)
-            Dim n = code - &HE000
-            If e.Column > n Then sb.Append(vbCrLf) : e.Column = 1
-            sb.Append(" "c, n - e.Column) : e.Column = n
-          Case Else
-            sb.Append(c) : e.Column += 1
-        End Select
-      Next
-      If Not noCr Then sb.Append(vbCrLf) : e.Column = 1
-      e.Write(sb.ToString)
+      If e.IsPrinter Then
+        Printer.Print(text, noCr) ' (The printer keeps its own position and width.)
+      Else
+        e.Write(PrintFormat.Format(text, e.Column, e.Width, noCr))
+      End If
     End Sub
 
     Friend Shared Sub PRINT_USING(filenum%, template$, ParamArray values() As Object)
@@ -522,6 +531,62 @@ Namespace Global.QB
         e.LastRecord = record : e.NextRecord = record + 1
       End If
 
+    End Sub
+
+#End Region
+
+#Region "FIELD, GET_FIELD and PUT_FIELD"
+
+    ''' <summary>FIELD #n, w1 AS a$, w2 AS b$ ...: splits the record buffer of a random file into fields (see <see cref="FieldRecord"/>).</summary>
+    Public Shared Function FIELD(filenum%, ParamArray widths%()) As FieldRecord
+      Dim e = GetEntry(filenum)
+      If e.Mode <> OpenMode.Random Then Throw New IOException("Bad file mode")
+      If widths.Length = 0 OrElse widths.Any(Function(w) w < 1) Then Throw New ArgumentException("Illegal function call")
+      If widths.Sum() > e.RecordLength Then Throw New IOException("Field overflow")
+      e.Field = New FieldRecord(e.RecordLength, widths)
+      Return e.Field
+    End Function
+
+    Private Shared Function FieldEntry(filenum As Integer) As FileEntry
+      Dim e = GetEntry(filenum)
+      If e.Mode <> OpenMode.Random Then Throw New IOException("Bad file mode")
+      If e.Field Is Nothing Then Throw New IOException("No FIELD for this file")
+      Return e
+    End Function
+
+    ''' <summary>GET #n, record: reads a record into the FIELD buffer.</summary>
+    Public Shared Sub GET_FIELD(filenum%, record As Long)
+      Dim e = FieldEntry(filenum)
+      If record < 1 Then Throw New ArgumentException("Bad record number")
+      Dim start = (record - 1) * e.RecordLength
+      If start >= e.Stream.Length Then Throw New EndOfStreamException("Input past end of file")
+      e.Position = start
+      Dim got = 0
+      Do While got < e.RecordLength
+        Dim n = e.Stream.Read(e.Field.Buffer, got, e.RecordLength - got)
+        If n = 0 Then Exit Do
+        got += n
+      Loop
+      e.LastRecord = record : e.NextRecord = record + 1
+    End Sub
+
+    ''' <summary>GET #n: reads the next record into the FIELD buffer.</summary>
+    Public Shared Sub GET_FIELD(filenum%)
+      GET_FIELD(filenum, GetEntry(filenum).NextRecord)
+    End Sub
+
+    ''' <summary>PUT #n, record: writes the FIELD buffer as a record.</summary>
+    Public Shared Sub PUT_FIELD(filenum%, record As Long)
+      Dim e = FieldEntry(filenum)
+      If record < 1 Then Throw New ArgumentException("Bad record number")
+      e.Position = (record - 1) * e.RecordLength
+      e.Stream.Write(e.Field.Buffer, 0, e.RecordLength)
+      e.LastRecord = record : e.NextRecord = record + 1
+    End Sub
+
+    ''' <summary>PUT #n: writes the FIELD buffer as the next record.</summary>
+    Public Shared Sub PUT_FIELD(filenum%)
+      PUT_FIELD(filenum, GetEntry(filenum).NextRecord)
     End Sub
 
 #End Region

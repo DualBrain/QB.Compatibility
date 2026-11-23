@@ -51,6 +51,21 @@ is the lower trigger, 1 the upper) and the mouse, which is the light pen (left b
 `/dev/ttyUSB0:9600,N,8,1` works too).  `PRINT #`, `INPUT #`, `LINE INPUT #`, `INPUT$`, `EOF` (nothing waiting), `LOC` (bytes waiting), `LOF` (free transmit
 space) and `CLOSE` work on it.  The handshake and time-out options are accepted and ignored.
 
+## Printer
+
+`LPRINT`, `LPRINT_USING`, `LPOS` and `WIDTH_LPRINT` (in `QB.Printer`), and files opened with `OPEN("LPT1:", OpenMode.Output, 1)` (`PRINT #`, `WRITE #`, `WIDTH_FILE(1, 132)`).
+Print positions follow QBasic: a Tab character is the comma's 14-column print zone, `TAB(n)` works, and long lines wrap at the line width (80 by default; 255 never wraps).
+Nothing is printed by accident: by default the output is appended to the text file `LPT1.TXT`.  `Printer.UseSystemPrinter()` sends it to the real printer as one job
+(`lp`, or PowerShell's `Out-Printer` on Windows; `UseSystemPrinter("command", "arguments")` takes any command that reads the text from standard input), sent when the printer
+file is closed, at `Printer.Flush()` and when the program ends.  `Printer.Device` can be set to any `IPrinterDevice` (`HeadlessPrinter` keeps the text, for tests).
+
+## Numbers in strings, LSET and FIELD
+
+`MKI`, `MKL`, `MKS`, `MKD` and `CVI`, `CVL`, `CVS`, `CVD` (in `QB.Devices`; `MKI$(x)` also works as a call) convert numbers to and from 2, 4, 4 and 8 byte strings (IEEE, little endian; a QBasic
+INTEGER is a VB `Short`, a LONG an `Integer`); `MKSMBF`, `MKDMBF`, `CVSMBF` and `CVDMBF` do the same for the Microsoft Binary format older programs stored.  `LSET(variable, text)` and
+`RSET(variable, text)` justify text inside a string variable, keeping its length.  Variables can't be bound to a file buffer in VB, so `FIELD` is numbered:
+`Dim f = FIELD(1, 20, 4)` (`FIELD #1, 20 AS name$, 4 AS score$`), `f.LSET(0, "Mary")`, `f.RSET(1, MKS(99.0F))`, `PUT_FIELD(1, 1)` (`PUT #1, 1`), `GET_FIELD(1, 1)` and `f(0)`.
+
 ## Sound
 
 `SOUND`, `BEEP` and `PLAY` (in `QB.Multimedia`) make square-wave tones through SDL2 audio.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).

@@ -65,6 +65,8 @@ Namespace Examples
       QB.Video.Display = display
       Dim audio As New QB.HeadlessAudio
       QB.Multimedia.Audio = audio
+      Dim printer As New QB.HeadlessPrinter
+      QB.Printer.Device = printer
 
       Dim chosen As New List(Of ExampleInfo)
       If args.Length > 2 Then
@@ -81,6 +83,7 @@ Namespace Examples
 
         Reset()
         audio.Clear()
+        printer.Clear()
 
         ' Type the example's input, or else press a key (alternately a space and Esc) every quarter of a second.
         Dim n = 0
@@ -110,6 +113,10 @@ Namespace Examples
 
         display.SavePpm(IO.Path.Combine(dir, e.Name & ".ppm"))
         Dim sound = If(audio.Tones.Count > 0, $" ({audio.Tones.Count} tones, {audio.TotalSeconds:0.0} s of sound)", "")
+        If printer.Text.Length > 0 Then
+          IO.File.WriteAllText(IO.Path.Combine(dir, e.Name & ".printed.txt"), printer.Text)
+          sound &= $" ({printer.Text.Length} characters printed)"
+        End If
         Console.WriteLine($"{e.Name,-14}{status}{sound}")
         If status <> "ok" Then failures += 1
         If status = "TIMEOUT" Then Exit For ' The abandoned example would disturb the next one.
