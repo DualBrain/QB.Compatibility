@@ -34,6 +34,8 @@ Namespace QB2VB
     Function IsArray(name As String) As Boolean
     Function FindProc(name As String) As ProcSym
     Function FindType(name As String) As TypeSym
+    ''' <summary>The type of a field of a TYPE (its QBasic type and, for a nested record, its TYPE name).</summary>
+    Function FieldOf(userType As String, field As String, ByRef fieldType As QT, ByRef fieldUserType As String) As Boolean
     Sub Note(message As String)
   End Interface
 
@@ -509,7 +511,7 @@ Namespace QB2VB
         If emptyParens Then Return New E(VarText(v), v.Qt, v.Qt, True) With {.IsLValue = False}
         Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a) Coerce(a, QT.Long))) & ")", v.Qt, v.Qt, True)
         e.IsLValue = True
-        Return e
+        Return Members(e, v.UserType)
       End If
 
       ' User procedures.
@@ -566,7 +568,7 @@ Namespace QB2VB
         Dim v = m_ctx.ResolveVariable(name, True)
         Dim e = New E(VarText(v) & "(" & String.Join(", ", args.Select(Function(a) Coerce(a, QT.Long))) & ")", v.Qt, v.Qt, True)
         e.IsLValue = True
-        Return e
+        Return Members(e, v.UserType)
       End If
 
       ' A user FUNCTION without arguments.
@@ -589,6 +591,27 @@ Namespace QB2VB
       If name.EndsWith("$", StringComparison.Ordinal) Then Return QT.String
       If Builtins.NumericLibrary.Contains(upper) Then Return QT.Short
       Return QT.Short
+    End Function
+
+    ' .field after an array element of a TYPE.
+    Private Function Members(e As E, userType As String) As E
+      Do While userType <> "" AndAlso Cur IsNot Nothing AndAlso Cur.Is_(".") AndAlso m_pos + 1 < m_toks.Count
+        m_pos += 1
+        Dim field = Cur.Text
+        m_pos += 1
+        Dim fq As QT, fut As String = ""
+        If Not m_ctx.FieldOf(userType, field, fq, fut) Then Throw New ConvertException("unknown field " & field & " of " & userType)
+        e = New E(e.Text & "." & FieldName(field), fq, fq, True) With {.IsLValue = True}
+        userType = fut
+      Loop
+      Return e
+    End Function
+
+    ''' <summary>The name of a TYPE field in VB (no suffix; a reserved word in brackets).</summary>
+    Friend Shared Function FieldName(field As String) As String
+      Dim bare = field
+      If bare.Length > 1 AndAlso Types.FromSuffix(bare(bare.Length - 1)) <> QT.Unknown Then bare = bare.Substring(0, bare.Length - 1)
+      Return If(Keywords.IsVbReserved(bare), "[" & bare & "]", bare)
     End Function
 
     ''' <summary>The VB text for a variable.</summary>

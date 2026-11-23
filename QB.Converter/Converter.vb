@@ -11,6 +11,7 @@ Namespace QB2VB
     Public ReadOnly Vars As New Dictionary(Of String, VarSym)
     Public ReadOnly Locals As New List(Of VarSym)          ' in the order they were met
     Public Proc As ProcSym
+    Public ReadOnly Names As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)   ' the VB names in use
     Public Sub New(parent As Scope)
       Me.Parent = parent
     End Sub
@@ -86,7 +87,7 @@ Namespace QB2VB
       Return bare.ToLowerInvariant() & "|" & Types.Suffix(qty)
     End Function
 
-    Private Function ChooseVbName(bare As String, qty As QT, hasSuffix As Boolean) As String
+    Private Function ChooseVbName(bare As String, qty As QT, hasSuffix As Boolean, scope As Scope) As String
       Dim n = bare
       If Keywords.IsVbReserved(n) OrElse s_shadowRisk.Contains(n) OrElse m_procs.ContainsKey(n) Then
         n = If(hasSuffix OrElse s_shadowRisk.Contains(n) OrElse m_procs.ContainsKey(n), n & "_", "[" & n & "]")
@@ -94,19 +95,24 @@ Namespace QB2VB
       ' The same name with another type is another variable in QBasic but the same in VB: tell them apart.
       Dim candidate = n
       Dim bareKey = candidate.Trim("["c, "]"c).ToLowerInvariant()
-      If m_vbNames.Contains(bareKey) Then
+      If InUse(scope, bareKey) Then
         Dim tag = Select_(qty)
         candidate = n.TrimEnd("]"c) & "_" & tag & If(n.EndsWith("]", StringComparison.Ordinal), "]", "")
         bareKey = candidate.Trim("["c, "]"c).ToLowerInvariant()
         Dim i = 2
-        Do While m_vbNames.Contains(bareKey)
+        Do While InUse(scope, bareKey)
           candidate = n.TrimEnd("]"c) & "_" & tag & i & If(n.EndsWith("]", StringComparison.Ordinal), "]", "")
           bareKey = candidate.Trim("["c, "]"c).ToLowerInvariant()
           i += 1
         Loop
       End If
-      m_vbNames.Add(bareKey)
+      scope.Names.Add(bareKey)
       Return candidate
+    End Function
+
+    ' A name is taken when this scope or (for a procedure) the module already uses it.
+    Private Function InUse(scope As Scope, key As String) As Boolean
+      Return scope.Names.Contains(key) OrElse (scope IsNot m_module AndAlso m_module.Names.Contains(key))
     End Function
 
     Private Shared Function Select_(qty As QT) As String
@@ -176,7 +182,7 @@ Namespace QB2VB
       End If
       If qty = QT.Short Then hasSuffix = False      ' VB has no suffix for a 16 bit Short (a LONG gets VB's %)
       v = New VarSym With {.QbName = bare, .Qt = qty, .HasSuffix = hasSuffix, .IsArray = isArray, .IsParam = isParam, .UserType = userType, .DeclaredAs = declaredAs}
-      v.VbName = ChooseVbName(bare, qty, hasSuffix)
+      v.VbName = ChooseVbName(bare, qty, hasSuffix, scope)
       scope.Vars(key) = v
       If Not isParam Then scope.Locals.Add(v)
       Return v
@@ -198,7 +204,7 @@ Namespace QB2VB
         Dim rv = FindRecord(recName)
         If rv IsNot Nothing Then
           Dim fieldType = FieldTypeOf(rv, name.Substring(dot + 1))
-          Return New VarSym With {.QbName = name, .Qt = fieldType, .VbName = rv.VbName & "." & name.Substring(dot + 1), .HasSuffix = False}
+          Return New VarSym With {.QbName = name, .Qt = fieldType, .VbName = rv.VbName & "." & ExprParser.FieldName(name.Substring(dot + 1)), .HasSuffix = False}
         End If
       End If
       ' New implicit variable: local to where it is used.
@@ -245,6 +251,22 @@ Namespace QB2VB
       Dim p As ProcSym = Nothing
       m_procs.TryGetValue(bare, p)
       Return p
+    End Function
+
+    Private Function FieldOfCore(userType As String, field As String, ByRef fieldType As QT, ByRef fieldUserType As String) As Boolean Implements IContext.FieldOf
+      Dim ts As TypeSym = Nothing
+      If Not m_types.TryGetValue(userType, ts) Then Return False
+      Dim hasSuffix As Boolean, bare As String = ""
+      TypeOfName(field, hasSuffix, bare)
+      For Each f In ts.Fields
+        Dim fh As Boolean, fb As String = ""
+        TypeOfName(f.Name, fh, fb)
+        If fb.Equals(bare, StringComparison.OrdinalIgnoreCase) Then
+          fieldType = f.Qt : fieldUserType = f.UserType
+          Return True
+        End If
+      Next
+      Return False
     End Function
 
     Private Function FindTypeCore(name As String) As TypeSym Implements IContext.FindType

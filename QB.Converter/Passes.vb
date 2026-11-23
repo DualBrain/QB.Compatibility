@@ -15,6 +15,8 @@ Namespace QB2VB
     Private m_procDeclAt As Integer
     Private m_procBodyStart As Integer
     Private m_procStatic As Boolean
+    Private ReadOnly m_gosubTargets As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase)
+    Private m_inGosub As Boolean
 
     ' ---- Pass 1: what the program declares ---------------------------------------------------------------
 
@@ -60,6 +62,20 @@ Namespace QB2VB
         Dim t = ln.Tokens
         If t.Count = 0 Then Continue For
         Dim first = t(0).Upper()
+
+        ' The labels that module-level GOSUBs call (they become procedures).
+        If inProc Is Nothing Then
+          For k = 0 To t.Count - 1
+            If t(k).IsWord("GOSUB") Then
+              Dim q = k + 1
+              Do While q < t.Count AndAlso (t(q).Kind = TokKind.Ident OrElse t(q).Kind = TokKind.Number)
+                m_gosubTargets.Add(t(q).Text)
+                q += 1
+                If q < t.Count AndAlso t(q).Is_(",") Then q += 1 Else Exit Do
+              Loop
+            End If
+          Next
+        End If
 
         Try
           Select Case first

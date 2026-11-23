@@ -120,6 +120,7 @@ Namespace QB2VB
     Public IsArray As Boolean
     Public HasSuffix As Boolean
     Public UserType As String = ""
+    Public Rank As Integer = 1            ' dimensions of an array parameter (from how the body indexes it)
   End Class
 
   Friend Class ProcSym

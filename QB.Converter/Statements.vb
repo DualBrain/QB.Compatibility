@@ -34,6 +34,10 @@ Namespace QB2VB
         End If
         s = e + 1
       Loop
+      ' An empty loop on one line (FOR ...: NEXT) is a delay: EMPTYLOOP gives each pass some time.
+      For k = result.Count - 2 To 0 Step -1
+        If result(k).StartsWith("For ", StringComparison.Ordinal) AndAlso result(k + 1).StartsWith("Next", StringComparison.Ordinal) Then result.Insert(k + 1, "EMPTYLOOP()")
+      Next
       Return result
     End Function
 
@@ -139,8 +143,26 @@ Namespace QB2VB
           Case "GOTO"
             Return "GoTo " & NeedLabel(t(s + 1))
 
-          Case "GOSUB", "RETURN"
-            Throw New ConvertException(w & " isn't converted yet")
+          Case "GOSUB"
+            If m_curProc IsNot Nothing Then Throw New ConvertException("GOSUB inside a SUB or FUNCTION isn't converted yet")
+            Return GosubName(t(s + 1).Text) & "()"
+          Case "RETURN"
+            If Not m_inGosub OrElse n <> 1 Then Throw New ConvertException("RETURN outside a converted GOSUB routine")
+            Return "Return"
+
+          Case "DEF"
+            If n >= 2 AndAlso t(s + 1).IsWord("SEG") Then
+              If n = 2 Then Return "DEF_SEG()"
+              If n > 3 AndAlso t(s + 2).Is_("=") Then Return "DEF_SEG(" & ExprParser.Coerce(Expr(t, s + 3, e), QT.Long) & ")"
+            End If
+            Throw New ConvertException("DEF FN isn't converted yet")
+
+          Case "VIEW"
+            If n >= 2 AndAlso t(s + 1).IsWord("PRINT") Then
+              If n = 2 Then Return "VIEW_PRINT()"
+              Dim toIdx = FindWord(t, s, e, "TO")
+              If toIdx > 0 Then Return "VIEW_PRINT(" & ExprParser.Coerce(Expr(t, s + 2, toIdx), QT.Long) & ", " & ExprParser.Coerce(Expr(t, toIdx + 1, e), QT.Long) & ")"
+            End If
 
           Case "ON"
             If n >= 4 AndAlso t(s + 1).IsWord("ERROR") AndAlso t(s + 2).IsWord("GOTO") Then
@@ -150,6 +172,22 @@ Namespace QB2VB
             End If
             If n >= 4 AndAlso t(s + 1).IsWord("ERROR") AndAlso t(s + 2).IsWord("RESUME") Then
               Return "On Error Resume Next"
+            End If
+            Dim jump = FindWord(t, s, e, "GOTO")
+            Dim isGosub = False
+            If jump < 0 Then jump = FindWord(t, s, e, "GOSUB") : isGosub = True
+            If jump > 0 Then
+              If isGosub AndAlso m_curProc IsNot Nothing Then Throw New ConvertException("GOSUB inside a SUB or FUNCTION isn't converted yet")
+              Dim sel = ExprParser.Coerce(Expr(t, s + 1, jump), QT.Long)
+              Dim sb = New StringBuilder("Select Case " & sel)
+              Dim idx = 1
+              For Each part In SplitTopLevel(t, jump + 1, e)
+                If part.Count = 0 Then Continue For
+                sb.Append(" : Case " & idx & " : " & If(isGosub, GosubName(part(0).Text) & "()", "GoTo " & part(0).Text))
+                idx += 1
+              Next
+              sb.Append(" : End Select")
+              Return sb.ToString
             End If
             Throw New ConvertException("ON " & If(n > 1, t(s + 1).Text, "") & " isn't converted yet")
 
@@ -232,6 +270,14 @@ Namespace QB2VB
 
       Throw New ConvertException("unrecognized statement """ & t(s).Text & """")
 
+    End Function
+
+    ' The VB name of the procedure that a GOSUB label becomes.
+    Private Function GosubName(label As String) As String
+      Dim n = If(Char.IsDigit(label(0)), "L" & label, label)
+      If Keywords.IsVbReserved(n) Then n = "[" & n & "]"
+      If m_procs.ContainsKey(n) OrElse m_module.Names.Contains(n.ToLowerInvariant()) OrElse m_main.Names.Contains(n.ToLowerInvariant()) Then n &= "_Sub"
+      Return n
     End Function
 
     Private m_selectType As QT
@@ -437,7 +483,7 @@ Namespace QB2VB
         Case Else
       End Select
       Select Case name
-        Case "LINE", "PSET", "PRESET", "CIRCLE", "PAINT", "GET", "PUT", "VIEW", "WINDOW", "DRAW", "PLAY", "WRITE", "FIELD", "LSET", "RSET", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
+        Case "LINE", "PSET", "PRESET", "CIRCLE", "PAINT", "GET", "PUT", "VIEW", "WINDOW", "DRAW", "WRITE", "FIELD", "LSET", "RSET", "DEF", "KEY", "ON", "ERASE", "CHAIN", "RUN", "COMMON"
           Throw New ConvertException(name & " isn't converted yet")
       End Select
       If p >= e Then Return name & "()"

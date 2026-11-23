@@ -54,7 +54,7 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub ControlFlowKeepsItsShape()
-      AssertMain("FOR i = 1 TO 10 STEP 2" & vbLf & "NEXT i", "For i = 1 To 10 Step 2", "Next i")
+      AssertMain("FOR i = 1 TO 10 STEP 2" & vbLf & "NEXT i", "For i = 1 To 10 Step 2 : EMPTYLOOP()", "Next i")
       AssertMain("WHILE a$ <> """"" & vbLf & "WEND", "While a$ <> """"", "End While")
       AssertMain("DO UNTIL x = 3" & vbLf & "LOOP", "Do Until x = 3", "Loop")
       AssertMain("IF x = 1 THEN y = 2 ELSE y = 3", "If x = 1 Then y = 2 Else y = 3")
@@ -156,10 +156,10 @@ Namespace QB2VB.Tests
     Public Sub UnsupportedStatementsAreFlaggedNotDropped()
       Dim notes As New List(Of String)
       Dim vb As String
-      Dim c As New Converter("GOSUB Foo")
+      Dim c As New Converter("DEF FNA(X) = X")
       vb = c.Convert("T")
       Assert.Contains("TODO(QB2VB)", vb)
-      Assert.Contains("GOSUB Foo", vb)
+      Assert.Contains("DEF FNA(X) = X", vb)
       Assert.NotEmpty(c.Notes)
     End Sub
 
@@ -181,6 +181,10 @@ Namespace QB2VB.Tests
           New Object() {"procs", "DECLARE FUNCTION Twice% (n%)" & vbLf & "DECLARE SUB Show (s$)" & vbLf & "Show ""a""" & vbLf & "PRINT Twice%(4)" & vbLf & "END" & vbLf &
                                 "FUNCTION Twice% (n%)" & vbLf & "Twice% = n% * 2" & vbLf & "END FUNCTION" & vbLf & "SUB Show (s$)" & vbLf & "PRINT s$" & vbLf & "END SUB"},
           New Object() {"data", "FOR i = 1 TO 2" & vbLf & "READ a$, b" & vbLf & "PRINT a$; b" & vbLf & "NEXT" & vbLf & "DATA x, 1, y, 2"},
+          New Object() {"gosub", "GOSUB Show" & vbLf & "ON n GOSUB Show, Show" & vbLf & "END" & vbLf & "Show:" & vbLf & "PRINT ""x""" & vbLf & "IF n = 1 THEN RETURN" & vbLf & "PRINT ""y""" & vbLf & "RETURN"},
+          New Object() {"arrays of types", "TYPE P" & vbLf & "x AS INTEGER" & vbLf & "n AS STRING * 4" & vbLf & "END TYPE" & vbLf & "DIM ps(1 TO 3) AS P" & vbLf & "ps(2).x = ps(1).x + 1" & vbLf & "DECLARE SUB Fill (a() AS P, g() AS INTEGER)" & vbLf & "DIM g(1 TO 2, 1 TO 2) AS INTEGER" & vbLf & "Fill ps(), g()" & vbLf &
+                                          "SUB Fill (a() AS P, g() AS INTEGER)" & vbLf & "a(1).x = g(1, 2)" & vbLf & "END SUB"},
+          New Object() {"memory and view", "DEF SEG = 0" & vbLf & "POKE 1047, 0" & vbLf & "DEF SEG" & vbLf & "VIEW PRINT 3 TO 10" & vbLf & "VIEW PRINT" & vbLf & "PLAY ""O2CDE"""},
           New Object() {"files", "OPEN ""t.txt"" FOR OUTPUT AS #1" & vbLf & "PRINT #1, ""hi""" & vbLf & "CLOSE #1" & vbLf & "OPEN ""t.txt"" FOR INPUT AS #1" & vbLf & "LINE INPUT #1, a$" & vbLf & "CLOSE" & vbLf & "PRINT a$"}
         }
       End Get
@@ -192,6 +196,43 @@ Namespace QB2VB.Tests
       Dim vb = Convert(source)
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", name & ":" & vbLf & errors & vbLf & vb)
+    End Sub
+
+    <Fact>
+    Public Sub NibblesConvertsWithoutNotesAndCompiles()
+      Dim c As New Converter(IO.File.ReadAllText(FindSample("NIBBLES.BAS"), Text.Encoding.Latin1))
+      Dim vb = c.Convert("NIBBLES")
+      Assert.Empty(c.Notes)
+      Dim errors = VbCompiler.Compile(vb, "NIBBLES")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub EmptyLoopsGetADelay()
+      AssertMain("FOR i = 1 TO 1000: NEXT i", "For i = 1 To 1000 : EMPTYLOOP() : Next i")
+      Dim m = Main("FOR i = 1 TO 5" & vbLf & "' wait" & vbLf & "NEXT")
+      Assert.Contains("For i = 1 To 5 : EMPTYLOOP()", m)
+      Assert.DoesNotContain("EMPTYLOOP()", String.Join(vbLf, Main("FOR i = 1 TO 5" & vbLf & "PRINT i" & vbLf & "NEXT")))
+    End Sub
+
+    <Fact>
+    Public Sub GosubRoutineBecomesAProcedure()
+      Dim vb = Convert("GOSUB Show" & vbLf & "END" & vbLf & "Show:" & vbLf & "PRINT ""x""" & vbLf & "RETURN")
+      Assert.Contains("Show()", vb)
+      Assert.Contains("Sub Show()", vb)
+      Assert.DoesNotContain("TODO(QB2VB):", vb)
+    End Sub
+
+    <Fact>
+    Public Sub ArrayParametersGetTheirRankFromTheirUse()
+      Dim vb = Convert("DECLARE SUB F (g() AS INTEGER)" & vbLf & "DIM g(1 TO 2, 1 TO 2)" & vbLf & "F g()" & vbLf & "SUB F (g() AS INTEGER)" & vbLf & "g(1, 1) = 3" & vbLf & "END SUB")
+      Assert.Contains("ByRef g(,) As Short", vb)
+    End Sub
+
+    <Fact>
+    Public Sub ControlZEndsTheSource()
+      Dim m = Main("PRINT 1" & vbLf & ChrW(26) & "garbage ((")
+      Assert.Equal({"PRINT(Str$(1) & "" "")"}, m)
     End Sub
 
     <Fact>
@@ -225,7 +266,7 @@ Namespace QB2VB.Tests
       Dim c As New Converter(IO.File.ReadAllText(path, Text.Encoding.GetEncoding(437)))
       Dim vb = c.Convert("REMLINE")
       Assert.Empty(c.Notes)
-      Assert.Contains("Function StrSpn(ByRef InString_Str$, ByRef Separator_Str$) As Short", vb)
+      Assert.Contains("Function StrSpn(ByRef InString$, ByRef Separator$) As Short", vb)
       Assert.Contains("DATA_LABEL(""KeyData"")", vb)
     End Sub
 

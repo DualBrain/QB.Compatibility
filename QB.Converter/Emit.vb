@@ -112,6 +112,12 @@ Namespace QB2VB
       Dim first = If(t.Count > 0, t(0).Upper(), "")
       Dim labelPrefix = If(ln.Label <> "", ln.Label & ":", If(ln.LineNumber <> "", ln.LineNumber & ":", ""))
 
+      ' A label that a GOSUB calls: its routine becomes a procedure.
+      If m_curProc Is Nothing AndAlso Not m_inGosub AndAlso ((ln.Label <> "" AndAlso m_gosubTargets.Contains(ln.Label)) OrElse (ln.LineNumber <> "" AndAlso m_gosubTargets.Contains(ln.LineNumber))) Then
+        Return EmitGosubRoutine(i)
+      End If
+      If m_inGosub Then labelPrefix = If(i = m_gosubStart, "", labelPrefix)
+
       ' A label alone on its line.
       If t.Count = 0 Then
         Flush(m_target)
@@ -181,6 +187,15 @@ Namespace QB2VB
         Return i + 1
       End If
 
+      ' A FOR whose NEXT is on the next line with nothing between: an empty (delay) loop.
+      If statements(statements.Count - 1).StartsWith("For ", StringComparison.Ordinal) Then
+        Dim nx = i + 1
+        Do While nx < m_lines.Count AndAlso (m_lines(nx).IsBlank OrElse m_lines(nx).IsCommentOnly)
+          nx += 1
+        Loop
+        If nx < m_lines.Count AndAlso m_lines(nx).Tokens.Count > 0 AndAlso m_lines(nx).Tokens(0).IsWord("NEXT") AndAlso m_lines(nx).Label = "" Then statements.Add("EMPTYLOOP()")
+      End If
+
       Flush(m_target)
       Dim text = ln.Indent & labelPrefix & If(labelPrefix <> "", " ", "") & String.Join(" : ", statements)
       If ln.Comment <> "" Then text &= "  " & VbComment(ln.Comment)
@@ -189,12 +204,47 @@ Namespace QB2VB
 
     End Function
 
+    Private m_gosubStart As Integer
+
+    ' The routine that starts at a label that a GOSUB calls: lines up to its RETURN become a Sub (module-level variables are shared).
+    Private Function EmitGosubRoutine(i As Integer) As Integer
+      Dim ln = m_lines(i)
+      Dim name = GosubName(If(ln.Label <> "", ln.Label, ln.LineNumber))
+      Dim [end] = HandlerRegionEnd(i)
+      Flush(m_target)
+      Dim saved = m_target
+      m_target = m_procLines
+      m_procLines.Add("Sub " & name & "()" & If(ln.Comment <> "", "  " & VbComment(ln.Comment), ""))
+      m_inGosub = True
+      m_gosubStart = i
+      Dim k = i
+      Do While k <= [end]
+        m_currentLine = m_lines(k).Number
+        Try
+          If k = i AndAlso m_lines(k).Tokens.Count = 0 Then
+            k += 1
+            Continue Do
+          End If
+          EmitLine(k)
+        Catch ex As ConvertException
+          Todo(m_lines(k), ex.Message)
+        End Try
+        k += 1
+      Loop
+      Flush(m_target)
+      m_procLines.Add("End Sub")
+      m_procLines.Add("")
+      m_inGosub = False
+      m_target = saved
+      Return [end] + 1
+    End Function
+
     ' ---- Procedures ---------------------------------------------------------------------------------------------
 
     Private Function ParamText(v As VarSym, prm As ParamSym) As String
       Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
       Dim sb As New StringBuilder("ByRef " & name)
-      If prm.IsArray Then sb.Append("()")
+      If prm.IsArray Then sb.Append("(" & New String(","c, prm.Rank - 1) & ")")
       If Not v.HasSuffix Then
         If v.UserType <> "" Then
           sb.Append(" As " & v.UserType)
@@ -219,6 +269,7 @@ Namespace QB2VB
       m_target = m_procLines
 
       Dim parms As New List(Of String)
+      SetArrayRanks(i, sym)
       For Each prm In sym.Params
         Dim v = DeclareVariable(scope, prm.QbName & If(prm.HasSuffix, Types.Suffix(prm.Qt), ""), prm.IsArray, If(prm.HasSuffix, QT.Unknown, If(prm.UserType <> "" OrElse prm.Qt <> QT.Unknown, prm.Qt, QT.Unknown)), prm.UserType, True)
         parms.Add(ParamText(v, prm))
@@ -227,6 +278,38 @@ Namespace QB2VB
       If sym.IsFunction AndAlso Not sym.HasSuffix Then head &= " As " & Types.VbName(sym.RetQt)
       m_procLines.Add(ln.Indent & head & If(ln.Comment <> "", "  " & VbComment(ln.Comment), ""))
       m_procDeclAt = m_procLines.Count
+    End Sub
+
+    ' The number of indexes an array parameter is used with in the procedure's body.
+    Private Sub SetArrayRanks(headerLine As Integer, sym As ProcSym)
+      For Each prm In sym.Params
+        If Not prm.IsArray Then Continue For
+        Dim rank = 1
+        Dim k = headerLine + 1
+        Do While k < m_lines.Count
+          Dim t = m_lines(k).Tokens
+          If t.Count >= 2 AndAlso t(0).IsWord("END") AndAlso (t(1).IsWord("SUB") OrElse t(1).IsWord("FUNCTION")) Then Exit Do
+          For q = 0 To t.Count - 2
+            Dim hs As Boolean, bare As String = ""
+            If t(q).Kind = TokKind.Ident AndAlso t(q + 1).Is_("(") Then
+              TypeOfName(t(q).Text, hs, bare)
+              If bare.Equals(prm.QbName, StringComparison.OrdinalIgnoreCase) Then
+                Dim depth = 0, commas = 0, r = q + 1
+                Do While r < t.Count
+                  If t(r).Is_("(") Then depth += 1
+                  If t(r).Is_(")") Then depth -= 1
+                  If depth = 1 AndAlso t(r).Is_(",") Then commas += 1
+                  If depth = 0 Then Exit Do
+                  r += 1
+                Loop
+                If r > q + 2 Then rank = Math.Max(rank, commas + 1)
+              End If
+            End If
+          Next
+          k += 1
+        Loop
+        prm.Rank = rank
+      Next
     End Sub
 
     Private Function DeclKeyword() As String
@@ -463,6 +546,7 @@ Namespace QB2VB
 
     Private Sub FinishModule()
       Flush(If(m_curProc Is Nothing, m_mainLines, m_procLines))
+      Dim mainDecls = If(m_gosubTargets.Count > 0, m_hoisted, m_mainDecls)   ' GOSUB routines are procedures that share the main variables
       ' Module-level variables that are shared only because a procedure says so, and were never DIMmed.
       For Each v In m_module.Locals
         If Not v.Declared AndAlso Not v.IsConst Then
@@ -472,7 +556,7 @@ Namespace QB2VB
       Next
       For Each v In m_main.Locals
         If Not v.Declared AndAlso Not v.IsConst AndAlso Not v.IsParam Then
-          m_mainDecls.Add("Dim " & DeclItem(v))
+          mainDecls.Add("Dim " & DeclItem(v))
           v.Declared = True
         End If
       Next

@@ -55,6 +55,8 @@ Namespace QB2VB
     End Sub
 
     Friend Shared Function Split(source As String) As List(Of SourceLine)
+      Dim eof = source.IndexOf(ChrW(26))       ' a ^Z ends a DOS text file
+      If eof >= 0 Then source = source.Substring(0, eof)
       Dim physical = source.Replace(vbCrLf, vbLf).Replace(vbCr, vbLf).Split(ControlChars.Lf)
       If physical.Length > 0 AndAlso physical(physical.Length - 1) = "" Then ReDim Preserve physical(physical.Length - 2)
       Dim lines As New List(Of SourceLine)

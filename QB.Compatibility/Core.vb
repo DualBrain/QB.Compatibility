@@ -460,6 +460,21 @@ Namespace Global.QB
       m_dataLabels(name) = m_data.Count
     End Sub
 
+    ''' <summary>How long one pass through an empty FOR loop takes, in microseconds (see <see cref="EMPTYLOOP"/>).</summary>
+    Public Shared Property EmptyLoopMicroseconds As Double = 10
+
+    ''' <summary>
+    ''' Stands in for the time an empty loop (FOR i = 1 TO n: NEXT) took in QBasic.  Programs use such loops as delays, and measure
+    ''' them with TIMER to adjust to the machine; a compiled loop is so fast that the measurement fails.  The converter adds a call
+    ''' to every empty loop; it waits <see cref="EmptyLoopMicroseconds"/>.
+    ''' </summary>
+    Public Shared Sub EMPTYLOOP()
+      Dim target = Global.System.Diagnostics.Stopwatch.GetTimestamp() + CLng(EmptyLoopMicroseconds * Global.System.Diagnostics.Stopwatch.Frequency / 1000000.0)
+      Do While Global.System.Diagnostics.Stopwatch.GetTimestamp() < target
+        Global.System.Threading.Thread.SpinWait(4)
+      Loop
+    End Sub
+
     ''' <summary>RESTORE: READ starts again from the first DATA item.</summary>
     Public Shared Sub RESTORE()
       m_dataIndex = 0
