@@ -226,7 +226,7 @@ Namespace Global.QB
         Case "ⁿ" : Return 252
         Case "²" : Return 253
         Case "■" : Return 254
-        Case " " : Return 255
+        Case ChrW(160) : Return 255 ' No-break space is CHR$(255), distinct from the space (CHR$(32)).
 
         Case "�" : Return 32
 
@@ -412,7 +412,7 @@ Namespace Global.QB
         Case 252 : Return "ⁿ"
         Case 253 : Return "²"
         Case 254 : Return "■"
-        Case 255 : Return " "
+        Case 255 : Return ChrW(160) ' No-break space, so QBAsc can tell it from CHR$(32).
 
         Case Else
           Return Chr(value)

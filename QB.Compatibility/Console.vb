@@ -8,8 +8,6 @@ Namespace Global.QB
 
   Public NotInheritable Class Console
 
-    Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
-
     Private Sub New()
     End Sub
 
@@ -91,84 +89,10 @@ Namespace Global.QB
     Public Shared Function INKEY$()
       If System.Console.KeyAvailable Then
         Dim cki = System.Console.ReadKey(True)
-
-        Dim shift = GetAsyncKeyState(&H10) <> 0
-        Dim ctrl = GetAsyncKeyState(&H11) <> 0
-        Dim alt = GetAsyncKeyState(&H12) <> 0
-
-        Dim adder = 0
-        If shift Then
-          adder = 0
-        ElseIf ctrl Then
-          adder = 10
-        ElseIf alt Then
-          adder = 20
-        End If
-
-        Select Case cki.Key
-          Case ConsoleKey.Delete
-            Return QBChr(0) & QBChr(83)
-          Case ConsoleKey.Home
-            Return QBChr(0) & QBChr(71)
-          Case ConsoleKey.UpArrow
-            Return QBChr(0) & QBChr(72)
-          Case ConsoleKey.PageUp
-            Return QBChr(0) & QBChr(73)
-          Case ConsoleKey.End
-            Return QBChr(0) & QBChr(79)
-          Case ConsoleKey.DownArrow
-            Return QBChr(0) & QBChr(80)
-          Case ConsoleKey.PageDown
-            Return QBChr(0) & QBChr(81)
-
-          Case ConsoleKey.LeftArrow
-            Return QBChr(0) & QBChr(75)
-          Case ConsoleKey.RightArrow
-            Return QBChr(0) & QBChr(77)
-
-          Case ConsoleKey.F1
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(84 + adder), QBChr(59))
-          Case ConsoleKey.F2
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(85 + adder), QBChr(60))
-          Case ConsoleKey.F3
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(86 + adder), QBChr(61))
-          Case ConsoleKey.F4
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(87 + adder), QBChr(62))
-          Case ConsoleKey.F5
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(88 + adder), QBChr(63))
-          Case ConsoleKey.F6
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(89 + adder), QBChr(64))
-          Case ConsoleKey.F7
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(80 + adder), QBChr(65))
-          Case ConsoleKey.F8
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(91 + adder), QBChr(66))
-          Case ConsoleKey.F9
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(92 + adder), QBChr(67))
-          Case ConsoleKey.F10
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(93 + adder), QBChr(68))
-          Case ConsoleKey.F11
-            If shift Then
-              Return QBChr(0) & QBChr(135)
-            ElseIf ctrl Then
-              Return QBChr(0) & QBChr(137)
-            ElseIf alt Then
-              Return QBChr(0) & QBChr(139)
-            Else
-              Return QBChr(0) & QBChr(133)
-            End If
-          Case ConsoleKey.F12
-            If shift Then
-              Return QBChr(0) & QBChr(136)
-            ElseIf ctrl Then
-              Return QBChr(0) & QBChr(138)
-            ElseIf alt Then
-              Return QBChr(0) & QBChr(140)
-            Else
-              Return QBChr(0) & QBChr(134)
-            End If
-          Case Else
-            Return cki.KeyChar
-        End Select
+        Return KeyCodec.Encode(cki.Key, cki.KeyChar,
+                               (cki.Modifiers And ConsoleModifiers.Shift) <> 0,
+                               (cki.Modifiers And ConsoleModifiers.Control) <> 0,
+                               (cki.Modifiers And ConsoleModifiers.Alt) <> 0)
       Else
         Return ""
       End If
@@ -200,11 +124,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub INPUT(filenumber%, ByRef resultKey$)
-      If filenumber <> 0 OrElse String.IsNullOrEmpty(resultKey) Then
-      End If
-      ' Read from the file a "word".
-      ' Each word is separated by either a space or a comma.
-      Throw New NotImplementedException
+      File.INPUT(filenumber, resultKey)
     End Sub
 
     Public Shared Function QBInput$(n As Long)
@@ -283,27 +203,16 @@ Namespace Global.QB
       End If
     End Sub
 
-    Public Shared Sub PRINT_USING(template$, ParamArray values$())
-      System.Console.Write([USING](template$, values$))
+    Public Shared Sub PRINT_USING(template$, ParamArray values() As Object)
+      System.Console.WriteLine([USING](template$, values))
     End Sub
 
-    Public Shared Function [USING](template$, ParamArray values$()) As String
-      'TODO: Need to actually implement...
-      If String.IsNullOrEmpty(template$) Then
-      End If
-      Dim resuLtKey$ = ""
-      For Each value$ In values$
-        resuLtKey$ &= value$
-      Next
-      Throw New NotImplementedException
-      Return resuLtKey$
+    Public Shared Function [USING](template$, ParamArray values() As Object) As String
+      Return PrintUsing.Format(template$, values)
     End Function
 
     Public Shared Sub PRINT(filenum%, value$)
-      If File.m_files.ContainsKey(filenum%) Then
-        Dim b = Text.ASCIIEncoding.ASCII.GetBytes(value$ & vbCrLf)
-        File.m_files(filenum%).Stream.Write(b, 0, b.Length)
-      End If
+      File.PRINT(filenum, value)
     End Sub
 
 #End Region
@@ -350,26 +259,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub LINE_INPUT(filenum%, ByRef value$)
-      value$ = ""
-      Dim b(0) As Byte
-      Do
-        Dim result = File.m_files(filenum%).Stream.Read(b, 0, 1)
-        If result = 0 Then
-          Return
-        End If
-        value$ &= QBChr(b(0))
-        If b(0) = 13 Then
-          ' nearing end of line, assume next character is a LF...
-          Dim size = File.m_files(filenum%).Stream.Read(b, 0, 1)
-          value$ &= QBChr(b(0))
-          value$ = value$.Substring(0, value$.Length - 2) ' Trim of the CRLF
-          Return
-        ElseIf b(0) = 10 Then
-          ' end of line (and a CR was not encountered)...
-          value$ = value$.Substring(0, value$.Length - 1) ' Trim of the LF
-          Return
-        End If
-      Loop
+      File.LINE_INPUT(filenum, value)
     End Sub
 
     Public Shared Sub WIDTH(Optional a% = -1, Optional b% = -1)

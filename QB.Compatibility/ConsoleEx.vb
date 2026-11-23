@@ -199,6 +199,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub EnableQuickEditMode()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
 
       Dim consoleHandle As IntPtr = GetStdHandle(CInt(StdHandle.STD_INPUT_HANDLE))
 
@@ -212,6 +213,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub DisableQuickEditMode()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
 
       Dim consoleHandle As IntPtr = GetStdHandle(CInt(StdHandle.STD_INPUT_HANDLE))
 
@@ -230,6 +232,7 @@ Namespace Global.QB
     Private Shared MoveCaption As Text.StringBuilder = Nothing
 
     Public Shared Sub DisableClose()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -243,6 +246,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub EnableClose()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -258,6 +262,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub DisableMaximize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -270,6 +275,7 @@ Namespace Global.QB
       End If
     End Sub
     Public Shared Sub EnableMaximize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -285,6 +291,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub DisableMinimize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -298,6 +305,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub EnableMinimize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -313,6 +321,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub DisableResize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -326,6 +335,7 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub EnableResize()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim handle = GetConsoleWindow()
       If handle <> IntPtr.Zero Then
         Dim sysMenu = GetSystemMenu(handle, False)
@@ -341,14 +351,17 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub Hide()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim result = ShowWindow(GetConsoleWindow(), HIDE_WINDOW)
     End Sub
 
     Public Shared Sub Kill()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim result = FreeConsole()
     End Sub
 
     Public Shared Function ReadChar(left%, top%) As Char?
+      If Not OperatingSystem.IsWindows() Then Return Nothing
       Dim consoleHandle = GetStdHandle(-11)
       If consoleHandle = IntPtr.Zero Then
         Return Nothing
@@ -374,6 +387,7 @@ Namespace Global.QB
     End Structure
 
     Public Shared Sub Snapshot(restore As Boolean)
+      If Not OperatingSystem.IsWindows() Then Return
 
       Static Snap(,) As CharInfo
 
@@ -448,6 +462,11 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub Resize(cols%, rows%)
+      If Not OperatingSystem.IsWindows() Then
+        ' Ask the terminal emulator to resize (not every terminal honors this).
+        System.Console.Write($"{ChrW(27)}[8;{rows};{cols}t")
+        Return
+      End If
       Try
         System.Console.SetWindowSize(cols%, rows%) ' Set the windows size...
       Catch ex As Exception
@@ -469,10 +488,17 @@ Namespace Global.QB
     End Sub
 
     Public Shared Sub Show()
+      If Not OperatingSystem.IsWindows() Then Return ' Windows console only.
       Dim result = ShowWindow(GetConsoleWindow(), SHOW_WINDOW)
     End Sub
 
     Public Shared Function SetColor(color As ConsoleColor, r As UInteger, g As UInteger, b As UInteger) As Integer
+      If Not OperatingSystem.IsWindows() Then
+        ' xterm-style palette change (supported by most Linux/macOS terminals).
+        Dim index = {0, 4, 2, 6, 1, 5, 3, 7, 8, 12, 10, 14, 9, 13, 11, 15}(CInt(color)) ' ConsoleColor -> ANSI order
+        System.Console.Write($"{ChrW(27)}]4;{index};rgb:{r:X2}/{g:X2}/{b:X2}{ChrW(27)}\\")
+        Return 0
+      End If
 
       Dim csbe As New CONSOLE_SCREEN_BUFFER_INFO_EX()
       csbe.cbSize = CInt(Marshal.SizeOf(csbe)) ' 96 = &H60

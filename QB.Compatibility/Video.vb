@@ -2,15 +2,6 @@
 Option Strict On
 Option Infer On
 
-' Yet another approach... try again on another episode.
-' https://stackoverflow.com/questions/24701703/c-sharp-faster-alternatives-to-setpixel-and-getpixel-for-bitmaps-for-windows-f
-
-#Const oldway = False
-
-Imports System.Drawing
-Imports System.Runtime.InteropServices
-Imports System.Windows.Forms
-
 Imports QB.Core
 Imports QB.Extensions
 
@@ -25,6 +16,9 @@ Namespace Global.QB
   Public Enum PutOption
     PUT_PSET
     PUT_XOR
+    PUT_AND
+    PUT_OR
+    PUT_PRESET
   End Enum
 
   Public NotInheritable Class Video
@@ -803,282 +797,635 @@ Namespace Global.QB
             {&HFE, {&H0, &H0, &H0, &H0, &H3E, &H3E, &H3E, &H3E, &H3E, &H3E, &H3E, &H0, &H0, &H0, &H0, &H0}},
             {&HFF, {&H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0}}}
 
-    Private Declare Function GetAsyncKeyState Lib "user32" (vkey As Integer) As Short
 
-#If oldway Then
-    Private Shared m_display As System.Drawing.Image = New System.Drawing.Bitmap(640, 480)
-#Else
-    Private Shared m_display As System.Drawing.Image = New System.Drawing.Bitmap(640, 480)
-    Private Shared m_rectangle As New Rectangle
-    Private Shared m_context As BufferedGraphicsContext
-    Private Shared m_buffer As BufferedGraphics
-#End If
+    ' ---- Video memory --------------------------------------------------------------------
+    ' The screen is a plain array of palette indices (just like VGA video memory).  A display
+    ' backend (IDisplay) asks for a snapshot of it whenever something has changed.
 
-    Private Shared m_parent As System.Windows.Forms.Form
-    Private Shared m_pictureBox As System.Windows.Forms.PictureBox
+    Private Shared ReadOnly m_sync As New Object
+    Private Shared m_width As Integer = 640
+    Private Shared m_height As Integer = 400
+    Private Shared m_pixels() As Byte                     ' The active page (SCREEN apage).
+    Private Shared ReadOnly m_palette(255) As UInteger
+    Private Shared m_dirty As Boolean = True
+    Private Shared m_suspend As Boolean
+    Private Shared m_mode As Integer = 0
+    Private Shared m_display As IDisplay
 
-    Private Shared m_manualMode As Boolean = False
+    Private Shared m_cursorRow As Integer = 1
+    Private Shared m_cursorCol As Integer = 1
+    Private Shared m_textH As Integer = 16
+    Private Shared m_textW As Integer = 8
+    Private Shared m_scaleX As Integer = 1                ' 2 when 40 columns are shown (double-wide cells)
+    Private Shared m_chars(,) As Byte                     ' Text on the active page [row, column], 0-based.
+    Private Shared m_attrs(,) As Integer                  ' foreground | background << 8 | blink << 16
+    Private Shared m_pages() As Page
+    Private Shared m_activePage As Integer
+    Private Shared m_visualPage As Integer
+    Private Shared m_viewTop As Integer = 1               ' Text viewport (VIEW PRINT).
+    Private Shared m_viewBottom As Integer = 25
+    Private Shared m_cursorVisible As Boolean = True
+    Private Shared m_cursorStart As Integer = 14          ' Cursor scan lines.
+    Private Shared m_cursorStop As Integer = 15
+    Private Shared m_hasBlink As Boolean
+    Private Shared m_lastPhase As Integer
+    Private Shared m_bgColor As Integer = 0
+    Private Shared m_fgColor As Integer = 7
+    Private Shared m_fgBlink As Boolean
+    Private Shared m_colorMask As Integer = 15           ' Number of colors in the mode, minus one.
+    ' Graphics viewport (VIEW) and window (WINDOW).
+    Private Shared m_vx1 As Integer = 0
+    Private Shared m_vy1 As Integer = 0
+    Private Shared m_vx2 As Integer = 639
+    Private Shared m_vy2 As Integer = 399
+    Private Shared m_viewSet As Boolean
+    Private Shared m_viewRelative As Boolean              ' VIEW (not VIEW SCREEN): coordinates are relative to the viewport.
+    Private Shared m_winOn As Boolean
+    Private Shared m_winScreen As Boolean                 ' WINDOW SCREEN: y increases downward.
+    Private Shared m_wx1, m_wy1, m_wx2, m_wy2 As Double
+    Private Shared m_lastX As Double                      ' The last point referenced, in the current coordinates.
+    Private Shared m_lastY As Double
+
+    Private Shared ReadOnly s_ega() As UInteger = {&HFF000000UI, &HFF0000AAUI, &HFF00AA00UI, &HFF00AAAAUI,
+                                                   &HFFAA0000UI, &HFFAA00AAUI, &HFFAA5500UI, &HFFAAAAAAUI,
+                                                   &HFF555555UI, &HFF5555FFUI, &HFF55FF55UI, &HFF55FFFFUI,
+                                                   &HFFFF5555UI, &HFFFF55FFUI, &HFFFFFF55UI, &HFFFFFFFFUI}
 
     Private Sub New()
     End Sub
 
-#Region "Interop"
+    Shared Sub New()
+      ApplyLayout(0, 640, 400, 8, 16, 1)
+      ResetPalette()
+    End Sub
 
-    '<DllImport("user32.dll")>
-    'Private Shared Function GetDC(hwnd As IntPtr) As IntPtr
-    'End Function
+    ' One screen page: its pixels and the text (characters and attributes) written on it.
+    Private NotInheritable Class Page
+      Friend ReadOnly Pixels() As Byte
+      Friend ReadOnly Chars(,) As Byte
+      Friend ReadOnly Attrs(,) As Integer
+      Friend Sub New(pixelCount As Integer, rows As Integer, cols As Integer, attr As Integer)
+        Pixels = New Byte(pixelCount - 1) {}
+        Chars = New Byte(rows - 1, cols - 1) {}
+        Attrs = New Integer(rows - 1, cols - 1) {}
+        For r = 0 To rows - 1
+          For c = 0 To cols - 1
+            Chars(r, c) = 32
+            Attrs(r, c) = attr
+          Next
+        Next
+      End Sub
+    End Class
 
-    '<DllImport("user32.dll")>
-    'Private Shared Function ReleaseDC(hwnd As IntPtr, hdc As IntPtr) As Int32
-    'End Function
+    Private NotInheritable Class FrameSource
+      Implements IVideoSource
 
-    <DllImport("gdi32.dll")>
-    Private Shared Function GetPixel(hdc As IntPtr, nXPos As Integer, nYPos As Integer) As UInteger
+      Public Function TryCopyFrame(ByRef argb() As UInteger, ByRef width As Integer, ByRef height As Integer) As Boolean Implements IVideoSource.TryCopyFrame
+        SyncLock m_sync
+          ' The cursor and blinking text are drawn onto the copy (never into video memory).
+          Dim phase = CInt((Environment.TickCount64 \ 250) And 1)
+          If (m_cursorVisible OrElse m_hasBlink) AndAlso phase <> m_lastPhase Then m_dirty = True
+          If Not m_dirty OrElse m_suspend Then Return False
+          m_dirty = False
+          m_lastPhase = phase
+          width = m_width
+          height = m_height
+          If argb Is Nothing OrElse argb.Length <> width * height Then
+            argb = New UInteger(width * height - 1) {}
+          End If
+          Dim vp = m_pages(m_visualPage).Pixels
+          For i = 0 To argb.Length - 1
+            argb(i) = m_palette(vp(i))
+          Next
+          If m_hasBlink AndAlso phase = 1 Then HideBlinkingText(argb)
+          If m_cursorVisible AndAlso phase = 0 Then DrawCursor(argb)
+          Return True
+        End SyncLock
+      End Function
+
+    End Class
+
+    ''' <summary>
+    ''' The display backend used to show the screen.  By default an SDL2 window is opened the
+    ''' first time something is drawn; assign another IDisplay before that to use a different
+    ''' backend (for example HeadlessDisplay).
+    ''' </summary>
+    Public Shared Property Display As IDisplay
+      Get
+        Return m_display
+      End Get
+      Set(value As IDisplay)
+        If m_display IsNot Nothing Then m_display.Close()
+        m_display = value
+        If m_display IsNot Nothing Then m_display.Open(New FrameSource)
+      End Set
+    End Property
+
+    Private Shared Sub EnsureDisplay()
+      If m_display Is Nothing Then
+        SyncLock m_sync
+          If m_display Is Nothing Then
+            Dim d As New SdlDisplay
+            d.Open(New FrameSource)
+            m_display = d
+          End If
+        End SyncLock
+      End If
+    End Sub
+
+    Private Shared Sub Touch()
+      EnsureDisplay()
+      Threading.Volatile.Write(m_dirty, True)
+      Events.Dispatch()
+    End Sub
+
+    ' The number of colors (attributes) of a screen mode, minus one.
+    Private Shared Function ColorMaskOf(mode As Integer) As Integer
+      Select Case mode
+        Case 1, 10 : Return 3
+        Case 2, 11 : Return 1
+        Case 13 : Return 255
+        Case Else : Return 15
+      End Select
     End Function
 
-    Public Shared Function GetColor(g As Graphics, x%, y%) As Color
-      Dim hdc = g.GetHdc
-      Dim pixel = GetPixel(hdc, x, y)
-      g.ReleaseHdc(hdc)
-      Dim c = System.Drawing.Color.FromArgb(CInt(Fix(pixel)))
-      Return System.Drawing.Color.FromArgb(255, c.B, c.G, c.R)
+    Private Shared Function Rgb(r As Integer, g As Integer, b As Integer) As UInteger
+      Return &HFF000000UI Or (CUInt(r) << 16) Or (CUInt(g) << 8) Or CUInt(b)
     End Function
 
-#End Region
+    ' 6-bit (0-63) VGA components to a color.
+    Private Shared Function Vga(r6 As Integer, g6 As Integer, b6 As Integer) As UInteger
+      Return Rgb(r6 * 255 \ 63, g6 * 255 \ 63, b6 * 255 \ 63)
+    End Function
 
-    Public Shared Sub Init(parent As System.Windows.Forms.Form, pic As System.Windows.Forms.PictureBox, Optional manualMode As Boolean = False)
-      m_manualMode = manualMode
-      m_parent = parent
-      m_parent.BackColor = Drawing.Color.Black
-      m_pictureBox = pic
-      m_pictureBox.SizeMode = System.Windows.Forms.PictureBoxSizeMode.StretchImage
-      AddHandler parent.KeyDown, AddressOf Me_KeyDown
-      AddHandler parent.Resize, AddressOf Me_Resize
-      GraphicsInit(640, 480)
-      Me_Resize(Nothing, EventArgs.Empty)
-    End Sub
+    ' The default 256-color VGA palette (SCREEN 13): 16 EGA colors, 16 grays, then 3 x 72 colors
+    ' (hue sweeps at three brightness levels, each at three saturations) and 8 blacks.
+    Private Shared Sub BuildVga256()
 
-    Private Shared Sub Me_KeyDown(sender As Object, e As System.Windows.Forms.KeyEventArgs)
-      m_keys.Push(e.KeyCode) : e.Handled = True : e.SuppressKeyPress = True
-    End Sub
+      For i = 0 To 15
+        m_palette(i) = s_ega(i)
+      Next
 
-    Private Shared Sub Me_Resize(sender As Object, e As EventArgs)
+      Dim grays() As Integer = {0, 5, 8, 11, 14, 17, 20, 24, 28, 32, 36, 40, 45, 50, 56, 63}
+      For i = 0 To 15
+        m_palette(16 + i) = Vga(grays(i), grays(i), grays(i))
+      Next
 
-      ' Resizes the picture box preserving the aspect ratio of 4x3.
-
-      Dim clientW = m_parent.ClientSize.Width
-      Dim clientH = m_parent.ClientSize.Height
-
-      If clientH > clientW * 0.75 Then
-        m_pictureBox.Width = clientW
-        m_pictureBox.Height = CInt(Fix(clientW * 0.75))
-        m_pictureBox.Left = 0
-        m_pictureBox.Top = (clientH - m_pictureBox.Height) \ 2
-      Else
-        m_pictureBox.Height = clientH
-        m_pictureBox.Width = CInt(Fix(clientH * 1.333))
-        m_pictureBox.Top = 0
-        m_pictureBox.Left = (clientW - m_pictureBox.Width) \ 2
-      End If
-
-    End Sub
-
-    Private Shared Sub GraphicsInit(width%, height%)
-
-#If Not oldway Then
-
-      If m_buffer IsNot Nothing Then
-        m_buffer.Dispose() : m_buffer = Nothing
-        m_context = Nothing
-      End If
-
-      m_context = New BufferedGraphicsContext
-
-      m_rectangle.Width = width
-      m_rectangle.Height = height
-      'm_buffer = m_context.Allocate(m_pictureBox.CreateGraphics, m_rectangle)
-      m_buffer = m_context.Allocate(Graphics.FromImage(m_display), m_rectangle)
-      m_buffer.Graphics.CompositingMode = Drawing2D.CompositingMode.SourceOver
-      m_buffer.Graphics.CompositingQuality = Drawing2D.CompositingQuality.AssumeLinear
-      m_buffer.Graphics.SmoothingMode = Drawing2D.SmoothingMode.None
-      m_buffer.Graphics.InterpolationMode = CType(Drawing2D.QualityMode.Low, Drawing2D.InterpolationMode)
-      m_buffer.Graphics.PixelOffsetMode = Drawing2D.PixelOffsetMode.None
-
-#End If
+      Dim index = 32
+      For Each high In {63, 28, 16}
+        For Each low In {0, high \ 2, CInt(Math.Floor(high * 0.7143 + 0.01))}
+          ' Round halves down: low, ..., high in four steps.
+          Dim ramp(4) As Integer
+          For k = 0 To 4
+            ramp(k) = CInt(Math.Ceiling(low + (high - low) * k / 4.0 - 0.5))
+          Next
+          ' Blue -> magenta -> red -> yellow -> green -> cyan -> back toward blue.
+          For k = 0 To 4 : m_palette(index) = Vga(ramp(k), low, high) : index += 1 : Next
+          For k = 3 To 0 Step -1 : m_palette(index) = Vga(high, low, ramp(k)) : index += 1 : Next
+          For k = 1 To 4 : m_palette(index) = Vga(high, ramp(k), low) : index += 1 : Next
+          For k = 3 To 0 Step -1 : m_palette(index) = Vga(ramp(k), high, low) : index += 1 : Next
+          For k = 1 To 4 : m_palette(index) = Vga(low, high, ramp(k)) : index += 1 : Next
+          For k = 3 To 1 Step -1 : m_palette(index) = Vga(low, ramp(k), high) : index += 1 : Next
+        Next
+      Next
 
     End Sub
 
-    Private Shared m_cursorRow As Integer
-    Private Shared m_cursorCol As Integer
-    Private Shared m_textH As Integer = 14
-    Private Shared m_textW As Integer = 8
-    Private Shared m_palette() As Color = {System.Drawing.Color.Black,
-                                           System.Drawing.Color.DarkBlue,
-                                           System.Drawing.Color.DarkGreen,
-                                           System.Drawing.Color.DarkCyan,
-                                           System.Drawing.Color.DarkRed,
-                                           System.Drawing.Color.DarkMagenta,
-                                           System.Drawing.Color.Brown,
-                                           System.Drawing.Color.LightGray,
-                                           System.Drawing.Color.Gray,
-                                           System.Drawing.Color.Blue,
-                                           System.Drawing.Color.LightGreen,
-                                           System.Drawing.Color.Cyan,
-                                           System.Drawing.Color.Red,
-                                           System.Drawing.Color.Magenta,
-                                           System.Drawing.Color.Yellow,
-                                           System.Drawing.Color.White}
+    ' Loads the default palette for the current screen mode.
+    Private Shared Sub ResetPalette()
+      For i = 0 To 255
+        m_palette(i) = &HFF000000UI
+      Next
+      Select Case m_mode
+        Case 1 ' CGA: background, then palette 0 (green, red, brown).
+          m_palette(1) = s_ega(2) : m_palette(2) = s_ega(4) : m_palette(3) = s_ega(6)
+        Case 2, 11
+          m_palette(1) = s_ega(15)
+        Case 10 ' Monochrome: black, normal, bright, bright.
+          m_palette(1) = Rgb(&HAA, &HAA, &HAA) : m_palette(2) = Rgb(255, 255, 255) : m_palette(3) = Rgb(255, 255, 255)
+        Case 13
+          BuildVga256()
+        Case Else
+          For i = 0 To 15
+            m_palette(i) = s_ega(i)
+          Next
+      End Select
+    End Sub
 
-    Private Shared m_brush() As SolidBrush = {New SolidBrush(System.Drawing.Color.Black),
-                                              New SolidBrush(System.Drawing.Color.DarkBlue),
-                                              New SolidBrush(System.Drawing.Color.DarkGreen),
-                                              New SolidBrush(System.Drawing.Color.DarkCyan),
-                                              New SolidBrush(System.Drawing.Color.DarkRed),
-                                              New SolidBrush(System.Drawing.Color.DarkMagenta),
-                                              New SolidBrush(System.Drawing.Color.Brown),
-                                              New SolidBrush(System.Drawing.Color.LightGray),
-                                              New SolidBrush(System.Drawing.Color.Gray),
-                                              New SolidBrush(System.Drawing.Color.Blue),
-                                              New SolidBrush(System.Drawing.Color.LightGreen),
-                                              New SolidBrush(System.Drawing.Color.Cyan),
-                                              New SolidBrush(System.Drawing.Color.Red),
-                                              New SolidBrush(System.Drawing.Color.Magenta),
-                                              New SolidBrush(System.Drawing.Color.Yellow),
-                                              New SolidBrush(System.Drawing.Color.White)}
+    Private Shared Function ToInt(value As Double) As Integer
+      If value > 1000000 Then Return 1000000
+      If value < -1000000 Then Return -1000000
+      Return CInt(value)
+    End Function
 
-    Private Shared m_pen() As Pen = {New Pen(System.Drawing.Color.Black),
-                                     New Pen(System.Drawing.Color.DarkBlue),
-                                     New Pen(System.Drawing.Color.DarkGreen),
-                                     New Pen(System.Drawing.Color.DarkCyan),
-                                     New Pen(System.Drawing.Color.DarkRed),
-                                     New Pen(System.Drawing.Color.DarkMagenta),
-                                     New Pen(System.Drawing.Color.Brown),
-                                     New Pen(System.Drawing.Color.LightGray),
-                                     New Pen(System.Drawing.Color.Gray),
-                                     New Pen(System.Drawing.Color.Blue),
-                                     New Pen(System.Drawing.Color.LightGreen),
-                                     New Pen(System.Drawing.Color.Cyan),
-                                     New Pen(System.Drawing.Color.Red),
-                                     New Pen(System.Drawing.Color.Magenta),
-                                     New Pen(System.Drawing.Color.Yellow),
-                                     New Pen(System.Drawing.Color.White)}
+    ' Draws a pixel if it is inside the graphics viewport.
+    Private Shared Sub SetPixel(x As Integer, y As Integer, color As Integer)
+      If x < m_vx1 OrElse y < m_vy1 OrElse x > m_vx2 OrElse y > m_vy2 Then Return
+      m_pixels(y * m_width + x) = CByte(color And m_colorMask)
+    End Sub
 
+    ' Draws a pixel anywhere on the screen (text isn't clipped by VIEW).
+    Private Shared Sub SetPixelRaw(x As Integer, y As Integer, color As Integer)
+      If x < 0 OrElse y < 0 OrElse x >= m_width OrElse y >= m_height Then Return
+      m_pixels(y * m_width + x) = CByte(color And m_colorMask)
+    End Sub
+
+    Private Shared ReadOnly s_cp437 As Dictionary(Of Char, Integer) = Cp437.Map
+
+    Private Shared ReadOnly Property TextRows As Integer
+      Get
+        Return m_height \ m_textH
+      End Get
+    End Property
+
+    Private Shared ReadOnly Property TextCols As Integer
+      Get
+        Return m_width \ (m_textW * m_scaleX)
+      End Get
+    End Property
+
+    Private Shared Sub ClearCells(topRow As Integer, bottomRow As Integer)
+      Dim a = (m_fgColor And &HFF) Or ((m_bgColor And &HFF) << 8)
+      For r = topRow - 1 To bottomRow - 1
+        For c = 0 To m_chars.GetLength(1) - 1
+          m_chars(r, c) = 32
+          m_attrs(r, c) = a
+        Next
+      Next
+    End Sub
+
+    Private Shared Sub HideBlinkingText(argb() As UInteger)
+      Dim cw = m_textW * m_scaleX
+      Dim attrs = m_pages(m_visualPage).Attrs
+      For r = 0 To attrs.GetLength(0) - 1
+        For c = 0 To attrs.GetLength(1) - 1
+          Dim a = attrs(r, c)
+          If (a And &H10000) <> 0 Then
+            Dim color = m_palette((a >> 8) And &HFF)
+            For y = r * m_textH To Math.Min((r + 1) * m_textH, m_height) - 1
+              For x = c * cw To Math.Min((c + 1) * cw, m_width) - 1
+                argb(y * m_width + x) = color
+              Next
+            Next
+          End If
+        Next
+      Next
+    End Sub
+
+    Private Shared Sub DrawCursor(argb() As UInteger)
+      If m_visualPage <> m_activePage Then Return
+      If m_cursorRow < 1 OrElse m_cursorRow > TextRows OrElse m_cursorCol < 1 OrElse m_cursorCol > TextCols Then Return
+      Dim cw = m_textW * m_scaleX
+      Dim color = m_palette(m_fgColor And 255)
+      For scan = m_cursorStart To Math.Min(m_cursorStop, m_textH - 1)
+        Dim y = (m_cursorRow - 1) * m_textH + scan
+        For x = (m_cursorCol - 1) * cw To m_cursorCol * cw - 1
+          argb(y * m_width + x) = color
+        Next
+      Next
+    End Sub
+
+    ''' <summary>Sets up the screen: pixel size, character cell size and (via scaleX) 40 or 80 columns.</summary>
+    Private Shared Sub ApplyLayout(mode As Integer, w As Integer, h As Integer, tw As Integer, th As Integer, scaleX As Integer)
+      SyncLock m_sync
+        m_mode = mode
+        m_colorMask = ColorMaskOf(mode)
+        m_width = w : m_height = h
+        m_textW = tw : m_textH = th : m_scaleX = scaleX
+        Dim rows = h \ th
+        Dim cols = w \ (tw * scaleX)
+        m_pages = New Page(PageCountOf(mode) - 1) {}
+        For i = 0 To m_pages.Length - 1
+          m_pages(i) = New Page(w * h, rows, cols, (m_fgColor And &HFF) Or ((m_bgColor And &HFF) << 8))
+        Next
+        m_activePage = 0 : m_visualPage = 0
+        BindActivePage()
+        m_viewTop = 1 : m_viewBottom = rows
+        m_cursorRow = 1 : m_cursorCol = 1
+        m_cursorStart = th - 2 : m_cursorStop = th - 1
+        m_cursorVisible = (mode = 0)
+        m_hasBlink = False
+        ResetGraphics()
+        If m_bgColor <> 0 Then
+          For Each p In m_pages
+            Array.Fill(p.Pixels, CByte(m_bgColor And m_colorMask))
+          Next
+        End If
+        m_dirty = True
+      End SyncLock
+    End Sub
+
+    ' The number of screen pages in a mode.
+    Private Shared Function PageCountOf(mode As Integer) As Integer
+      Select Case mode
+        Case 0, 7 : Return 8
+        Case 8 : Return 4
+        Case 9, 10 : Return 2
+        Case Else : Return 1
+      End Select
+    End Function
+
+    Private Shared Sub BindActivePage()
+      Dim p = m_pages(m_activePage)
+      m_pixels = p.Pixels
+      m_chars = p.Chars
+      m_attrs = p.Attrs
+    End Sub
+
+    ' The joysticks and pointer of the display, if it has them (opens the display).
+    Friend Shared Function GameInput() As IGameInput
+      EnsureDisplay()
+      Return TryCast(m_display, IGameInput)
+    End Function
+
+    ' The character row and column (1-based) of a screen pixel.
+    Friend Shared Sub PixelToCell(x As Integer, y As Integer, ByRef row As Integer, ByRef col As Integer)
+      col = Math.Max(1, Math.Min(TextCols, x \ (m_textW * m_scaleX) + 1))
+      row = Math.Max(1, Math.Min(TextRows, y \ m_textH + 1))
+    End Sub
+
+    Public Shared Sub Init()
+      EnsureDisplay()
+    End Sub
 
     Public Shared Sub PRINT()
-      m_cursorRow += 1
-      m_cursorCol = 1
+      NewLine()
+      Touch()
     End Sub
 
+    ''' <summary>
+    ''' Prints text.  TAB(n) and SPC(n) can be concatenated into the text, and a Tab character moves
+    ''' to the next 14-column print zone (what a comma does in QBasic).
+    ''' </summary>
     Public Shared Sub PRINT(text$, Optional noCr As Boolean = False)
-      'TODO: (Possibly) Need to take into account the usage of TAB
-      '      Tab should return a token that can then be used
-      '      within the PRINT statement in order to do 
-      '      specific formatting.  This is because the TAB
-      '      could be called after other formatting (USING) takes
-      '      place.  So should determine the total output and then
-      '      adjust for TAB(s).
-      If False Then
-        Using g = Graphics.FromImage(m_display)
-          Dim x = (m_cursorCol - 1) * m_textW
-          Dim y = (m_cursorRow - 1) * m_textH
-          'Using b = New SolidBrush(m_palette(m_bgColor))
-          g.FillRectangle(m_brush(m_bgColor), x, y, m_textW * text$.Length, m_textH)
-          'End Using
-          Using f = New Font("Consolas", 9, FontStyle.Regular)
-            'Using b = New SolidBrush(m_palette(m_fgColor))
-            g.DrawString(text$, f, m_brush(m_fgColor), x, y)
-            'End Using
-          End Using
-        End Using
-      Else
-        Dim suspended = m_suspend
-        m_suspend = True
-        For Each c In text
-          WriteCharacter(CByte(Asc(c)))
-        Next
-        m_suspend = suspended
-      End If
-      If noCr Then
-        m_cursorCol += If(text?.Length, 0)
-      Else
-        m_cursorCol = 1
-        m_cursorRow += 1
-      End If
-      Invalidate()
+      WriteText(text)
+      If Not noCr Then NewLine()
+      Touch()
     End Sub
 
-    Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional a% = -1, Optional b% = -1, Optional c% = -1)
-      If a <> 0 OrElse b <> 0 OrElse c <> 0 Then
+    Public Shared Sub PRINT_USING(template$, ParamArray values() As Object)
+      PRINT([USING](template, values))
+    End Sub
+
+    Public Shared Function [USING](template$, ParamArray values() As Object) As String
+      Return PrintUsing.Format(template, values)
+    End Function
+
+    Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional cursor% = -1, Optional start% = -1, Optional [stop] As Integer = -1)
+      If row <> -1 Then
+        If row < 1 OrElse row > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(row))
+        m_cursorRow = row
       End If
-      If row% = -1 AndAlso column% > 0 Then
-        m_cursorCol = column%
-      ElseIf column% = -1 AndAlso row% > 0 Then
-        System.Console.CursorTop = row% - 1
-        m_cursorRow = row%
-      ElseIf row% > 0 AndAlso column% > 0 Then
-        m_cursorCol = column%
-        m_cursorRow = row%
+      If column <> -1 Then
+        If column < 1 OrElse column > TextCols Then Throw New ArgumentOutOfRangeException(NameOf(column))
+        m_cursorCol = column
+      End If
+      If cursor <> -1 Then m_cursorVisible = (cursor <> 0)
+      If start <> -1 Then
+        m_cursorStart = Math.Min(start, m_textH - 1)
+        m_cursorStop = Math.Min(If([stop] <> -1, [stop], start), m_textH - 1)
+      End If
+      Touch()
+    End Sub
+
+    Public Shared Function CSRLIN() As Integer
+      Return m_cursorRow
+    End Function
+
+    Public Shared Function POS(value%) As Integer
+      Return m_cursorCol
+    End Function
+
+    ''' <summary>Resets the text viewport to the whole screen.</summary>
+    Public Shared Sub VIEW_PRINT()
+      m_viewTop = 1 : m_viewBottom = TextRows
+      m_cursorRow = 1 : m_cursorCol = 1
+      Touch()
+    End Sub
+
+    ''' <summary>Limits text output (and scrolling) to rows <paramref name="top"/> through <paramref name="bottom"/>.</summary>
+    Public Shared Sub VIEW_PRINT(top%, bottom%)
+      If top < 1 OrElse bottom < top OrElse bottom > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(top))
+      m_viewTop = top : m_viewBottom = bottom
+      m_cursorRow = top : m_cursorCol = 1
+      Touch()
+    End Sub
+
+    ''' <summary>Pass as the first argument of PSET, LINE, CIRCLE etc. for QBasic's STEP: <c>PSET([STEP], 5, 5)</c>.</summary>
+    Public Const [STEP] As Boolean = True
+
+    Private Shared Sub StepPoint([step] As Boolean, ByRef x As Double, ByRef y As Double)
+      If [step] Then x += m_lastX : y += m_lastY
+    End Sub
+
+    ' ---- Coordinates ------------------------------------------------------------------------
+
+    Private Shared ReadOnly Property ScaleX As Double
+      Get
+        Return If(m_winOn, (m_vx2 - m_vx1) / (m_wx2 - m_wx1), 1.0)
+      End Get
+    End Property
+
+    Private Shared ReadOnly Property ScaleY As Double
+      Get
+        Return If(m_winOn, (m_vy2 - m_vy1) / (m_wy2 - m_wy1), 1.0)
+      End Get
+    End Property
+
+    ' Logical (current coordinate system) to absolute screen pixels.
+    Private Shared Sub ToPhysical(x As Double, y As Double, ByRef px As Integer, ByRef py As Integer)
+      Dim fx, fy As Double
+      If m_winOn Then
+        fx = m_vx1 + (x - m_wx1) * ScaleX
+        If m_winScreen Then
+          fy = m_vy1 + (y - m_wy1) * ScaleY
+        Else
+          fy = m_vy2 - (y - m_wy1) * ScaleY
+        End If
+      Else
+        fx = x : fy = y
+        If m_viewRelative Then fx += m_vx1 : fy += m_vy1
+      End If
+      px = ToInt(fx)
+      py = ToInt(fy)
+    End Sub
+
+    ' Resets the graphics cursor to the center of the viewport (or window).
+    Private Shared Sub ResetLastPoint()
+      If m_winOn Then
+        m_lastX = (m_wx1 + m_wx2) / 2
+        m_lastY = (m_wy1 + m_wy2) / 2
+      ElseIf m_viewRelative Then
+        m_lastX = (m_vx2 - m_vx1) / 2.0
+        m_lastY = (m_vy2 - m_vy1) / 2.0
+      Else
+        m_lastX = (m_vx1 + m_vx2) / 2.0
+        m_lastY = (m_vy1 + m_vy2) / 2.0
       End If
     End Sub
+
+    Private Shared Sub ResetGraphics()
+      m_vx1 = 0 : m_vy1 = 0 : m_vx2 = m_width - 1 : m_vy2 = m_height - 1
+      m_viewSet = False : m_viewRelative = False : m_winOn = False
+      m_drawAngle = 0 : m_drawScale = 4
+      ResetLastPoint()
+    End Sub
+
+    Private Shared Sub RawRect(x1 As Integer, y1 As Integer, x2 As Integer, y2 As Integer, color As Integer, fill As Boolean)
+      For y = Math.Max(y1, 0) To Math.Min(y2, m_height - 1)
+        For x = Math.Max(x1, 0) To Math.Min(x2, m_width - 1)
+          If fill OrElse y = y1 OrElse y = y2 OrElse x = x1 OrElse x = x2 Then m_pixels(y * m_width + x) = CByte(color And m_colorMask)
+        Next
+      Next
+    End Sub
+
+    Private Shared Sub SetView(absolute As Boolean, x1 As Integer, y1 As Integer, x2 As Integer, y2 As Integer, color As Integer, border As Integer)
+      If x2 < x1 Then Core.SWAP(x1, x2)
+      If y2 < y1 Then Core.SWAP(y1, y2)
+      If x1 < 0 OrElse y1 < 0 OrElse x2 >= m_width OrElse y2 >= m_height Then Throw New ArgumentOutOfRangeException(NameOf(x1))
+      m_vx1 = x1 : m_vy1 = y1 : m_vx2 = x2 : m_vy2 = y2
+      m_viewSet = True : m_viewRelative = Not absolute
+      If color <> -1 Then RawRect(x1, y1, x2, y2, color, True)
+      If border <> -1 Then RawRect(x1 - 1, y1 - 1, x2 + 1, y2 + 1, border, False)
+      ResetLastPoint()
+      Touch()
+    End Sub
+
+    ''' <summary>Makes the whole screen the graphics viewport again.</summary>
+    Public Shared Sub VIEW()
+      m_vx1 = 0 : m_vy1 = 0 : m_vx2 = m_width - 1 : m_vy2 = m_height - 1
+      m_viewSet = False : m_viewRelative = False
+      ResetLastPoint()
+    End Sub
+
+    ''' <summary>
+    ''' Limits graphics to a rectangle; coordinates become relative to its top-left corner.  A
+    ''' <paramref name="color"/> fills it and a <paramref name="border"/> draws a box around it.
+    ''' </summary>
+    Public Shared Sub VIEW(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
+      SetView(False, x1, y1, x2, y2, color, border)
+    End Sub
+
+    ''' <summary>Like VIEW, but coordinates stay relative to the whole screen (VIEW SCREEN).</summary>
+    Public Shared Sub VIEW_SCREEN(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
+      SetView(True, x1, y1, x2, y2, color, border)
+    End Sub
+
+    ''' <summary>Returns to physical coordinates.</summary>
+    Public Shared Sub WINDOW()
+      m_winOn = False
+      ResetLastPoint()
+    End Sub
+
+    Private Shared Sub SetWindow(screenOrientation As Boolean, x1 As Double, y1 As Double, x2 As Double, y2 As Double)
+      If x1 = x2 OrElse y1 = y2 Then Throw New ArgumentException("Illegal function call")
+      m_wx1 = Math.Min(x1, x2) : m_wx2 = Math.Max(x1, x2)
+      m_wy1 = Math.Min(y1, y2) : m_wy2 = Math.Max(y1, y2)
+      m_winOn = True : m_winScreen = screenOrientation
+      ResetLastPoint()
+    End Sub
+
+    ''' <summary>Defines logical coordinates for the viewport; y increases upward (Cartesian).</summary>
+    Public Shared Sub WINDOW(x1#, y1#, x2#, y2#)
+      SetWindow(False, x1, y1, x2, y2)
+    End Sub
+
+    ''' <summary>Defines logical coordinates for the viewport; y increases downward (WINDOW SCREEN).</summary>
+    Public Shared Sub WINDOW_SCREEN(x1#, y1#, x2#, y2#)
+      SetWindow(True, x1, y1, x2, y2)
+    End Sub
+
+    ''' <summary>
+    ''' Maps between logical and physical coordinates (relative to the viewport): 0 = logical x to
+    ''' physical, 1 = logical y to physical, 2 = physical x to logical, 3 = physical y to logical.
+    ''' </summary>
+    Public Shared Function PMAP(expression#, func%) As Double
+      Dim offX = If(m_viewRelative, m_vx1, 0)
+      Dim offY = If(m_viewRelative, m_vy1, 0)
+      Select Case func
+        Case 0
+          If Not m_winOn Then Return expression
+          Return Math.Round(m_vx1 + (expression - m_wx1) * ScaleX - offX, MidpointRounding.AwayFromZero)
+        Case 1
+          If Not m_winOn Then Return expression
+          If m_winScreen Then Return Math.Round(m_vy1 + (expression - m_wy1) * ScaleY - offY, MidpointRounding.AwayFromZero)
+          Return Math.Round(m_vy2 - (expression - m_wy1) * ScaleY - offY, MidpointRounding.AwayFromZero)
+        Case 2
+          If Not m_winOn Then Return expression
+          Return m_wx1 + (expression + offX - m_vx1) / ScaleX
+        Case 3
+          If Not m_winOn Then Return expression
+          If m_winScreen Then Return m_wy1 + (expression + offY - m_vy1) / ScaleY
+          Return m_wy1 + (m_vy2 - (expression + offY)) / ScaleY
+        Case Else
+          Throw New ArgumentOutOfRangeException(NameOf(func))
+      End Select
+    End Function
+
+    ' ---- Points -------------------------------------------------------------------------------
 
     Public Shared Sub PSET(x#, y#)
-      PSET(CInt(x), CInt(y), m_fgColor)
+      PSET(False, x, y, -1)
     End Sub
 
-    Public Shared Sub PSET(x%, y%, color%)
-      s_prevX = x
-      s_prevY = y
-#If oldway Then
-      CType(m_display, Bitmap).SetPixel(x, y, m_palette(color))
-#Else
-      m_buffer.Graphics.FillRectangle(m_brush(color), x, y, 1, 1)
-#End If
-      Invalidate()
+    Public Shared Sub PSET(x#, y#, color%)
+      PSET(False, x, y, color)
     End Sub
 
-    Public Shared Sub CIRCLE(x%, y%, radius#)
-      CIRCLE(x, y, radius, m_fgColor)
+    Public Shared Sub PSET([step] As Boolean, x#, y#, Optional color% = -1)
+      StepPoint([step], x, y)
+      m_lastX = x : m_lastY = y
+      Dim px, py As Integer
+      ToPhysical(x, y, px, py)
+      SetPixel(px, py, If(color = -1, m_fgColor, color))
+      Touch()
     End Sub
 
-    Public Shared Sub CIRCLE(x%, y%, radius#, attribute%)
-      Dim start = 0
-      Dim [end] = Math.PI * 2
-      CIRCLE(x, y, radius, attribute, start, [end])
+    ''' <summary>Like PSET, but uses the background color unless a color is given.</summary>
+    Public Shared Sub PRESET(x#, y#)
+      PSET(False, x, y, m_bgColor)
     End Sub
 
-    Public Shared Sub CIRCLE(x%, y%, radius#, attribute%, start#, end#)
-      Dim aspect = 1.0
-      Select Case m_mode
-        Case 9 : aspect = 4.0 * (350.0 / 640.0) / 3.0
-        Case Else
-          Throw New NotImplementedException
-      End Select
-      CIRCLE(x, y, radius, attribute, start, [end], aspect)
+    Public Shared Sub PRESET(x#, y#, color%)
+      PSET(False, x, y, color)
     End Sub
 
-    Public Shared Sub CIRCLE(xcenter%, ycenter%, radius As Double, attribute%, startValue As Double?, endValue As Double?, aspect As Double)
+    Public Shared Sub PRESET([step] As Boolean, x#, y#, Optional color% = -1)
+      PSET([step], x, y, If(color = -1, m_bgColor, color))
+    End Sub
+
+    ' Plots a pixel at physical coordinates.
+    Private Shared Sub PlotPhys(px As Integer, py As Integer, color As Integer)
+      SetPixel(px, py, color)
+    End Sub
+
+    ''' <summary>Circle, arc or ellipse.  Angles are in radians; negative angles also draw a line to the center.</summary>
+    Public Shared Sub CIRCLE(x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
+      CIRCLE(False, x, y, radius, attribute, start, [end], aspect)
+    End Sub
+
+    Public Shared Sub CIRCLE([step] As Boolean, x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
+
+      If m_mode = 0 Then Throw New InvalidOperationException
+      StepPoint([step], x, y)
+      m_lastX = x : m_lastY = y
+
+      Dim maxColor = m_colorMask
+      Dim attr = If(attribute = -1, m_fgColor, attribute)
+      If attr < 0 OrElse attr > maxColor Then attr = maxColor
+
+      Dim px, py As Integer
+      ToPhysical(x, y, px, py)
+      CircleCore(px, py, Math.Abs(radius * ScaleX), attr, start, [end], If(aspect, 4.0 * m_height / m_width / 3.0))
+
+    End Sub
+
+    ' Circle at physical coordinates with a radius in pixels.
+    Private Shared Sub CircleCore(xcenter As Integer, ycenter As Integer, radius As Double, attribute As Integer, startValue As Double?, endValue As Double?, aspect As Double)
 
       Dim start As Double = If(startValue, 0.0)
       Dim [end] As Double = If(endValue, Math.PI * 2)
 
-      Select Case m_mode
-        Case 0
-          Throw New InvalidOperationException
-        Case 1
-          If Not attribute.Between(0, 3) Then attribute = 3
-        Case 2
-          If Not attribute.Between(0, 1) Then attribute = 1
-        Case 7
-          If Not attribute.Between(0, 15) Then attribute = 15
-        Case 8
-          If Not attribute.Between(0, 15) Then attribute = 15
-        Case 9
-          If Not attribute.Between(0, 15) Then attribute = 15
-        Case 10
-          If Not attribute.Between(0, 3) Then attribute = 3
-        Case Else
-          Stop
-      End Select
 
       Static pi As Double = 3.1415926535897931
       Static pi2 As Double = 6.2831853071795862
@@ -1206,7 +1553,7 @@ Namespace Global.QB
         px = Math.Cos(start) : py = Math.Sin(start)
         x2 = CInt(px * xspan + 0.5) : y2 = CInt(py * yspan - 0.5)
         'FastLine(ix, iy, ix + x2, iy - y2, col)
-        LINE(ix, iy, ix + x2, iy - y2, attribute)
+        DrawLine(ix, iy, ix + x2, iy - y2, attribute)
       End If
 
       px = 1
@@ -1221,15 +1568,15 @@ drawcircle:
       If ((Math.Abs(x2 - lastplotted_x2) >= 2) OrElse (Math.Abs(y2 - lastplotted_y2) >= 2)) Then
 plot:
         If CBool(exclusive) Then
-          If ((arc1 <= start) OrElse (arc1 >= [end])) Then PSET(ix + lastchecked_x2, iy + lastchecked_y2, attribute)
-          If ((arc2 <= start) OrElse (arc2 >= [end])) Then PSET(ix - lastchecked_x2, iy + lastchecked_y2, attribute)
-          If ((arc3 <= start) OrElse (arc3 >= [end])) Then PSET(ix - lastchecked_x2, iy - lastchecked_y2, attribute)
-          If ((arc4 <= start) OrElse (arc4 >= [end])) Then PSET(ix + lastchecked_x2, iy - lastchecked_y2, attribute)
+          If ((arc1 <= start) OrElse (arc1 >= [end])) Then PlotPhys(ix + lastchecked_x2, iy + lastchecked_y2, attribute)
+          If ((arc2 <= start) OrElse (arc2 >= [end])) Then PlotPhys(ix - lastchecked_x2, iy + lastchecked_y2, attribute)
+          If ((arc3 <= start) OrElse (arc3 >= [end])) Then PlotPhys(ix - lastchecked_x2, iy - lastchecked_y2, attribute)
+          If ((arc4 <= start) OrElse (arc4 >= [end])) Then PlotPhys(ix + lastchecked_x2, iy - lastchecked_y2, attribute)
         Else ' inclusive
-          If ((arc1 >= start) AndAlso (arc1 <= [end])) Then PSET(ix + lastchecked_x2, iy + lastchecked_y2, attribute)
-          If ((arc2 >= start) AndAlso (arc2 <= [end])) Then PSET(ix - lastchecked_x2, iy + lastchecked_y2, attribute)
-          If ((arc3 >= start) AndAlso (arc3 <= [end])) Then PSET(ix - lastchecked_x2, iy - lastchecked_y2, attribute)
-          If ((arc4 >= start) AndAlso (arc4 <= [end])) Then PSET(ix + lastchecked_x2, iy - lastchecked_y2, attribute)
+          If ((arc1 >= start) AndAlso (arc1 <= [end])) Then PlotPhys(ix + lastchecked_x2, iy + lastchecked_y2, attribute)
+          If ((arc2 >= start) AndAlso (arc2 <= [end])) Then PlotPhys(ix - lastchecked_x2, iy + lastchecked_y2, attribute)
+          If ((arc3 >= start) AndAlso (arc3 <= [end])) Then PlotPhys(ix - lastchecked_x2, iy - lastchecked_y2, attribute)
+          If ((arc4 >= start) AndAlso (arc4 <= [end])) Then PlotPhys(ix + lastchecked_x2, iy - lastchecked_y2, attribute)
         End If
         If (i > pixels) Then GoTo allplotted
         lastplotted_x2 = lastchecked_x2 : lastplotted_y2 = lastchecked_y2
@@ -1252,187 +1599,631 @@ allplotted:
         px = Math.Cos([end]) : py = Math.Sin([end])
         x2 = CInt(px * xspan + 0.5) : y2 = CInt(py * yspan - 0.5)
         'FastLine(ix, iy, ix + x2, iy - y2, col)
-        LINE(ix, iy, ix + x2, iy - y2, attribute)
+        DrawLine(ix, iy, ix + x2, iy - y2, attribute)
       End If
 
-      Invalidate()
+      Touch()
 
     End Sub
 
-    Public Shared Sub PAINT(x%, y%)
-      PAINT(False, x, y, m_fgColor, m_fgColor, Nothing)
+    Public Shared Sub PAINT(x#, y#)
+      PAINT(False, x, y, -1, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x%, y%, color%)
-      PAINT(False, x, y, color, color, Nothing)
+    Public Shared Sub PAINT(x#, y#, color%)
+      PAINT(False, x, y, color, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x%, y%, color%, border%)
+    Public Shared Sub PAINT(x#, y#, color%, border%)
       PAINT(False, x, y, color, border, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x%, y%, color%, border%, background$)
+    Public Shared Sub PAINT(x#, y#, color%, border%, background$)
       PAINT(False, x, y, color, border, background)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x%, y%)
-      PAINT([step], x, y, m_fgColor, m_fgColor, Nothing)
+    Public Shared Sub PAINT([step] As Boolean, x#, y#)
+      PAINT([step], x, y, -1, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x%, y%, color%)
-      PAINT([step], x, y, color, color, Nothing)
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%)
+      PAINT([step], x, y, color, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x%, y%, color%, border%)
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%)
       PAINT([step], x, y, color, border, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x%, y%, color%, border%, background$)
+    Public Shared Sub PAINT(x#, y#, tile$)
+      PAINT(False, x, y, tile, -1, Nothing)
+    End Sub
 
-      '#If oldway Then
-      Dim p = New Drawing.Point(x, y)
-      Dim stk As New Stack()
-      stk.Push(p)
-#If oldway Then
-      Dim b = DirectCast(m_display, Bitmap)
-#Else
-      'm_buffer.Render(Graphics.FromImage(m_display))
-      'Dim b = DirectCast(m_display, Bitmap)
-#End If
-#If oldway Then
-      Dim replacementColor = b.GetPixel(x, y)
-#Else
-      Dim replacementColor = GetColor(m_buffer.Graphics, p.X, p.Y)
-#End If
-      Do While stk.Count <> 0
-        p = CType(stk.Pop(), Point)
-#If oldway Then
-        Dim testColor = b.GetPixel(p.X, p.Y)
-#Else
-        Dim testColor = GetColor(m_buffer.Graphics, p.X, p.Y)
-#End If
-        If SameColor(testColor, replacementColor) AndAlso Not SameColor(testColor, m_palette(color)) Then
-#If oldway Then
-          DirectCast(m_display, Bitmap).SetPixel(p.X, p.Y, m_palette(color))
-#Else
-          m_buffer.Graphics.FillRectangle(m_brush(color), p.X, p.Y, 1, 1)
-          'm_buffer.Render(Graphics.FromImage(m_display))
-          'b = DirectCast(m_display, Bitmap)
-#End If
-          If p.X - 1 > -1 Then stk.Push(New Point(p.X - 1, p.Y))
-          If p.X + 1 < m_display.Width Then stk.Push(New Point(p.X + 1, p.Y))
-          If p.Y - 1 > -1 Then stk.Push(New Point(p.X, p.Y - 1))
-          If p.Y + 1 < m_display.Height Then stk.Push(New Point(p.X, p.Y + 1))
-        End If
+    Public Shared Sub PAINT(x#, y#, tile$, border%)
+      PAINT(False, x, y, tile, border, Nothing)
+    End Sub
+
+    Public Shared Sub PAINT(x#, y#, tile$, border%, background$)
+      PAINT(False, x, y, tile, border, background)
+    End Sub
+
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$)
+      PAINT([step], x, y, tile, -1, Nothing)
+    End Sub
+
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%)
+      PAINT([step], x, y, tile, border, Nothing)
+    End Sub
+
+    ''' <summary>
+    ''' Fills with a pattern: <paramref name="tile"/> is up to 64 characters, each giving 8 pixels of a row
+    ''' (SCREEN 1: 4 pixels of 2 bits; planar modes 7 to 12: one byte per plane for each row;
+    ''' SCREEN 13: one byte per pixel, 8 per row); build it with QBChr(n), as CHR$(n) in QBasic.  The pattern is anchored to the screen.  The
+    ''' <paramref name="background"/> slice is accepted for compatibility; because every pixel up to the border is
+    ''' repainted, painting over an already painted area works without it.
+    ''' </summary>
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%, background$)
+
+      If m_mode = 0 Then Throw New InvalidOperationException
+      If String.IsNullOrEmpty(tile) OrElse tile.Length > 64 Then Throw New ArgumentException("Illegal function call")
+
+      StepPoint([step], x, y)
+      m_lastX = x : m_lastY = y
+      Dim px0, py0 As Integer
+      ToPhysical(x, y, px0, py0)
+      If px0 < m_vx1 OrElse py0 < m_vy1 OrElse px0 > m_vx2 OrElse py0 > m_vy2 Then Return
+
+      Dim bytes(tile.Length - 1) As Byte
+      For i = 0 To tile.Length - 1
+        Dim code = AscW(tile(i))
+        If Not s_cp437.TryGetValue(tile(i), code) Then code = AscW(tile(i)) And 255
+        bytes(i) = CByte(code And 255)
+      Next
+
+      Dim edge = CByte(If(border = -1, m_fgColor, border) And m_colorMask)
+      Dim w = m_width
+      Dim px = m_pixels
+      Dim visited(m_width * m_height - 1) As Boolean
+
+      Dim stk As New Stack(Of (X As Integer, Y As Integer))
+      stk.Push((px0, py0))
+
+      Do While stk.Count > 0
+        Dim pt = stk.Pop()
+        Dim row = pt.Y * w
+        If visited(row + pt.X) OrElse px(row + pt.X) = edge Then Continue Do
+
+        Dim l = pt.X
+        Do While l > m_vx1 AndAlso Not visited(row + l - 1) AndAlso px(row + l - 1) <> edge
+          l -= 1
+        Loop
+        Dim r = pt.X
+        Do While r < m_vx2 AndAlso Not visited(row + r + 1) AndAlso px(row + r + 1) <> edge
+          r += 1
+        Loop
+
+        For i = l To r
+          visited(row + i) = True
+        Next
+
+        For Each ny In {pt.Y - 1, pt.Y + 1}
+          If ny < m_vy1 OrElse ny > m_vy2 Then Continue For
+          Dim nrow = ny * w
+          Dim inSpan = False
+          For i = l To r
+            Dim open = Not visited(nrow + i) AndAlso px(nrow + i) <> edge
+            If open AndAlso Not inSpan Then stk.Push((i, ny))
+            inSpan = open
+          Next
+        Next
       Loop
 
-      Invalidate()
+      ' Paint the region (found first, so the pattern can't confuse the search).
+      For y2 = m_vy1 To m_vy2
+        For x2 = m_vx1 To m_vx2
+          If visited(y2 * w + x2) Then px(y2 * w + x2) = CByte(TilePixel(bytes, x2, y2) And m_colorMask)
+        Next
+      Next
+
+      Touch()
 
     End Sub
 
-    Private Shared Function SameColor(c1 As Color, c2 As Color) As Boolean
-      Return ((c1.A = c2.A) AndAlso (c1.B = c2.B) AndAlso (c1.G = c2.G) AndAlso (c1.R = c2.R))
+    ' The color of the pattern at a screen position.
+    Private Shared Function TilePixel(tile() As Byte, x As Integer, y As Integer) As Integer
+      Dim n = tile.Length
+      Select Case m_mode
+        Case 13
+          Dim rows = Math.Max(1, n \ 8)
+          Return tile(((y Mod rows) * 8 + (x And 7)) Mod n)
+        Case 1
+          Return (tile(y Mod n) >> (6 - 2 * (x And 3))) And 3
+        Case 2, 11
+          Return (tile(y Mod n) >> (7 - (x And 7))) And 1
+        Case Else
+          Dim planes = If(m_mode = 10, 2, 4)
+          Dim rows = Math.Max(1, n \ planes)
+          Dim color = 0
+          For p = 0 To planes - 1
+            Dim b = tile(((y Mod rows) * planes + p) Mod n)
+            color = color Or (((b >> (7 - (x And 7))) And 1) << p)
+          Next
+          Return color
+      End Select
     End Function
 
+    ''' <summary>
+    ''' Fills the area around (x, y) with <paramref name="color"/> up to pixels of color <paramref name="border"/>
+    ''' (both default to the foreground color).  Filling stays inside the graphics viewport.
+    ''' </summary>
+    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%, background$)
+
+      'TODO: The background$ tile pattern is not supported.
+
+      StepPoint([step], x, y)
+      m_lastX = x : m_lastY = y
+      Dim px0, py0 As Integer
+      ToPhysical(x, y, px0, py0)
+      FloodFill(px0, py0, color, border)
+
+    End Sub
+
+    ' Flood fill at a physical position (inside the viewport).
+    Private Shared Sub FloodFill(px0 As Integer, py0 As Integer, color As Integer, border As Integer)
+
+      If px0 < m_vx1 OrElse py0 < m_vy1 OrElse px0 > m_vx2 OrElse py0 > m_vy2 Then Return
+
+      Dim fillC = CByte(If(color = -1, m_fgColor, color) And m_colorMask)
+      Dim edge = CByte(If(border = -1, If(color = -1, m_fgColor, color), border) And m_colorMask)
+      Dim w = m_width
+      Dim px = m_pixels
+      Dim minX = m_vx1, maxX = m_vx2, minY = m_vy1, maxY = m_vy2
+
+      Dim stk As New Stack(Of (X As Integer, Y As Integer))
+      stk.Push((px0, py0))
+
+      Do While stk.Count > 0
+        Dim pt = stk.Pop()
+        Dim row = pt.Y * w
+        If px(row + pt.X) = edge OrElse px(row + pt.X) = fillC Then Continue Do
+
+        Dim l = pt.X
+        Do While l > minX AndAlso px(row + l - 1) <> edge AndAlso px(row + l - 1) <> fillC
+          l -= 1
+        Loop
+        Dim r = pt.X
+        Do While r < maxX AndAlso px(row + r + 1) <> edge AndAlso px(row + r + 1) <> fillC
+          r += 1
+        Loop
+
+        For i = l To r
+          px(row + i) = fillC
+        Next
+
+        For Each ny In {pt.Y - 1, pt.Y + 1}
+          If ny < minY OrElse ny > maxY Then Continue For
+          Dim nrow = ny * w
+          Dim inSpan = False
+          For i = l To r
+            Dim open = px(nrow + i) <> edge AndAlso px(nrow + i) <> fillC
+            If open AndAlso Not inSpan Then stk.Push((i, ny))
+            inSpan = open
+          Next
+        Next
+      Loop
+
+      Touch()
+
+    End Sub
+
+    ' ---- DRAW ---------------------------------------------------------------------------------
+
+    Private Shared m_drawAngle As Double = 0              ' Degrees, counterclockwise (A and TA).
+    Private Shared m_drawScale As Integer = 4             ' S: distances are multiplied by scale / 4.
+
+    ' Reads an integer argument of a DRAW command (the digits right after the command letter).
+    Private Shared Function DrawInt(s As String, ByRef i As Integer, defaultValue As Integer, allowSign As Boolean, required As Boolean, ByRef signed As Boolean) As Integer
+      signed = False
+      Do While i < s.Length AndAlso s(i) = " "c
+        i += 1
+      Loop
+      If i < s.Length AndAlso s(i) = "="c Then
+        Throw New NotSupportedException("DRAW can't read variables with =; put the value into the command string.")
+      End If
+      Dim start = i
+      If i < s.Length AndAlso (s(i) = "+"c OrElse s(i) = "-"c) Then
+        If Not allowSign Then Throw New ArgumentException("Illegal function call")
+        signed = True
+        i += 1
+      End If
+      Dim digits = i
+      Do While i < s.Length AndAlso Char.IsDigit(s(i))
+        i += 1
+      Loop
+      If i = digits Then
+        If signed OrElse required Then Throw New ArgumentException("Illegal function call")
+        Return defaultValue
+      End If
+      Return Integer.Parse(s.Substring(start, i - start), Globalization.CultureInfo.InvariantCulture)
+    End Function
+
+    ''' <summary>
+    ''' Draws from the last point using QBasic's graphics macro language: U D L R E F G H (move up, down,
+    ''' left, right and diagonally by n), M x,y (move to; with + or - relative), B (move without drawing),
+    ''' N (draw then return), A n (angle 0 to 3), TA n (angle in degrees), C n (color), S n (scale, 4 = 1:1),
+    ''' P paint,border (fill).  The X (execute) command and =variable arguments aren't supported.
+    ''' </summary>
+    Public Shared Sub DRAW(commands As String)
+
+      Dim s = If(commands, "").ToUpperInvariant()
+      Dim i = 0
+
+      Dim ix, iy As Integer
+      ToPhysical(m_lastX, m_lastY, ix, iy)
+      Dim cx As Double = ix, cy As Double = iy
+
+      Dim color = m_fgColor
+      Dim blank = False, noUpdate = False
+      Dim signed As Boolean
+
+      Do While i < s.Length
+
+        Dim c = s(i)
+        i += 1
+        If c = " "c OrElse c = ";"c OrElse c = vbTab OrElse c = vbCr OrElse c = vbLf Then Continue Do
+
+        Dim vx = 0.0, vy = 0.0      ' Movement, before scale and rotation.
+        Dim move = False
+        Dim absolute = False
+
+        Select Case c
+          Case "B"c : blank = True
+          Case "N"c : noUpdate = True
+          Case "U"c : vy = -1 : move = True
+          Case "D"c : vy = 1 : move = True
+          Case "L"c : vx = -1 : move = True
+          Case "R"c : vx = 1 : move = True
+          Case "E"c : vx = 1 : vy = -1 : move = True
+          Case "F"c : vx = 1 : vy = 1 : move = True
+          Case "G"c : vx = -1 : vy = 1 : move = True
+          Case "H"c : vx = -1 : vy = -1 : move = True
+          Case "M"c
+            Dim x = DrawInt(s, i, 0, True, True, signed)
+            Dim relative = signed
+            Do While i < s.Length AndAlso s(i) = " "c : i += 1 : Loop
+            If i >= s.Length OrElse s(i) <> ","c Then Throw New ArgumentException("Illegal function call")
+            i += 1
+            Do While i < s.Length AndAlso s(i) = " "c : i += 1 : Loop
+            Dim y = DrawInt(s, i, 0, True, True, signed)
+            If relative Then
+              vx = x : vy = y
+            Else
+              vx = x + If(m_viewRelative AndAlso Not m_winOn, m_vx1, 0) - cx
+              vy = y + If(m_viewRelative AndAlso Not m_winOn, m_vy1, 0) - cy
+              absolute = True
+            End If
+            move = True
+          Case "A"c
+            Dim a = DrawInt(s, i, 0, False, True, signed)
+            If a < 0 OrElse a > 3 Then Throw New ArgumentException("Illegal function call")
+            m_drawAngle = a * 90
+          Case "T"c
+            If i >= s.Length OrElse s(i) <> "A"c Then Throw New ArgumentException("Illegal function call")
+            i += 1
+            Dim a = DrawInt(s, i, 0, True, True, signed)
+            If a < -360 OrElse a > 360 Then Throw New ArgumentException("Illegal function call")
+            m_drawAngle = a
+          Case "C"c
+            Dim n = DrawInt(s, i, 0, False, True, signed)
+            If n < 0 OrElse n > m_colorMask Then Throw New ArgumentException("Illegal function call")
+            color = n
+          Case "S"c
+            Dim n = DrawInt(s, i, 0, False, True, signed)
+            If n < 1 OrElse n > 255 Then Throw New ArgumentException("Illegal function call")
+            m_drawScale = n
+          Case "P"c
+            Dim paintColor = DrawInt(s, i, 0, False, True, signed)
+            Do While i < s.Length AndAlso s(i) = " "c : i += 1 : Loop
+            If i >= s.Length OrElse s(i) <> ","c Then Throw New ArgumentException("Illegal function call")
+            i += 1
+            Dim border = DrawInt(s, i, 0, False, True, signed)
+            Dim fx = CInt(Math.Round(cx, MidpointRounding.AwayFromZero))
+            Dim fy = CInt(Math.Round(cy, MidpointRounding.AwayFromZero))
+            FloodFill(fx, fy, paintColor, border)
+          Case "X"c
+            Throw New NotSupportedException("DRAW's X (execute substring) command isn't supported.")
+          Case Else
+            Throw New ArgumentException("Illegal function call")
+        End Select
+
+        If Not move Then Continue Do
+
+        If Not absolute Then
+          ' Relative moves (and the direction letters) use the scale and the angle.
+          Dim dist = If(c = "M"c, 1, DrawInt(s, i, 1, False, False, signed))
+          Dim k = dist * m_drawScale / 4.0
+          vx *= k : vy *= k
+          Dim rad = m_drawAngle * Math.PI / 180
+          Dim rx = vx * Math.Cos(rad) + vy * Math.Sin(rad)
+          Dim ry = -vx * Math.Sin(rad) + vy * Math.Cos(rad)
+          vx = rx : vy = ry
+        End If
+
+        Dim nx = cx + vx, ny = cy + vy
+        If Not blank Then
+          DrawLine(CInt(Math.Round(cx, MidpointRounding.AwayFromZero)), CInt(Math.Round(cy, MidpointRounding.AwayFromZero)),
+                   CInt(Math.Round(nx, MidpointRounding.AwayFromZero)), CInt(Math.Round(ny, MidpointRounding.AwayFromZero)), color)
+        End If
+        If Not noUpdate Then cx = nx : cy = ny
+        blank = False : noUpdate = False
+
+      Loop
+
+      ' The graphics cursor ends where the drawing did.
+      Dim offX = If(m_viewRelative, m_vx1, 0), offY = If(m_viewRelative, m_vy1, 0)
+      m_lastX = PMAP(cx - offX, 2)
+      m_lastY = PMAP(cy - offY, 3)
+      Touch()
+
+    End Sub
+
+    ''' <summary>Draws a line from the last point referenced to (x2, y2).</summary>
     Public Shared Sub LINE(x2#, y2#)
-      LINE(s_prevX, s_prevY, x2, y2, m_fgColor)
+      LINE(False, m_lastX, m_lastY, False, x2, y2, -1, LineOption.None, &HFFFF)
     End Sub
 
-    Private Shared s_prevX As Integer
-    Private Shared s_prevY As Integer
-
-    Public Shared Sub LINE(x1#, y1#, x2#, y2#)
-      LINE(x1, y1, x2, y2, m_fgColor)
+    ''' <summary>Draws a line from the last point referenced; with STEP, (x2, y2) is relative to it.</summary>
+    Public Shared Sub LINE([step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
+      LINE(False, m_lastX, m_lastY, [step2], x2, y2, attr, lo, style)
     End Sub
 
-    Public Shared Sub LINE(x1#, y1#, x2#, y2#, attr%, Optional lo As LineOption = LineOption.None)
+    ''' <summary>
+    ''' Draws a line, box (B) or filled box (BF).  <paramref name="style"/> is a 16-bit dash pattern
+    ''' (most significant bit first) that repeats along the line.
+    ''' </summary>
+    Public Shared Sub LINE(x1#, y1#, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
+      LINE(False, x1, y1, False, x2, y2, attr, lo, style)
+    End Sub
 
-      s_prevX = CInt(x2)
-      s_prevY = CInt(y2)
+    ''' <summary>The first point is relative to the last point with STEP; the second is relative to the first with STEP.</summary>
+    Public Shared Sub LINE([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
 
-      If x2 < x1 Then SWAP(x1, x2)
-      If y2 < y1 Then SWAP(y1, y2)
+      StepPoint([step1], x1, y1)
+      If [step2] Then x2 += x1 : y2 += y1
+      m_lastX = x2 : m_lastY = y2
 
-#If oldway Then
-      Using g = Graphics.FromImage(m_display)
-#Else
-      Dim g = m_buffer.Graphics
-#End If
+      Dim color = If(attr = -1, m_fgColor, attr)
+      Dim ax, ay, bx, by As Integer
+      ToPhysical(x1, y1, ax, ay)
+      ToPhysical(x2, y2, bx, by)
+
       Select Case lo
         Case LineOption.None
-          g.DrawLine(m_pen(attr), CInt(x1), CInt(y1), CInt(x2), CInt(y2))
+          DrawLine(ax, ay, bx, by, color, style)
         Case LineOption.B
-          g.DrawRectangle(m_pen(attr), CInt(x1), CInt(y1), CInt(x2 - x1) + 1, CInt(y2 - y1) + 1)
+          If bx < ax Then Core.SWAP(ax, bx)
+          If by < ay Then Core.SWAP(ay, by)
+          DrawLine(ax, ay, bx, ay, color, style)
+          DrawLine(ax, by, bx, by, color, style)
+          DrawLine(ax, ay, ax, by, color, style)
+          DrawLine(bx, ay, bx, by, color, style)
         Case LineOption.BF
-          g.FillRectangle(m_brush(attr), CInt(x1), CInt(y1), CInt(x2 - x1) + 1, CInt(y2 - y1) + 1)
-        Case Else
+          If bx < ax Then Core.SWAP(ax, bx)
+          If by < ay Then Core.SWAP(ay, by)
+          ax = Math.Max(ax, m_vx1) : ay = Math.Max(ay, m_vy1)
+          bx = Math.Min(bx, m_vx2) : by = Math.Min(by, m_vy2)
+          For yy = ay To by
+            For xx = ax To bx
+              m_pixels(yy * m_width + xx) = CByte(color And m_colorMask)
+            Next
+          Next
       End Select
-#If oldway Then
-      End Using
-#End If
-      Invalidate()
+
+      Touch()
+
     End Sub
 
-    Private Shared m_suspend As Boolean
+    Private Shared Sub DrawLine(x1 As Integer, y1 As Integer, x2 As Integer, y2 As Integer, color As Integer, Optional style As Integer = &HFFFF)
+      Dim dx = Math.Abs(x2 - x1)
+      Dim dy = -Math.Abs(y2 - y1)
+      Dim sx = If(x1 < x2, 1, -1)
+      Dim sy = If(y1 < y2, 1, -1)
+      Dim err = dx + dy
+      Dim n = 0
+      Do
+        If ((style >> (15 - (n And 15))) And 1) <> 0 Then SetPixel(x1, y1, color)
+        n += 1
+        If x1 = x2 AndAlso y1 = y2 Then Exit Do
+        Dim e2 = 2 * err
+        If e2 >= dy Then err += dy : x1 += sx
+        If e2 <= dx Then err += dx : y1 += sy
+      Loop
+    End Sub
 
+    ''' <summary>Stops the screen from updating (to avoid flicker) until ResumeOutput is called.</summary>
     Public Shared Sub SuspendOutput()
       m_suspend = True
     End Sub
 
     Public Shared Sub ResumeOutput()
       m_suspend = False
-      Invalidate()
+      Touch()
     End Sub
 
-    Private Shared m_invalidated As Boolean
-
-    Private Shared Sub Invalidate()
-      m_invalidated = True
-      If Not m_manualMode Then
-        Render()
-      End If
-    End Sub
-
+    ''' <summary>Forces the screen to be refreshed.</summary>
     Public Shared Sub Render()
-      If m_suspend Then Return
-      If m_pictureBox IsNot Nothing AndAlso
-         m_invalidated Then
-#If Not oldway Then
-        m_buffer.Render(Graphics.FromImage(m_display))
-#End If
-        m_pictureBox.Image = m_display
-        m_invalidated = False
-      End If
+      Touch()
     End Sub
 
-    Public Shared Sub PUT(x%, y%, img As System.Drawing.Image, po As PutOption)
-#If oldway Then
-      Using g = System.Drawing.Graphics.FromImage(m_display)
-#Else
-      Dim g = m_buffer.Graphics
-#End If
-      Dim src = New Rectangle(0, 0, img.Width, img.Height)
-      Dim dest = New Rectangle(x, y, img.Width, img.Height)
-      g.DrawImage(img, dest, src, System.Drawing.GraphicsUnit.Pixel)
-#If oldway Then
-      End Using
-#End If
-      Invalidate()
+    ' ---- GET and PUT ----------------------------------------------------------------------
+
+    ' Bits per pixel (per plane) and number of planes of the current mode, as QBasic stores images.
+    Private Shared Sub ImageFormat(ByRef bitsPerPixel As Integer, ByRef planes As Integer)
+      Select Case m_mode
+        Case 1 : bitsPerPixel = 2 : planes = 1
+        Case 2, 11 : bitsPerPixel = 1 : planes = 1
+        Case 7, 8, 9, 12 : bitsPerPixel = 1 : planes = 4
+        Case 10 : bitsPerPixel = 1 : planes = 2
+        Case 13 : bitsPerPixel = 8 : planes = 1
+        Case Else : Throw New InvalidOperationException("GET and PUT need a graphics screen mode.")
+      End Select
     End Sub
 
-    Private Shared m_address As New List(Of System.Drawing.Image)
+    Private Shared Function ElementSize(image As Array) As Integer
+      If image Is Nothing OrElse image.Length = 0 Then Throw New ArgumentException("Illegal function call")
+      Return Buffer.ByteLength(image) \ image.Length
+    End Function
 
-    Public Shared Sub [GET](x1%, y1%, x2%, y2%, ByRef img As System.Drawing.Image)
-      img = New Bitmap(x2 - x1, y2 - y1)
-      Using g = Graphics.FromImage(img)
-        Dim src = New Rectangle(x1, y1, x2 - x1, y2 - y1)
-        Dim dest = New Rectangle(0, 0, x2 - x1, y2 - y1)
-        g.DrawImage(m_display, dest, src, System.Drawing.GraphicsUnit.Pixel)
-      End Using
+    Public Shared Sub PUT(x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
+      PUT(False, x, y, image, action, index)
     End Sub
+
+    ' (Whole-number coordinates need their own overload: otherwise PUT(10, 20, image) would match the
+    ' file form PUT(filenum, record, value), which is a better fit for Integers.)
+    Public Shared Sub PUT(x As Integer, y As Integer, image As Array)
+      PUT(False, CDbl(x), CDbl(y), image, PutOption.PUT_XOR, 0)
+    End Sub
+
+    Public Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption)
+      PUT(False, CDbl(x), CDbl(y), image, action, 0)
+    End Sub
+
+    Public Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption, index As Integer)
+      PUT(False, CDbl(x), CDbl(y), image, action, index)
+    End Sub
+
+    ''' <summary>
+    ''' Draws an image captured by GET (stored in any numeric array, starting at element
+    ''' <paramref name="index"/>) with its top-left corner at (x, y), clipped to the viewport.
+    ''' The default action is XOR, as in QBasic.
+    ''' </summary>
+    Public Shared Sub PUT([step] As Boolean, x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
+
+      StepPoint([step], x, y)
+      m_lastX = x : m_lastY = y
+      Dim x0, y0 As Integer
+      ToPhysical(x, y, x0, y0)
+
+      Dim bpp, planes As Integer
+      ImageFormat(bpp, planes)
+      Dim elem = ElementSize(image)
+      Dim offset = index * elem
+      If index < 0 OrElse Buffer.ByteLength(image) - offset < 4 Then Throw New ArgumentException("Illegal function call")
+
+      Dim header(3) As Byte
+      Buffer.BlockCopy(image, offset, header, 0, 4)
+      Dim wBits = header(0) Or (header(1) << 8)
+      Dim h = header(2) Or (header(3) << 8)
+      Dim w = wBits \ bpp
+      Dim rowBytes = (wBits + 7) \ 8
+      Dim total = 4 + rowBytes * planes * h
+      If Buffer.ByteLength(image) - offset < total Then Throw New ArgumentException("Illegal function call")
+
+      Dim buf(total - 1) As Byte
+      Buffer.BlockCopy(image, offset, buf, 0, total)
+
+      For sy = 0 To h - 1
+        For sx = 0 To w - 1
+
+          Dim dx = x0 + sx, dy = y0 + sy
+          If dx < m_vx1 OrElse dy < m_vy1 OrElse dx > m_vx2 OrElse dy > m_vy2 Then Continue For
+
+          Dim color As Integer = 0 ' (A Dim inside a loop keeps its value between iterations in VB.)
+          Select Case bpp
+            Case 8
+              color = buf(4 + sy * rowBytes + sx)
+            Case 2
+              color = (buf(4 + sy * rowBytes + sx \ 4) >> (6 - 2 * (sx And 3))) And 3
+            Case Else
+              For p = 0 To planes - 1
+                Dim b = buf(4 + (sy * planes + p) * rowBytes + sx \ 8)
+                color = color Or (((b >> (7 - (sx And 7))) And 1) << p)
+              Next
+          End Select
+
+          Dim i = dy * m_width + dx
+          Select Case action
+            Case PutOption.PUT_PSET : m_pixels(i) = CByte(color And m_colorMask)
+            Case PutOption.PUT_PRESET : m_pixels(i) = CByte((Not color) And m_colorMask)
+            Case PutOption.PUT_XOR : m_pixels(i) = CByte(m_pixels(i) Xor color)
+            Case PutOption.PUT_AND : m_pixels(i) = CByte(m_pixels(i) And color)
+            Case PutOption.PUT_OR : m_pixels(i) = CByte(m_pixels(i) Or color)
+          End Select
+
+        Next
+      Next
+
+      Touch()
+
+    End Sub
+
+    Public Shared Sub [GET](x1#, y1#, x2#, y2#, image As Array, Optional index% = 0)
+      [GET](False, x1, y1, False, x2, y2, image, index)
+    End Sub
+
+    ''' <summary>
+    ''' Captures the pixels of a rectangle (corners inclusive) into a numeric array, in QBasic's image
+    ''' format, starting at element <paramref name="index"/>.  The array must be big enough, as in QBasic:
+    ''' 4 + INT((width * bits-per-pixel + 7) / 8) * planes * height bytes.
+    ''' </summary>
+    Public Shared Sub [GET]([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, image As Array, Optional index% = 0)
+
+      StepPoint([step1], x1, y1)
+      If [step2] Then x2 += x1 : y2 += y1
+      m_lastX = x2 : m_lastY = y2
+      Dim ax, ay, bx, by As Integer
+      ToPhysical(x1, y1, ax, ay)
+      ToPhysical(x2, y2, bx, by)
+      If bx < ax Then Core.SWAP(ax, bx)
+      If by < ay Then Core.SWAP(ay, by)
+
+      Dim bpp, planes As Integer
+      ImageFormat(bpp, planes)
+      Dim w = bx - ax + 1, h = by - ay + 1
+      Dim rowBytes = (w * bpp + 7) \ 8
+      Dim total = 4 + rowBytes * planes * h
+
+      Dim elem = ElementSize(image)
+      Dim offset = index * elem
+      If index < 0 OrElse Buffer.ByteLength(image) - offset < total Then Throw New ArgumentException("Illegal function call")
+
+      Dim buf(total - 1) As Byte
+      buf(0) = CByte((w * bpp) And 255) : buf(1) = CByte(((w * bpp) >> 8) And 255)
+      buf(2) = CByte(h And 255) : buf(3) = CByte((h >> 8) And 255)
+
+      Dim pos = 4
+      For sy = 0 To h - 1
+        For p = 0 To planes - 1
+          For cb = 0 To rowBytes - 1
+            Dim b = 0
+            Select Case bpp
+              Case 8
+                b = Pixel(ax + cb, ay + sy)
+              Case 2
+                For k = 0 To 3
+                  If cb * 4 + k < w Then b = b Or ((Pixel(ax + cb * 4 + k, ay + sy) And 3) << (6 - 2 * k))
+                Next
+              Case Else
+                For k = 0 To 7
+                  If cb * 8 + k < w Then b = b Or (((Pixel(ax + cb * 8 + k, ay + sy) >> p) And 1) << (7 - k))
+                Next
+            End Select
+            buf(pos) = CByte(b)
+            pos += 1
+          Next
+        Next
+      Next
+
+      Buffer.BlockCopy(buf, 0, image, offset, total)
+
+    End Sub
+
+    Private Shared Function Pixel(x As Integer, y As Integer) As Integer
+      If x < 0 OrElse y < 0 OrElse x >= m_width OrElse y >= m_height Then Return 0
+      Return m_pixels(y * m_width + x)
+    End Function
 
     Public Shared Async Function LineInputAsync(prompt$) As Task(Of String)
-      PRINT(prompt$)
+      PRINT(prompt$, True)
       Dim result$ = ""
       Do
         Await Task.Delay(1)
@@ -1448,393 +2239,341 @@ allplotted:
       Loop
     End Function
 
-    'Private Shared m_bgBrush As Brush = Brushes.Black
-    'Private Shared m_fgBrush As Brush = Brushes.White
-
-    Private Shared m_bgColor As Integer = 0
-    Private Shared m_fgColor As Integer = 7
-
+    ''' <summary>In SCREEN 1 this sets the background color (0 to 15); elsewhere the foreground.</summary>
     Public Shared Sub COLOR(fg%)
-      'If fg% > 15 Then fg% -= 16
-      'Throw New NotImplementedException
-      m_fgColor = fg
+      If m_mode = 1 Then
+        m_palette(0) = s_ega(fg And 15)
+        Touch()
+      Else
+        COLOR(fg, m_bgColor)
+      End If
     End Sub
 
+    ''' <summary>In text mode (SCREEN 0), a foreground of 16 to 31 blinks and the background is 0 to 7.</summary>
     Public Shared Sub COLOR(fg%, bg%)
-      'Throw New NotImplementedException
-      m_fgColor = fg
-      m_bgColor = bg
+      If m_mode = 1 Then
+        ' SCREEN 1: COLOR background, palette (0 = green/red/brown, 1 = cyan/magenta/light gray).
+        m_palette(0) = s_ega(fg And 15)
+        Dim first = If((bg And 1) = 0, 2, 3)
+        m_palette(1) = s_ega(first) : m_palette(2) = s_ega(first + 2) : m_palette(3) = s_ega(first + 4)
+        Touch()
+      ElseIf m_mode = 0 Then
+        m_fgBlink = fg > 15
+        m_fgColor = fg And 15
+        m_bgColor = bg And 7
+      Else
+        m_fgBlink = False
+        m_fgColor = fg
+        m_bgColor = bg
+      End If
     End Sub
 
+    ''' <summary>Clears the screen (or the text viewport if VIEW PRINT is in effect).</summary>
     Public Shared Sub CLS()
-#If oldway Then
-      Using g = System.Drawing.Graphics.FromImage(m_display)
-        g.FillRectangle(m_brush(m_bgColor), 0, 0, m_display.Width, m_display.Height)
-      End Using
-#Else
-      m_buffer.Graphics.FillRectangle(m_brush(m_bgColor), 0, 0, m_rectangle.Width, m_rectangle.Height)
-#End If
-      m_cursorCol = 1
-      m_cursorRow = 1
-      Invalidate()
+      CLS(If(m_viewTop <> 1 OrElse m_viewBottom <> TextRows, 2, If(m_viewSet, 1, 0)))
     End Sub
 
+    ''' <summary>0 = whole screen, 1 = graphics viewport, 2 = text viewport.</summary>
     Public Shared Sub CLS(viewport As Integer)
       Select Case viewport
-        Case 0, 1, 2
-          CLS() 'TODO: For now, just call the base.
+        Case 0
+          Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask))
+          ClearCells(1, TextRows)
+          m_hasBlink = False
+          m_cursorRow = m_viewTop : m_cursorCol = 1
+        Case 1
+          RawRect(m_vx1, m_vy1, m_vx2, m_vy2, m_bgColor, True)
+          ResetLastPoint()
+        Case 2
+          Dim y0 = (m_viewTop - 1) * m_textH
+          Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask), y0 * m_width, (m_viewBottom - m_viewTop + 1) * m_textH * m_width)
+          ClearCells(m_viewTop, m_viewBottom)
+          m_cursorRow = m_viewTop : m_cursorCol = 1
         Case Else
           Throw New ArgumentException
       End Select
+      Touch()
     End Sub
 
     Public Shared Async Function InputAsync(prompt$) As Task(Of String)
-      PRINT(prompt$)
-      Dim result$ = ""
-      Do
-        Await Task.Delay(1)
-        Dim a$ = INKEY()
-        If a$?.Length > 0 Then
-          If a$ = Chr(13) Then
-            Return result$
-          Else
-            result$ &= a$
-            PRINT(a$, True)
-          End If
-        End If
-      Loop
+      Return Await LineInputAsync(prompt$)
     End Function
 
 #Region "SCREEN (Function)"
 
-    'Public Shared Function SCREEN(r%, c%) As Integer
-    '  Return 0
-    'End Function
-
+    ''' <summary>
+    ''' The character (ASCII code) at a screen position, or, when <paramref name="colr"/> is not 0, its
+    ''' color attribute (foreground + 16 * background, + 128 if blinking, in SCREEN 0).
+    ''' </summary>
     Public Shared Function SCREEN%(row%, column%, Optional colr% = 0)
-      Throw New NotImplementedException
-      If colr% = 0 Then
-        'Dim ch = ConsoleEx.ReadChar(column - 1, row - 1)
-        'If ch IsNot Nothing Then
-        '  Select Case CStr(ch)
-        '    Case "█" : Return 219
-        '    Case "▄" : Return 220
-        '    Case "▌" : Return 221
-        '    Case "▐" : Return 222
-        '    Case "▀" : Return 223
-        '      'Case "√" : Return 251
-        '    Case Else
-        '      Return QBAsc(CChar(ch))
-        '  End Select
-        'Else
-        '  Return 0
-        'End If
-      Else
-        Return 0
-      End If
-      Return 0
+      If row < 1 OrElse row > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(row))
+      If column < 1 OrElse column > TextCols Then Throw New ArgumentOutOfRangeException(NameOf(column))
+      If colr = 0 Then Return m_chars(row - 1, column - 1)
+      Dim a = m_attrs(row - 1, column - 1)
+      Dim fg = a And &HFF
+      If m_mode <> 0 Then Return fg
+      Dim bg = (a >> 8) And &HFF
+      Return (fg And 15) + 16 * (bg And 7) + If((a And &H10000) <> 0, 128, 0)
     End Function
 
 #End Region
 
 #Region "SCREEN (Statement)"
 
-    Private Shared m_mode As Integer = 0
+    ''' <summary>
+    ''' SCREEN with pages: <paramref name="apage"/> is the page drawing goes to and <paramref name="vpage"/> the
+    ''' page shown.  Pass -1 for any argument to omit it; with a mode given the screen is reset (as
+    ''' SCREEN mode does), otherwise only the pages change.  Pages: SCREEN 0 and 7: 0 to 7, SCREEN 8: 0 to 3,
+    ''' SCREEN 9 and 10: 0 to 1, other modes: 0.  <paramref name="colorswitch"/> is ignored.
+    ''' </summary>
+    Public Shared Sub SCREEN(mode%, colorswitch%, apage%, vpage%)
+      If mode <> -1 Then SCREEN(mode)
+      If apage <> -1 AndAlso (apage < 0 OrElse apage >= m_pages.Length) Then Throw New ArgumentOutOfRangeException(NameOf(apage))
+      If vpage <> -1 AndAlso (vpage < 0 OrElse vpage >= m_pages.Length) Then Throw New ArgumentOutOfRangeException(NameOf(vpage))
+      SyncLock m_sync
+        If apage <> -1 Then m_activePage = apage : BindActivePage()
+        If vpage <> -1 Then m_visualPage = vpage
+        m_dirty = True
+      End SyncLock
+      Touch()
+    End Sub
 
-    Public Shared Sub SCREEN(mode%, colr%, active%, visible%)
-      If mode <> 0 OrElse colr <> 0 OrElse active <> 0 OrElse visible <> 0 Then
-      End If
-      Throw New NotImplementedException
+    ''' <summary>Copies the contents (pixels and text) of one page to another.</summary>
+    Public Shared Sub PCOPY(source%, destination%)
+      If source < 0 OrElse source >= m_pages.Length Then Throw New ArgumentOutOfRangeException(NameOf(source))
+      If destination < 0 OrElse destination >= m_pages.Length Then Throw New ArgumentOutOfRangeException(NameOf(destination))
+      SyncLock m_sync
+        Dim src = m_pages(source), dst = m_pages(destination)
+        Buffer.BlockCopy(src.Pixels, 0, dst.Pixels, 0, src.Pixels.Length)
+        Array.Copy(src.Chars, dst.Chars, src.Chars.Length)
+        Array.Copy(src.Attrs, dst.Attrs, src.Attrs.Length)
+        m_dirty = True
+      End SyncLock
+      Touch()
     End Sub
 
     Public Shared Sub SCREEN(mode%)
-      If m_pictureBox IsNot Nothing AndAlso
-         m_pictureBox.Image IsNot Nothing Then
-        m_pictureBox.Image = Nothing
-      End If
+
+      Dim w, h, th As Integer
       Select Case mode
-        Case 0 ' Text Mode
-          m_mode = mode
-          m_textW = 8 : m_textH = 16
-          m_display = New Bitmap(640, 480) ' 80 x 25 text
-#If oldway Then
-          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
-#Else
-          GraphicsInit(640, 480)
-#End If
-        Case 9
-          m_mode = mode
-          m_textW = 8 : m_textH = 14
-          m_display = New Bitmap(640, 350) ' 80 x 25 text
-#If oldway Then
-          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
-#Else
-          GraphicsInit(640, 350)
-#End If
-        Case 13
-          m_mode = mode
-          m_textW = 8 : m_textH = 8
-          m_display = New Bitmap(320, 200) ' 40 x 25 text
-#If oldway Then
-          If m_pictureBox IsNot Nothing Then m_pictureBox.Image = m_display
-#Else
-          GraphicsInit(320, 200)
-#End If
-        Case Else
-          Throw New NotImplementedException
+        Case 0 : w = 640 : h = 400 : th = 16 ' 80 x 25 text
+        Case 1 : w = 320 : h = 200 : th = 8  ' 4 colors, 40 x 25 text
+        Case 2 : w = 640 : h = 200 : th = 8  ' 2 colors, 80 x 25 text
+        Case 7 : w = 320 : h = 200 : th = 8  ' 16 colors, 40 x 25 text
+        Case 8 : w = 640 : h = 200 : th = 8  ' 16 colors, 80 x 25 text
+        Case 9 : w = 640 : h = 350 : th = 14 ' 16 of 64 colors, 80 x 25 text
+        Case 10 : w = 640 : h = 350 : th = 14 ' Monochrome, 80 x 25 text
+        Case 11 : w = 640 : h = 480 : th = 16 ' 2 colors, 80 x 30 text
+        Case 12 : w = 640 : h = 480 : th = 16 ' 16 colors, 80 x 30 text
+        Case 13 : w = 320 : h = 200 : th = 8 ' 256 colors, 40 x 25 text
+        Case 3, 4 : Throw New NotImplementedException("Hercules and Olivetti modes aren't supported.")
+        Case Else : Throw New ArgumentOutOfRangeException(NameOf(mode))
       End Select
+
+      EnsureDisplay()
+
+      m_fgColor = If(mode = 0, 7, Math.Min(15, ColorMaskOf(mode)))
+      m_bgColor = 0
+      m_fgBlink = False
+
+      ApplyLayout(mode, w, h, 8, th, 1)
+
+      SyncLock m_sync
+        ResetPalette()
+        m_dirty = True
+      End SyncLock
+
     End Sub
 
 #End Region
 
-    Public Shared Sub VIEW_PRINT(row1%, row2%)
-      Throw New NotImplementedException
+    ''' <summary>
+    ''' Sets the number of text columns (40 or 80, as the width allows) and rows (SCREEN 0: 25, 43 or 50;
+    ''' SCREEN 9 and 10: 25 or 43; SCREEN 11 and 12: 30 or 60; others: 25).  Changing either clears the screen.
+    ''' </summary>
+    Public Shared Sub WIDTH(Optional columns% = -1, Optional rows% = -1)
+
+      EnsureDisplay()
+
+      Dim cols = If(columns = -1, TextCols, columns)
+      Dim rws = If(rows = -1, TextRows, rows)
+      If cols = TextCols AndAlso rws = TextRows Then Return
+
+      Dim w = m_width, h = m_height, th As Integer
+      Select Case m_mode
+        Case 0
+          Select Case rws
+            Case 25 : h = 400 : th = 16
+            Case 43 : h = 350 : th = 8
+            Case 50 : h = 400 : th = 8
+            Case Else : Throw New ArgumentOutOfRangeException(NameOf(rows))
+          End Select
+        Case 9, 10
+          Select Case rws
+            Case 25 : th = 14
+            Case 43 : th = 8
+            Case Else : Throw New ArgumentOutOfRangeException(NameOf(rows))
+          End Select
+        Case 11, 12
+          Select Case rws
+            Case 30 : th = 16
+            Case 60 : th = 8
+            Case Else : Throw New ArgumentOutOfRangeException(NameOf(rows))
+          End Select
+        Case Else
+          If rws <> 25 Then Throw New ArgumentOutOfRangeException(NameOf(rows))
+          th = 8
+      End Select
+
+      If cols <> 40 AndAlso cols <> 80 Then Throw New ArgumentOutOfRangeException(NameOf(columns))
+      Dim scaleX = w \ (8 * cols)
+      If scaleX < 1 Then Throw New ArgumentOutOfRangeException(NameOf(columns))
+
+      ApplyLayout(m_mode, w, h, 8, th, scaleX)
+
     End Sub
 
+    ''' <summary>Restores the default palette of the current screen mode.</summary>
+    Public Shared Sub PALETTE()
+      ResetPalette()
+      Touch()
+    End Sub
+
+    ''' <summary>
+    ''' Assigns a color to a palette entry (attribute).  What <paramref name="display"/> means depends on the mode:
+    ''' SCREEN 1, 2, 7, 8: 0 to 15 (the standard 16 colors); SCREEN 0 and 9: 0 to 63 (EGA);
+    ''' SCREEN 10: 0 to 8 (shades); SCREEN 11, 12, 13: 65536 * blue + 256 * green + red, each 0 to 63.
+    ''' </summary>
     Public Shared Sub PALETTE(color%, display%)
-      If color < 0 OrElse color > 16 Then
+
+      If color < 0 OrElse color > ColorMaskOf(m_mode) Then
         Throw New ArgumentOutOfRangeException(NameOf(color))
       End If
-      If display < 0 OrElse display > 63 Then
-        Throw New ArgumentOutOfRangeException(NameOf(display))
-      End If
-      Dim clr = System.Drawing.Color.FromArgb(255, 0, 0, 0)
-      Select Case display
-        Case 0 : clr = System.Drawing.Color.FromArgb(255, 0, 0, 0)
-        Case 1 : clr = System.Drawing.Color.FromArgb(255, &H0, &H0, &HAA)
-        Case 2 : clr = System.Drawing.Color.FromArgb(255, &H0, &HAA, &H0)
-        Case 3 : clr = System.Drawing.Color.FromArgb(255, &H0, &HAA, &HAA)
-        Case 4 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H0, &H0)
-        Case 5 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H0, &HAA)
-        Case 6 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HAA, &H0)
-        Case 7 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HAA, &HAA)
-        Case 8 : clr = System.Drawing.Color.FromArgb(255, &H0, &H0, &H55)
-        Case 9 : clr = System.Drawing.Color.FromArgb(255, &H0, &H0, &HFF)
-        Case 10 : clr = System.Drawing.Color.FromArgb(255, &H0, &HAA, &H55)
-        Case 11 : clr = System.Drawing.Color.FromArgb(255, &H0, &HAA, &H55)
-        Case 12 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H0, &H55)
-        Case 13 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H0, &HFF)
-        Case 14 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HAA, &H55)
-        Case 15 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HAA, &HFF)
-        Case 16 : clr = System.Drawing.Color.FromArgb(255, &H0, &H55, &H0)
-        Case 17 : clr = System.Drawing.Color.FromArgb(255, &H0, &H55, &HAA)
-        Case 18 : clr = System.Drawing.Color.FromArgb(255, &H0, &HFF, &H0)
-        Case 19 : clr = System.Drawing.Color.FromArgb(255, &H0, &HFF, &HAA)
-        Case 20 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H55, &H0)
-        Case 21 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H55, &HAA)
-        Case 22 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HFF, &H0)
-        Case 23 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HFF, &HAA)
-        Case 24 : clr = System.Drawing.Color.FromArgb(255, &H0, &H55, &H55)
-        Case 25 : clr = System.Drawing.Color.FromArgb(255, &H0, &H55, &HFF)
-        Case 26 : clr = System.Drawing.Color.FromArgb(255, &H0, &HFF, &H55)
-        Case 27 : clr = System.Drawing.Color.FromArgb(255, &H0, &HFF, &HFF)
-        Case 28 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H55, &H55)
-        Case 29 : clr = System.Drawing.Color.FromArgb(255, &HAA, &H55, &HFF)
-        Case 30 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HFF, &H55)
-        Case 31 : clr = System.Drawing.Color.FromArgb(255, &HAA, &HFF, &HFF)
-        Case 32 : clr = System.Drawing.Color.FromArgb(255, &H55, &H0, &H0)
-        Case 33 : clr = System.Drawing.Color.FromArgb(255, &H55, &H0, &HAA)
-        Case 34 : clr = System.Drawing.Color.FromArgb(255, &H55, &HAA, &H0)
-        Case 35 : clr = System.Drawing.Color.FromArgb(255, &H55, &HAA, &HAA)
-        Case 36 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H0, &H0)
-        Case 37 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H0, &HAA)
-        Case 38 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HAA, &H0)
-        Case 39 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HAA, &HAA)
-        Case 40 : clr = System.Drawing.Color.FromArgb(255, &H55, &H0, &H55)
-        Case 41 : clr = System.Drawing.Color.FromArgb(255, &H55, &H0, &HFF)
-        Case 42 : clr = System.Drawing.Color.FromArgb(255, &H55, &HAA, &H55)
-        Case 23 : clr = System.Drawing.Color.FromArgb(255, &H55, &HAA, &HFF)
-        Case 44 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H0, &H55)
-        Case 45 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H0, &HFF)
-        Case 46 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HAA, &H55)
-        Case 47 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HAA, &HFF)
-        Case 48 : clr = System.Drawing.Color.FromArgb(255, &H55, &H55, &H0)
-        Case 49 : clr = System.Drawing.Color.FromArgb(255, &H55, &H55, &HAA)
-        Case 50 : clr = System.Drawing.Color.FromArgb(255, &H55, &HFF, &H0)
-        Case 51 : clr = System.Drawing.Color.FromArgb(255, &H55, &HFF, &HAA)
-        Case 52 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H55, &H0)
-        Case 53 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H55, &HAA)
-        Case 54 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HFF, &H0)
-        Case 55 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HFF, &HAA)
-        Case 56 : clr = System.Drawing.Color.FromArgb(255, &H55, &H55, &H55)
-        Case 57 : clr = System.Drawing.Color.FromArgb(255, &H55, &H55, &HFF)
-        Case 58 : clr = System.Drawing.Color.FromArgb(255, &H55, &HFF, &H55)
-        Case 59 : clr = System.Drawing.Color.FromArgb(255, &H55, &HFF, &HFF)
-        Case 60 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H55, &H55)
-        Case 61 : clr = System.Drawing.Color.FromArgb(255, &HFF, &H55, &HFF)
-        Case 62 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HFF, &H55)
-        Case 63 : clr = System.Drawing.Color.FromArgb(255, &HFF, &HFF, &HFF)
-        Case Else
+
+      Dim argb As UInteger
+      Select Case m_mode
+        Case 1, 2, 7, 8
+          If display < 0 OrElse display > 15 Then Throw New ArgumentOutOfRangeException(NameOf(display))
+          argb = s_ega(display)
+        Case 10
+          If display < 0 OrElse display > 8 Then Throw New ArgumentOutOfRangeException(NameOf(display))
+          Dim v = display * 255 \ 8
+          argb = Rgb(v, v, v)
+        Case 11, 12, 13
+          If display < 0 Then Throw New ArgumentOutOfRangeException(NameOf(display))
+          argb = Vga(display And 63, (display >> 8) And 63, (display >> 16) And 63)
+        Case Else ' 0, 9: EGA
+          If display < 0 OrElse display > 63 Then Throw New ArgumentOutOfRangeException(NameOf(display))
+          ' Bits are  R G B r g b  (high intensity 55h, low intensity AAh).
+          Dim r = (If((display And 4) <> 0, &HAA, 0)) + (If((display And 32) <> 0, &H55, 0))
+          Dim g = (If((display And 2) <> 0, &HAA, 0)) + (If((display And 16) <> 0, &H55, 0))
+          Dim b = (If((display And 1) <> 0, &HAA, 0)) + (If((display And 8) <> 0, &H55, 0))
+          argb = Rgb(r, g, b)
       End Select
-      m_palette(color) = clr
-      If m_brush(color) IsNot Nothing Then m_brush(color).Dispose()
-      m_brush(color) = New SolidBrush(clr)
-      If m_pen(color) IsNot Nothing Then m_pen(color).Dispose()
-      m_pen(color) = New Pen(clr)
+
+      m_palette(color) = argb
+      Touch()
+
     End Sub
 
-    Public Shared Sub QbWidth(Optional a% = -1, Optional b% = -1)
-      If a <> 80 OrElse b <> 25 Then
-        Throw New NotImplementedException
-      End If
+    ''' <summary>
+    ''' Assigns palette entries from a numeric array, starting at element <paramref name="index"/>
+    ''' (that element is attribute 0); an element of -1 leaves its entry unchanged.
+    ''' </summary>
+    Public Shared Sub PALETTE_USING(values As Array, Optional index% = 0)
+      Dim count = Math.Min(values.Length - index, ColorMaskOf(m_mode) + 1)
+      For i = 0 To count - 1
+        Dim v = Convert.ToInt32(values.GetValue(index + i))
+        If v <> -1 Then PALETTE(i, v)
+      Next
     End Sub
 
-    Private Shared m_keys As New Stack(Of Keys)
-
+    ''' <summary>Returns the next key pressed (as QBasic encodes it) or an empty string.</summary>
     Public Shared Function INKEY$()
-      If m_keys.Count > 0 Then
-        Dim key = m_keys.Pop
-
-        Dim shift = GetAsyncKeyState(&H10) <> 0
-        Dim ctrl = GetAsyncKeyState(&H11) <> 0
-        Dim alt = GetAsyncKeyState(&H12) <> 0
-
-        Dim adder = 0
-        If shift Then
-          adder = 0
-        ElseIf ctrl Then
-          adder = 10
-        ElseIf alt Then
-          adder = 20
-        End If
-
-        Select Case key
-          Case Keys.Delete
-            Return QBChr(0) & QBChr(83)
-          Case Keys.Home
-            Return QBChr(0) & QBChr(71)
-          Case Keys.Up
-            Return QBChr(0) & QBChr(72)
-          Case Keys.PageUp
-            Return QBChr(0) & QBChr(73)
-          Case Keys.End
-            Return QBChr(0) & QBChr(79)
-          Case Keys.Down
-            Return QBChr(0) & QBChr(80)
-          Case Keys.PageDown
-            Return QBChr(0) & QBChr(81)
-
-          Case Keys.Left
-            Return QBChr(0) & QBChr(75)
-          Case Keys.Right
-            Return QBChr(0) & QBChr(77)
-
-          Case Keys.F1
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(84 + adder), QBChr(59))
-          Case Keys.F2
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(85 + adder), QBChr(60))
-          Case Keys.F3
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(86 + adder), QBChr(61))
-          Case Keys.F4
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(87 + adder), QBChr(62))
-          Case Keys.F5
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(88 + adder), QBChr(63))
-          Case Keys.F6
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(89 + adder), QBChr(64))
-          Case Keys.F7
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(80 + adder), QBChr(65))
-          Case Keys.F8
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(91 + adder), QBChr(66))
-          Case Keys.F9
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(92 + adder), QBChr(67))
-          Case Keys.F10
-            Return QBChr(0) & If(shift OrElse ctrl OrElse alt, QBChr(93 + adder), QBChr(68))
-          Case Keys.F11
-            If shift Then
-              Return QBChr(0) & QBChr(135)
-            ElseIf ctrl Then
-              Return QBChr(0) & QBChr(137)
-            ElseIf alt Then
-              Return QBChr(0) & QBChr(139)
-            Else
-              Return QBChr(0) & QBChr(133)
-            End If
-          Case Keys.F12
-            If shift Then
-              Return QBChr(0) & QBChr(136)
-            ElseIf ctrl Then
-              Return QBChr(0) & QBChr(138)
-            ElseIf alt Then
-              Return QBChr(0) & QBChr(140)
-            Else
-              Return QBChr(0) & QBChr(134)
-            End If
-          Case Else
-            Return ChrW(key)
-        End Select
-      Else
-        Return ""
-      End If
+      EnsureDisplay()
+      Events.Dispatch()
+      If m_keyBuffer.Count > 0 Then Return m_keyBuffer.Dequeue()
+      Do
+        Dim k = m_display.ReadKey()
+        If k = "" Then Return ""
+        If Not Events.TryTrap(k) Then Return k
+        Events.Dispatch() ' A trapped key: run its handler now.
+      Loop
     End Function
+
+    ' Keys read ahead (so that key traps see keys even when the program isn't calling INKEY$).
+    Private Shared ReadOnly m_keyBuffer As New Queue(Of String)
+
+    Friend Shared Sub PumpKeys()
+      If m_display Is Nothing Then Return
+      Do
+        Dim k = m_display.ReadKey()
+        If k = "" Then Return
+        If Not Events.TryTrap(k) Then m_keyBuffer.Enqueue(k)
+      Loop
+    End Sub
 
 #Region "SLEEP"
 
+    ''' <summary>Waits for a key press.</summary>
     Public Shared Sub SLEEP()
-      Throw New NotImplementedException
       Do
-        If Not String.IsNullOrEmpty(INKEY) Then
-          Exit Do
-        End If
-        Threading.Thread.Sleep(100)
+        If Not String.IsNullOrEmpty(INKEY()) Then Exit Do
+        Threading.Thread.Sleep(10)
+      Loop
+    End Sub
+
+    ''' <summary>Waits for the number of seconds or a key press.</summary>
+    Public Shared Sub SLEEP(seconds As Integer)
+      Dim till = DateTime.UtcNow.AddSeconds(seconds)
+      Do
+        If Not String.IsNullOrEmpty(INKEY()) OrElse DateTime.UtcNow >= till Then Exit Do
+        Threading.Thread.Sleep(10)
       Loop
     End Sub
 
     Public Shared Async Function SleepAsync(seconds As Integer) As Task
-      Dim till = DateAdd(DateInterval.Second, seconds, Now)
+      Dim till = DateTime.UtcNow.AddSeconds(seconds)
       Do
-        If Not String.IsNullOrEmpty(INKEY) OrElse
-           Now >= till Then
-          Exit Do
-        End If
-        'Threading.Thread.Sleep(100)
-        Await Task.Delay(100)
+        If Not String.IsNullOrEmpty(INKEY()) OrElse DateTime.UtcNow >= till Then Exit Do
+        Await Task.Delay(10)
       Loop
     End Function
 
 #End Region
 
-    Public Shared Function POINT%(x%, y%)
-      'Render()
-#If oldway Then
-      Dim b = CType(m_display, Bitmap)
-      Dim c = b.GetPixel(x, y)
-#Else
-      'm_buffer.Render(Graphics.FromImage(m_display))
-      'Dim c = DirectCast(m_display, Bitmap).GetPixel(x, y)
-      Dim c = GetColor(m_buffer.Graphics, x, y)
-
-#End If
-      For entry = 0 To m_palette.Length - 1
-        If c.R = m_palette(entry).R AndAlso
-           c.G = m_palette(entry).G AndAlso
-           c.B = m_palette(entry).B Then
-          Return entry
-        End If
-      Next
-      Return 0
+    ''' <summary>Returns the color of a pixel, or -1 when outside the viewport.</summary>
+    Public Shared Function POINT%(x#, y#)
+      Dim px, py As Integer
+      ToPhysical(x, y, px, py)
+      If px < m_vx1 OrElse py < m_vy1 OrElse px > m_vx2 OrElse py > m_vy2 Then Return -1
+      Return m_pixels(py * m_width + px)
     End Function
 
+    ''' <summary>The graphics cursor: 0 = physical x, 1 = physical y, 2 = logical x, 3 = logical y.</summary>
+    Public Shared Function POINT(func%) As Double
+      Select Case func
+        Case 0 : Return PMAP(m_lastX, 0)
+        Case 1 : Return PMAP(m_lastY, 1)
+        Case 2 : Return m_lastX
+        Case 3 : Return m_lastY
+        Case Else : Throw New ArgumentOutOfRangeException(NameOf(func))
+      End Select
+    End Function
+
+    ''' <summary>Moves to the given column when printed; use it inside the text passed to PRINT.</summary>
     Public Shared Function TAB(column%) As String
-      If column% <= 32767 Then
-        If column% < 0 Then
-          column% = 1
-        Else
-          column% = column% Mod 80
-        End If
-        Dim current% = m_cursorCol
-        Dim count% = column% - current%
-        Dim resuLtKey$ = ""
-        If count% < 0 Then
-          resuLtKey$ = vbCrLf : count% = column%
-        End If
-        resuLtKey$ &= Space(count%)
-        Return resuLtKey$
-      Else
-        Throw New ArgumentException
-      End If
+      If column% > 32767 Then Throw New ArgumentException
+      column = If(column < 1, 1, ((column - 1) Mod TextCols) + 1)
+      Return ChrW(&HE000 + column)
     End Function
 
-    Private Shared Function CharMap(charHeight%, ascii As Byte) As Integer()
+    Public Shared Function SPC(count%) As String
+      If count < 0 OrElse count > 32767 Then Throw New ArgumentException
+      Return New String(" "c, count)
+    End Function
+
+    Private Shared Function CharMap(charHeight%, ascii As Integer) As Integer()
       Select Case charHeight
         Case 8 : Return m_font8x8(ascii)
         Case 14 : Return m_font8x14(ascii)
@@ -1842,40 +2581,344 @@ allplotted:
         Case Else
           Throw New ArgumentException(NameOf(charHeight))
       End Select
-      Return Nothing
     End Function
 
-    Private Shared Sub WriteCharacter(ascii As Byte)
+    Private Shared Sub NewLine()
+      m_cursorCol = 1
+      If m_cursorRow >= m_viewBottom Then
+        ScrollUp()
+        m_cursorRow = m_viewBottom ' (From a row below the viewport, printing resumes in it.)
+      ElseIf m_cursorRow < m_viewTop Then
+        m_cursorRow = m_viewTop
+      Else
+        m_cursorRow += 1
+      End If
+    End Sub
 
-      Dim map = CharMap(m_textH, ascii)
+    Private Shared Sub ScrollUp()
+      Dim top = (m_viewTop - 1) * m_textH
+      Dim regionHeight = (m_viewBottom - m_viewTop + 1) * m_textH
+      Dim keep = (regionHeight - m_textH) * m_width
+      Buffer.BlockCopy(m_pixels, (top + m_textH) * m_width, m_pixels, top * m_width, keep)
+      Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask), top * m_width + keep, m_textH * m_width)
+      For r = m_viewTop - 1 To m_viewBottom - 2
+        For c = 0 To m_chars.GetLength(1) - 1
+          m_chars(r, c) = m_chars(r + 1, c)
+          m_attrs(r, c) = m_attrs(r + 1, c)
+        Next
+      Next
+      ClearCells(m_viewBottom, m_viewBottom)
+    End Sub
 
-      Dim r = m_cursorRow
-      Dim c = m_cursorCol
+    Private Shared Sub PadTo(column As Integer)
+      Do While m_cursorCol < column
+        WriteCharacter(" "c)
+      Loop
+    End Sub
 
-      Dim x = (c - 1) * m_textW
-      Dim y = (r - 1) * m_textH
+    Private Shared Sub WriteText(text As String)
+      If text Is Nothing Then Return
+      For Each c In text
+        Dim code = AscW(c)
+        Select Case code
+          Case 13 : m_cursorCol = 1
+          Case 10 : NewLine()
+          Case 7 : Multimedia.BEEP() ' Bell
+          Case 9 ' Next 14-column print zone.
+            Dim target = ((m_cursorCol - 1) \ 14 + 1) * 14 + 1
+            If target > TextCols Then NewLine() Else PadTo(target)
+          Case &HE001 To &HE0FF ' TAB(n)
+            Dim n = code - &HE000
+            If m_cursorCol > n Then NewLine()
+            PadTo(n)
+          Case Else
+            WriteCharacter(c)
+        End Select
+      Next
+    End Sub
+
+    ''' <summary>Draws a character cell at the cursor position without moving the cursor.</summary>
+    Private Shared Sub DrawCell(code As Integer)
+
+      Dim map = CharMap(m_textH, code)
+      Dim x0 = (m_cursorCol - 1) * m_textW * m_scaleX
+      Dim y0 = (m_cursorRow - 1) * m_textH
 
       For dy = 0 To m_textH - 1
-        PSET(x + 0, dy + y, If((map(dy) And 1) > 0, m_fgColor, m_bgColor))
-        PSET(x + 1, dy + y, If((map(dy) And 2) > 0, m_fgColor, m_bgColor))
-        PSET(x + 2, dy + y, If((map(dy) And 4) > 0, m_fgColor, m_bgColor))
-        PSET(x + 3, dy + y, If((map(dy) And 8) > 0, m_fgColor, m_bgColor))
-        PSET(x + 4, dy + y, If((map(dy) And 16) > 0, m_fgColor, m_bgColor))
-        PSET(x + 5, dy + y, If((map(dy) And 32) > 0, m_fgColor, m_bgColor))
-        PSET(x + 6, dy + y, If((map(dy) And 64) > 0, m_fgColor, m_bgColor))
-        PSET(x + 7, dy + y, If((map(dy) And 128) > 0, m_fgColor, m_bgColor))
+        For dx = 0 To 7
+          Dim color = If((map(dy) And (1 << dx)) <> 0, m_fgColor, m_bgColor)
+          For sx = 0 To m_scaleX - 1
+            SetPixelRaw(x0 + dx * m_scaleX + sx, y0 + dy, color)
+          Next
+        Next
       Next
 
-      m_cursorCol += 1
-      If m_cursorCol > 80 Then
-        m_cursorCol = 1
-        m_cursorRow += 1
-        If m_cursorRow > 25 Then
-          m_cursorRow = 1
-        End If
-      End If
+      m_chars(m_cursorRow - 1, m_cursorCol - 1) = CByte(code)
+      m_attrs(m_cursorRow - 1, m_cursorCol - 1) = (m_fgColor And &HFF) Or ((m_bgColor And &HFF) << 8) Or If(m_fgBlink, &H10000, 0)
+      If m_fgBlink Then m_hasBlink = True
 
     End Sub
+
+    Private Shared Sub WriteCharacter(ch As Char)
+
+      Dim code As Integer
+      If Not s_cp437.TryGetValue(ch, code) Then
+        code = If(AscW(ch) < 256, AscW(ch), AscW("?"c))
+      End If
+
+      DrawCell(code)
+
+      m_cursorCol += 1
+      If m_cursorCol > TextCols Then NewLine()
+
+    End Sub
+
+#Region "INPUT"
+
+    ' Reads a line from the keyboard, echoing it on the screen (Backspace edits).
+    Private Shared Function ReadLineEcho(Optional keepCursor As Boolean = False) As String
+      Dim sb As New Text.StringBuilder
+      Dim saved = m_cursorVisible
+      m_cursorVisible = True
+      Try
+        Do
+          Dim k = INKEY()
+          If k = "" Then
+            Threading.Thread.Sleep(5)
+          ElseIf k = ChrW(13) Then
+            If Not keepCursor Then NewLine() ' (INPUT; leaves the cursor where the typing ended.)
+            Touch()
+            Return sb.ToString
+          ElseIf k = ChrW(8) Then
+            If sb.Length > 0 AndAlso m_cursorCol > 1 Then
+              sb.Length -= 1
+              m_cursorCol -= 1
+              DrawCell(32)
+              Touch()
+            End If
+          ElseIf k.Length = 1 AndAlso AscW(k(0)) >= 32 Then
+            sb.Append(k)
+            WriteCharacter(k(0))
+            Touch()
+          End If
+        Loop
+      Finally
+        m_cursorVisible = saved
+      End Try
+    End Function
+
+    ''' <summary>LINE INPUT "prompt"; value.  Pass True for keepCursor for LINE INPUT; (no new line after Enter).</summary>
+    Public Shared Sub LINE_INPUT(prompt$, ByRef value$, Optional keepCursor As Boolean = False)
+      PRINT(prompt, True)
+      value = ReadLineEcho(keepCursor)
+    End Sub
+
+    Public Shared Sub LINE_INPUT(ByRef value$)
+      value = ReadLineEcho()
+    End Sub
+
+    ''' <summary>
+    ''' INPUT "prompt"; value shows the prompt followed by "? " (the default); INPUT "prompt", value shows
+    ''' only the prompt (pass False for <paramref name="question"/>).
+    ''' </summary>
+    Public Shared Sub INPUT(prompt$, ByRef value$, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      PRINT(prompt & If(question, "? ", ""), True)
+      value = ReadLineEcho(keepCursor)
+    End Sub
+
+    Public Shared Sub INPUT(ByRef value$)
+      INPUT("", value)
+    End Sub
+
+    Public Shared Sub INPUT(prompt$, ByRef value%, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      Do
+        Dim s$ = ""
+        INPUT(prompt, s, question, keepCursor)
+        If Integer.TryParse(s.Trim, value) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(ByRef value%)
+      INPUT("", value)
+    End Sub
+
+    Public Shared Sub INPUT(prompt$, ByRef value&, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      Do
+        Dim s$ = ""
+        INPUT(prompt, s, question, keepCursor)
+        If Long.TryParse(s.Trim, value) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(ByRef value&)
+      INPUT("", value)
+    End Sub
+
+    Public Shared Sub INPUT(prompt$, ByRef value!, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      Do
+        Dim s$ = ""
+        INPUT(prompt, s, question, keepCursor)
+        If Single.TryParse(s.Trim, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, value) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(ByRef value!)
+      INPUT("", value)
+    End Sub
+
+    Public Shared Sub INPUT(prompt$, ByRef value#, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      Do
+        Dim s$ = ""
+        INPUT(prompt, s, question, keepCursor)
+        If Double.TryParse(s.Trim, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, value) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(ByRef value#)
+      INPUT("", value)
+    End Sub
+
+    ' ---- Files (the file number forms of PRINT, WRITE, INPUT and LINE INPUT) -------------------
+
+    ''' <summary>PRINT # to a file: text and a CR LF (unless <paramref name="noCr"/>).</summary>
+    Public Shared Sub PRINT(filenum%, text$, Optional noCr As Boolean = False)
+      File.PRINT(filenum, text, noCr)
+    End Sub
+
+    Public Shared Sub PRINT_USING(filenum%, template$, ParamArray values() As Object)
+      File.PRINT_USING(filenum, template, values)
+    End Sub
+
+    ''' <summary>WRITE # to a file: values separated by commas, strings in quotes, in a form INPUT # can read.</summary>
+    Public Shared Sub WRITE(filenum%, ParamArray values() As Object)
+      File.WRITE(filenum, values)
+    End Sub
+
+    ''' <summary>LINE INPUT # from a file: a line up to a CR LF.</summary>
+    Public Shared Sub LINE_INPUT(filenum%, ByRef value$)
+      File.LINE_INPUT(filenum, value)
+    End Sub
+
+    ''' <summary>INPUT # from a file: reads a value (String or any numeric type) up to a comma or line end.</summary>
+    Public Shared Sub INPUT(Of T)(filenum%, ByRef value As T)
+      File.INPUT(filenum, value)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2)(filenum%, ByRef value1 As T1, ByRef value2 As T2)
+      File.INPUT(filenum, value1, value2)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3)
+      File.INPUT(filenum, value1, value2, value3)
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4)(filenum%, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4)
+      File.INPUT(filenum, value1, value2, value3, value4)
+    End Sub
+
+    ''' <summary>
+    ''' GET # from a random or binary file into a variable: a record structure (a QBasic TYPE; strings need
+    ''' VBFixedString), a number, or a string (which reads as many characters as it holds).  For random files
+    ''' <paramref name="position"/> is the record number, for binary files the byte position (the first is 1).
+    ''' </summary>
+    Public Shared Sub [GET](Of T)(filenum%, position As Long, ByRef value As T)
+      File.GetRecord(filenum, True, position, value)
+    End Sub
+
+    ''' <summary>GET # without a record number: the next record (or the current position).</summary>
+    Public Shared Sub [GET](Of T)(filenum%, ByRef value As T)
+      File.GetRecord(filenum, False, 0, value)
+    End Sub
+
+    ''' <summary>
+    ''' PUT # to a random or binary file.  (The value is an Object, not a generic, so that PUT(x, y, image), the
+    ''' graphics statement, can't be mistaken for this form.)
+    ''' </summary>
+    Public Shared Sub PUT(filenum%, position As Long, value As Object)
+      File.PutRecord(filenum, True, position, value)
+    End Sub
+
+    ''' <summary>PUT # without a record number: the next record (or the current position).</summary>
+    Public Shared Sub PUT(filenum%, value As Object)
+      File.PutRecord(filenum, False, 0, value)
+    End Sub
+
+    ''' <summary>Reads n characters from a file.</summary>
+    Public Shared Function INPUT$(n%, filenum%)
+      Return File.INPUT(n, filenum)
+    End Function
+
+    ''' <summary>
+    ''' Prints the files and directories of the current directory, or of a path or file spec (? and * allowed),
+    ''' in columns, followed by the free space on the disk.
+    ''' </summary>
+    Public Shared Sub FILES(Optional filespec$ = "")
+
+      Dim dir As String, pattern As String
+      If String.IsNullOrEmpty(filespec) Then
+        dir = IO.Directory.GetCurrentDirectory() : pattern = "*"
+      ElseIf IO.Directory.Exists(filespec) Then
+        dir = IO.Path.GetFullPath(filespec) : pattern = "*"
+      Else
+        Dim full = IO.Path.GetFullPath(filespec)
+        dir = IO.Path.GetDirectoryName(full) : pattern = IO.Path.GetFileName(full)
+      End If
+      If Not IO.Directory.Exists(dir) Then Throw New IO.DirectoryNotFoundException("Path not found")
+
+      Dim names As New List(Of String)
+      For Each d In IO.Directory.GetDirectories(dir, pattern).OrderBy(Function(x) x, StringComparer.OrdinalIgnoreCase)
+        names.Add((IO.Path.GetFileName(d) & "").ToUpperInvariant().PadRight(9) & "<DIR>")
+      Next
+      For Each f In IO.Directory.GetFiles(dir, pattern).OrderBy(Function(x) x, StringComparer.OrdinalIgnoreCase)
+        names.Add(IO.Path.GetFileName(f).ToUpperInvariant())
+      Next
+      If names.Count = 0 Then Throw New IO.FileNotFoundException("File not found", filespec)
+
+      PRINT(dir.ToUpperInvariant())
+      Dim columns = Math.Max(1, TextCols \ 16)
+      Dim line As New Text.StringBuilder
+      For i = 0 To names.Count - 1
+        line.Append(names(i).PadRight(16))
+        If (i + 1) Mod columns = 0 OrElse i = names.Count - 1 Then
+          PRINT(line.ToString().TrimEnd())
+          line.Clear()
+        End If
+      Next
+
+      Dim free = 0L
+      Try
+        free = New IO.DriveInfo(IO.Path.GetPathRoot(dir)).AvailableFreeSpace
+      Catch
+      End Try
+      PRINT(free.ToString("N0", Globalization.CultureInfo.InvariantCulture) & " Bytes free")
+
+    End Sub
+
+    ''' <summary>INPUT$(n) from the keyboard: waits for n keys and returns them (without showing them).</summary>
+    Public Shared Function InputStr(n%) As String
+      Dim sb As New Text.StringBuilder
+      Do While sb.Length < n
+        Dim k = INKEY()
+        If k = "" Then Threading.Thread.Sleep(5) Else sb.Append(k)
+      Loop
+      Return sb.ToString
+    End Function
+
+    ''' <summary>INPUT$(n, #filenum): n characters from a file (the same as INPUT$(n, filenum)).</summary>
+    Public Shared Function InputStr(n%, filenum%) As String
+      Return File.INPUT(n, filenum)
+    End Function
+
+    ''' <summary>Prints values separated by commas, strings in quotes, and a new line (WRITE without a file).</summary>
+    Public Shared Sub WRITE(ParamArray values() As Object)
+      PRINT(File.FormatWrite(values))
+    End Sub
+
+#End Region
 
   End Class
 
