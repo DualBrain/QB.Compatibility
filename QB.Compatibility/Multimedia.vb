@@ -4,9 +4,9 @@ Option Infer On
 
 Namespace Global.QB
 
-  Public NotInheritable Class Multimedia
+  Public MustInherit Class Multimedia
 
-    Private Sub New()
+    Protected Sub New()
     End Sub
 
     Private Shared ReadOnly m_sync As New Object
@@ -42,12 +42,16 @@ Namespace Global.QB
       End Set
     End Property
 
+    ''' <summary>Creates the audio device when sound is first played (SDL2 audio, with QB.Compatibility.Sdl); without one the sound is silent.</summary>
+    Public Shared Property AudioFactory As Func(Of IAudioDevice)
+
     Private Shared Function Device() As IAudioDevice
       If m_device Is Nothing Then
         SyncLock m_sync
           If m_device Is Nothing Then
             Try
-              m_device = New SdlAudio
+              Dim factory = AudioFactory
+              m_device = If(factory Is Nothing, New SilentAudio, factory())
             Catch ex As Exception
               m_device = New SilentAudio
             End Try
@@ -72,7 +76,7 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Plays a tone: <paramref name="frequency"/> 37 to 32767 Hz for <paramref name="duration"/> clock ticks (18.2 per second).</summary>
-    Public Shared Sub SOUND(frequency As Double, duration As Double)
+    Friend Shared Sub SOUND(frequency As Double, duration As Double)
       Dim f = Math.Round(frequency)
       Dim ticks = Math.Round(duration)
       If f < 37 OrElse f > 32767 OrElse ticks < 0 OrElse ticks > 65535 Then
@@ -85,6 +89,7 @@ Namespace Global.QB
 
     ''' <summary>Sounds the speaker (800 Hz for a quarter of a second); PRINT CHR$(7) does the same.</summary>
     Public Shared Sub BEEP()
+      If TypeOf Device() Is SilentAudio Then Video.RingBell()   ' no sound device: the terminal's bell
       Queue(800, 0.25)
       WaitUntilFinished()
     End Sub
@@ -92,7 +97,7 @@ Namespace Global.QB
     ''' <summary>
     ''' The number of notes still waiting to be played in the background by PLAY (MB).
     ''' </summary>
-    Public Shared Function PLAY(n As Integer) As Integer
+    Friend Shared Function PLAY(n As Integer) As Integer
       Events.Dispatch()
       Return PendingNotes()
     End Function
@@ -166,11 +171,11 @@ Namespace Global.QB
     ''' Plays music written in QBasic's music macro language: A to G (with # + - and a length and dots),
     ''' O n (octave 0 to 6), &lt; and &gt; (octave down and up), N n (note 0 to 84), L n (length), P n (pause),
     ''' T n (tempo 32 to 255), MF and MB (foreground and background), MN, ML and MS (normal, legato,
-    ''' staccato).  Settings last until the next PLAY.  The X command and =variable arguments aren't supported.
+    ''' staccato).  Settings last until the next PLAY.  X works with VARPTR$ (it plays that string).  =variable arguments aren't supported.
     ''' </summary>
-    Public Shared Sub PLAY(commands As String)
+    Friend Shared Sub PLAY(commands As String)
 
-      Dim s = If(commands, "").ToUpperInvariant()
+      Dim s = If(Core.ExpandExecute(commands), "").ToUpperInvariant()
       Dim i = 0
 
       Do While i < s.Length

@@ -173,7 +173,8 @@ Namespace QB2VB
             Throw New ConvertException("this form of DEF isn't converted yet")
 
           Case "VIEW"
-            If n >= 2 AndAlso Not t(s + 1).IsWord("PRINT") AndAlso Not t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("VIEW", t, s, e)
+            If n >= 2 AndAlso t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("VIEW_SCREEN", t, s, e, 2)
+            If n >= 2 AndAlso Not t(s + 1).IsWord("PRINT") Then Return ViewWindowStatement("VIEW", t, s, e)
             If n >= 2 AndAlso t(s + 1).IsWord("PRINT") Then
               If n = 2 Then Return "VIEW_PRINT()"
               Dim toIdx = FindWord(t, s, e, "TO")
@@ -181,6 +182,7 @@ Namespace QB2VB
             End If
 
           Case "ON"
+            If n >= 3 AndAlso {"TIMER", "PLAY", "KEY", "STRIG", "PEN", "COM"}.Contains(t(s + 1).Upper()) Then Return OnEventStatement(t, s, e)
             If n >= 4 AndAlso t(s + 1).IsWord("ERROR") AndAlso t(s + 2).IsWord("GOTO") Then
               Dim lab = t(s + 3).Text
               If lab = "0" Then Return "On Error GoTo 0"
@@ -234,6 +236,7 @@ Namespace QB2VB
           Case "GET", "PUT"
             Return GetPutStatement(t, s, e)
           Case "PALETTE"
+            m_usesGraphics = True
             If n > 1 AndAlso t(s + 1).IsWord("USING") Then Return "PALETTE_USING(" & ArrayArgs(t.GetRange(s + 2, n - 2)) & ")"
             Return LibraryStatement(t, s, e)
 
@@ -269,6 +272,57 @@ Namespace QB2VB
           Case "LPRINT"
             Return PrintStatement(t, s, e, True)
 
+          Case "WIDTH"
+            If n >= 4 AndAlso t(s + 1).Is_("#") Then
+              Dim parts = SplitTopLevel(t, s + 2, e)
+              If parts.Count = 2 Then Return "WIDTH_FILE(" & ExprParser.Coerce(Expr(parts(0), 0, parts(0).Count), QT.Long) & ", " & ExprParser.Coerce(Expr(parts(1), 0, parts(1).Count), QT.Long) & ")"
+            End If
+            If n >= 3 AndAlso t(s + 1).IsWord("LPRINT") Then Return "WIDTH_LPRINT(" & ExprParser.Coerce(Expr(t, s + 2, e), QT.Long) & ")"
+            Return LibraryStatement(t, s, e)
+
+          Case "WRITE"
+            Dim wp = s + 1
+            Dim wfile = ""
+            If wp < e AndAlso t(wp).Is_("#") Then
+              Dim wcomma = -1
+              For k = wp To e - 1
+                If t(k).Is_(",") Then wcomma = k : Exit For
+              Next
+              If wcomma < 0 Then Throw New ConvertException("malformed WRITE #")
+              wfile = ExprParser.Coerce(Expr(t, wp + 1, wcomma), QT.Long)
+              wp = wcomma + 1
+            End If
+            Dim wvals As New List(Of String)
+            For Each part In SplitTopLevel(t, wp, e)
+              If part.Count > 0 Then wvals.Add(Expr(part, 0, part.Count).Text)
+            Next
+            Return "WRITE(" & String.Join(", ", If(wfile <> "", New List(Of String) From {wfile}, New List(Of String)).Concat(wvals)) & ")"
+
+          Case "TIMER", "PEN"
+            If w = "PEN" Then m_usesGraphics = True
+            If n = 2 AndAlso {"ON", "OFF", "STOP"}.Contains(t(s + 1).Upper()) Then Return w & "_" & t(s + 1).Upper() & "()"
+            Return LibraryStatement(t, s, e)
+          Case "PLAY"
+            m_usesSound = True
+            If n = 2 AndAlso {"ON", "OFF", "STOP"}.Contains(t(s + 1).Upper()) Then Return "PLAY_" & t(s + 1).Upper() & "()"
+            Return LibraryStatement(t, s, e)
+          Case "STRIG", "COM"
+            If w = "STRIG" Then m_usesGraphics = True
+            If n >= 4 AndAlso t(s + 1).Is_("(") AndAlso {"ON", "OFF", "STOP"}.Contains(t(e - 1).Upper()) Then Return w & "_" & t(e - 1).Upper() & "(" & ExprParser.Coerce(Expr(t, s + 2, e - 2), QT.Long) & ")"
+            Return LibraryStatement(t, s, e)
+          Case "KEY"
+            If n = 2 AndAlso {"ON", "OFF", "LIST"}.Contains(t(s + 1).Upper()) Then Return "KEY_" & t(s + 1).Upper() & "()"
+            If n >= 4 AndAlso t(s + 1).Is_("(") AndAlso {"ON", "OFF", "STOP"}.Contains(t(e - 1).Upper()) Then Return "KEY_" & t(e - 1).Upper() & "(" & ExprParser.Coerce(Expr(t, s + 2, e - 2), QT.Long) & ")"
+            Dim kparts = SplitTopLevel(t, s + 1, e)
+            If kparts.Count = 2 AndAlso kparts(0).Count > 0 AndAlso kparts(1).Count > 0 Then
+              Dim kn = Expr(kparts(0), 0, kparts(0).Count)
+              Dim ktext = Expr(kparts(1), 0, kparts(1).Count)
+              ' KEY 15 to 25 define a key from two characters: the keyboard flag and the scan code.
+              If kn.IsLiteral AndAlso kn.LiteralValue >= 15 Then Return "KEY_DEFINE(" & ExprParser.Coerce(kn, QT.Long) & ", Asc(Left$(" & ktext.Text & ", 1)), Asc(Mid$(" & ktext.Text & ", 2, 1)))"
+              Return "KEY_SET(" & ExprParser.Coerce(kn, QT.Long) & ", " & ktext.Text & ")"
+            End If
+            Throw New ConvertException("this form of KEY isn't converted yet")
+
           Case "CLOSE"
             If n = 1 Then Return "CLOSE()"
             Return "CLOSE(" & ArgList(t, s + 1, e) & ")"
@@ -298,7 +352,7 @@ Namespace QB2VB
 
           Case "WINDOW"
             If n >= 2 AndAlso Not t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("WINDOW", t, s, e)
-            If n >= 2 Then Throw New ConvertException("WINDOW SCREEN isn't converted yet")
+            If n >= 2 Then Return ViewWindowStatement("WINDOW_SCREEN", t, s, e, 2)
             Return "WINDOW()"
 
           Case "SHARED", "STATIC", "DIM", "REDIM", "COMMON"
@@ -564,6 +618,13 @@ Namespace QB2VB
       Dim name = t(s).Upper()
       Dim p = s + 1
       Select Case name
+        Case "DRAW", "PALETTE", "PCOPY", "STRIG", "PEN" : m_usesGraphics = True
+        Case "SOUND", "PLAY" : m_usesSound = True
+        Case "SCREEN"
+          ' SCREEN 0 is the text screen; any other mode (or one that isn't known) needs graphics.
+          If Not (p < e AndAlso t(p).Kind = TokKind.Number AndAlso t(p).Text = "0") Then m_usesGraphics = True
+      End Select
+      Select Case name
         Case "VIEW", "KEY", "WIDTH", "ERROR", "ENVIRON", "DEF", "SOUND", "PLAY", "DRAW", "PSET", "PRESET", "CIRCLE", "PAINT", "GET", "PUT", "WINDOW", "PALETTE", "PCOPY", "OUT", "WAIT", "LOCK", "UNLOCK", "TIMER", "STRIG", "PEN", "COM", "LPRINT", "LOCATE", "COLOR", "CLS", "RANDOMIZE", "BEEP", "SCREEN", "KILL", "MKDIR", "CHDIR", "RMDIR", "FILES", "SHELL", "POKE", "BLOAD", "BSAVE", "SEEK", "WRITE", "FIELD", "LSET", "RSET", "RUN", "CHAIN", "CLEAR", "ERASE", "FILEATTR", "ON", "RESET", "TROFF", "TRON"
           ' fall through to the generic form below
         Case Else
@@ -624,6 +685,7 @@ Namespace QB2VB
     End Function
 
     Private Function PointStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      m_usesGraphics = True
       Dim p = s + 1
       Dim st As Boolean, x As String = "", y As String = ""
       If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException(t(s).Text & " needs (x, y)")
@@ -636,6 +698,7 @@ Namespace QB2VB
     End Function
 
     Private Function LineStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      m_usesGraphics = True
       Dim p = s + 1
       Dim st1 As Boolean, x1 As String = "", y1 As String = ""
       Dim hasFirst = ParseCoord(t, p, e, st1, x1, y1)
@@ -668,6 +731,7 @@ Namespace QB2VB
     End Function
 
     Private Function CircleStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      m_usesGraphics = True
       Dim p = s + 1
       Dim st As Boolean, x As String = "", y As String = ""
       If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException("CIRCLE needs (x, y)")
@@ -691,6 +755,7 @@ Namespace QB2VB
     End Function
 
     Private Function PaintStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      m_usesGraphics = True
       Dim p = s + 1
       Dim st As Boolean, x As String = "", y As String = ""
       If Not ParseCoord(t, p, e, st, x, y) Then Throw New ConvertException("PAINT needs (x, y)")
@@ -742,6 +807,7 @@ Namespace QB2VB
         Return If(isGet, "[GET]", "PUT") & "(" & num & If(rec <> "", ", " & rec, "") & ", " & v.Text & ")"
       End If
 
+      m_usesGraphics = True
       Dim st1 As Boolean, x1 As String = "", y1 As String = ""
       ParseCoord(t, p, e, st1, x1, y1)
       Dim st2 As Boolean, x2 As String = "", y2 As String = ""
@@ -780,19 +846,38 @@ Namespace QB2VB
     End Function
 
     ' VIEW (x1, y1)-(x2, y2)[, color[, border]]  and  WINDOW (x1, y1)-(x2, y2)
-    Private Function ViewWindowStatement(name As String, t As List(Of Token), s As Integer, e As Integer) As String
-      Dim p = s + 1
+    Private Function ViewWindowStatement(name As String, t As List(Of Token), s As Integer, e As Integer, Optional skip As Integer = 1) As String
+      m_usesGraphics = True
+      Dim p = s + skip
       Dim st As Boolean, x1 As String = "", y1 As String = "", x2 As String = "", y2 As String = ""
       If Not ParseCoord(t, p, e, st, x1, y1) OrElse p >= e OrElse Not t(p).Is_("-") Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
       p += 1
       If Not ParseCoord(t, p, e, st, x2, y2) Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
       Dim args As New List(Of String) From {x1, y1, x2, y2}
-      If name = "VIEW" Then
+      If name.StartsWith("VIEW", StringComparison.Ordinal) Then
         Dim parts = TailParts(t, p, e)
         If parts.Count > 0 Then args.Add(IntText(TailExpr(parts, 0)))
         If parts.Count > 1 Then args.Add(IntText(TailExpr(parts, 1)))
       End If
       Return name & "(" & String.Join(", ", args) & ")"
+    End Function
+
+    ' ON TIMER(n) GOSUB label, ON PLAY(n), ON KEY(n), ON STRIG(n), ON PEN, ON COM(n): the library takes the routine as a delegate.
+    Private Function OnEventStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim kind = t(s + 1).Upper()
+      If kind = "PEN" OrElse kind = "STRIG" Then m_usesGraphics = True
+      If kind = "PLAY" Then m_usesSound = True
+      Dim gosubAt = FindWord(t, s, e, "GOSUB")
+      If gosubAt < 0 Then Throw New ConvertException("ON " & kind & " needs GOSUB")
+      Dim arg = ""
+      If gosubAt > s + 2 Then
+        If Not t(s + 2).Is_("(") OrElse Not t(gosubAt - 1).Is_(")") Then Throw New ConvertException("malformed ON " & kind)
+        arg = ExprParser.Coerce(Expr(t, s + 3, gosubAt - 1), QT.Long)
+      End If
+      Dim label = t(gosubAt + 1).Text
+      If m_curProc IsNot Nothing AndAlso Not m_procGosubTargets.Contains(label) Then Throw New ConvertException("GOSUB to a label outside the procedure")
+      Dim routine = If(m_curProc IsNot Nothing, GosubName(label), "AddressOf " & GosubName(label))
+      Return "ON_" & kind & "(" & If(arg <> "", arg & ", ", "") & routine & ")"
     End Function
 
     ' DEF FNname (params) = expression: a function, with its parameters by value.

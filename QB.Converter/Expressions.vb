@@ -37,6 +37,8 @@ Namespace QB2VB
     ''' <summary>The type of a field of a TYPE (its QBasic type and, for a nested record, its TYPE name).</summary>
     Function FieldOf(userType As String, field As String, ByRef fieldType As QT, ByRef fieldUserType As String) As Boolean
     Sub Note(message As String)
+    ''' <summary>The program uses a feature that needs more than the text screen: "graphics" (SCREEN 1 and up, drawing, joystick, pen) or "sound" (SOUND, PLAY).</summary>
+    Sub Feature(kind As String)
   End Interface
 
   Friend Class BuiltinFn
@@ -113,7 +115,7 @@ Namespace QB2VB
     ''' <summary>Library functions that keep their QBasic names (no table entry needed beyond the type).</summary>
     Friend Shared ReadOnly LibraryNames As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {
       "PEEK", "SCREEN", "LPOS", "PMAP", "STICK", "STRIG", "PEN", "PLAY", "FRE", "INP", "ERDEV", "FILEATTR", "ENVIRON$", "COMMAND$",
-      "MKI$", "MKL$", "MKS$", "MKD$", "MKSMBF$", "MKDMBF$", "CVSMBF", "CVDMBF", "INPUT$"}
+      "MKI$", "MKL$", "MKS$", "MKD$", "MKSMBF$", "MKDMBF$", "CVSMBF", "CVDMBF", "INPUT$", "VARPTR$"}
 
     ''' <summary>Library functions that return a number (the rest of the library names return text).</summary>
     Friend Shared ReadOnly NumericLibrary As New HashSet(Of String)(StringComparer.OrdinalIgnoreCase) From {
@@ -510,6 +512,11 @@ Namespace QB2VB
 
       Dim upper = name.ToUpperInvariant()
 
+      ' Addresses of variables can't be given in .NET.
+      If (upper = "VARPTR" OrElse upper = "VARSEG" OrElse upper = "SADD") AndAlso hasParen AndAlso Not m_ctx.IsArray(name) Then
+        Throw New ConvertException(upper & " (the address of a variable) isn't supported")
+      End If
+
       ' Arrays (and whole-array arguments) first.
       If m_ctx.IsArray(name) AndAlso (hasParen OrElse False) Then
         Dim v = m_ctx.ResolveVariable(name, True)
@@ -537,6 +544,8 @@ Namespace QB2VB
 
       ' Built-in functions.
       Dim fn As BuiltinFn = Nothing
+      If upper = "POINT" OrElse upper = "PMAP" OrElse upper = "STICK" OrElse upper = "STRIG" OrElse upper = "PEN" Then m_ctx.Feature("graphics")
+      If upper = "PLAY" Then m_ctx.Feature("sound")
       If Builtins.Table.TryGetValue(upper, fn) Then
         Dim qty = fn.Qt, vb = fn.Vb
         If fn.SameAsArg AndAlso args.Count > 0 Then

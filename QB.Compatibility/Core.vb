@@ -460,6 +460,47 @@ Namespace Global.QB
       m_dataLabels(name) = m_data.Count
     End Sub
 
+    ' ---- VARPTR$ and the X command of DRAW and PLAY ---------------------------------------------------------------
+
+    Private Shared ReadOnly s_stringsByPointer As New Dictionary(Of Integer, String)
+    Private Shared s_nextPointer As Integer
+
+    ''' <summary>
+    ''' VARPTR$(text$): a three character token for a string, for the X (execute substring) command of DRAW and PLAY:
+    ''' <c>DRAW("C2 X" &amp; VARPTR$(triangle$))</c>.  (QBasic's token holds the address of the variable; here it names the text.)
+    ''' </summary>
+    Public Shared Function VARPTR$(value As String)
+      SyncLock s_stringsByPointer
+        s_nextPointer = (s_nextPointer + 1) And &HFFFF
+        s_stringsByPointer(s_nextPointer) = If(value, "")
+        Return ChrW(3) & ChrW(s_nextPointer And 255) & ChrW(s_nextPointer >> 8)
+      End SyncLock
+    End Function
+
+    ''' <summary>Replaces each X plus VARPTR$ token in a DRAW or PLAY command string by the string it names.</summary>
+    Friend Shared Function ExpandExecute(commands As String) As String
+      If commands Is Nothing OrElse commands.IndexOf(ChrW(3)) < 0 Then Return commands
+      Dim sb As New Global.System.Text.StringBuilder
+      Dim i = 0
+      Do While i < commands.Length
+        Dim c = commands(i)
+        If (c = "X"c OrElse c = "x"c) AndAlso i + 3 < commands.Length AndAlso commands(i + 1) = ChrW(3) Then
+          Dim id = AscW(commands(i + 2)) + (AscW(commands(i + 3)) << 8)
+          Dim text As String = Nothing
+          SyncLock s_stringsByPointer
+            s_stringsByPointer.TryGetValue(id, text)
+          End SyncLock
+          If text Is Nothing Then Throw New ArgumentException("Illegal function call")
+          sb.Append(ExpandExecute(text))
+          i += 4
+        Else
+          sb.Append(c)
+          i += 1
+        End If
+      Loop
+      Return sb.ToString
+    End Function
+
     ''' <summary>How long one pass through an empty FOR loop takes, in microseconds (see <see cref="EMPTYLOOP"/>).</summary>
     Public Shared Property EmptyLoopMicroseconds As Double = 400
 

@@ -16,8 +16,11 @@
     <DebugType>none</DebugType>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />
     <PackageReference Include="System.IO.Ports" Version="10.0.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="QB.Compatibility.Sdl" />
+    <InternalsVisibleTo Include="QB.Compatibility.Tests" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="My Project\" />

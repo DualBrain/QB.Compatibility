@@ -14,5 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\QB.Compatibility\QB.Compatibility.vbproj" />
+    <ProjectReference Include="..\QB.Compatibility.Sdl\QB.Compatibility.Sdl.vbproj" />
   </ItemGroup>
 </Project>

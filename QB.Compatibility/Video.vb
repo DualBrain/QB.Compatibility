@@ -21,7 +21,10 @@ Namespace Global.QB
     PUT_PRESET
   End Enum
 
-  Public NotInheritable Class Video
+  Public MustInherit Class Video
+
+    Protected Sub New()
+    End Sub
 
     Private Shared ReadOnly m_font8x8 As New Dictionary(Of Integer, Integer()) _
       From {{&H0, {&H0, &H0, &H0, &H0, &H0, &H0, &H0, &H0}},
@@ -811,6 +814,8 @@ Namespace Global.QB
     Private Shared m_suspend As Boolean
     Private Shared m_mode As Integer = 0
     Private Shared m_display As IDisplay
+    Private Shared m_textOut As ITextOutput                ' set when the display follows text output (a terminal)
+    Private Shared m_textVersion As Long                   ' changes whenever the text or the cursor changes
 
     Private Shared m_cursorRow As Integer = 1
     Private Shared m_cursorCol As Integer = 1
@@ -853,8 +858,6 @@ Namespace Global.QB
                                                    &HFF555555UI, &HFF5555FFUI, &HFF55FF55UI, &HFF55FFFFUI,
                                                    &HFFFF5555UI, &HFFFF55FFUI, &HFFFFFF55UI, &HFFFFFFFFUI}
 
-    Private Sub New()
-    End Sub
 
     Shared Sub New()
       ApplyLayout(0, 640, 400, 8, 16, 1)
@@ -880,7 +883,26 @@ Namespace Global.QB
     End Class
 
     Private NotInheritable Class FrameSource
-      Implements IVideoSource
+      Implements IVideoSource, ITextSource
+
+      Public Sub CopyText(ByRef version As Long, ByRef columns As Integer, ByRef rows As Integer, ByRef chars(,) As Byte, ByRef attrs(,) As Integer,
+                          ByRef cursorRow As Integer, ByRef cursorColumn As Integer, ByRef cursorVisible As Boolean) Implements ITextSource.CopyText
+        SyncLock m_sync
+          version = Threading.Interlocked.Read(m_textVersion)
+          Dim page = m_pages(m_visualPage)
+          rows = page.Chars.GetLength(0)
+          columns = page.Chars.GetLength(1)
+          If chars Is Nothing OrElse chars.GetLength(0) <> rows OrElse chars.GetLength(1) <> columns Then
+            chars = New Byte(rows - 1, columns - 1) {}
+            attrs = New Integer(rows - 1, columns - 1) {}
+          End If
+          Array.Copy(page.Chars, chars, page.Chars.Length)
+          Array.Copy(page.Attrs, attrs, page.Attrs.Length)
+          cursorRow = m_cursorRow
+          cursorColumn = m_cursorCol
+          cursorVisible = m_cursorVisible AndAlso m_visualPage = m_activePage
+        End SyncLock
+      End Sub
 
       Public Function TryCopyFrame(ByRef argb() As UInteger, ByRef width As Integer, ByRef height As Integer) As Boolean Implements IVideoSource.TryCopyFrame
         SyncLock m_sync
@@ -919,24 +941,53 @@ Namespace Global.QB
       Set(value As IDisplay)
         If m_display IsNot Nothing Then m_display.Close()
         m_display = value
+        m_textOut = TryCast(m_display, ITextOutput)
         If m_display IsNot Nothing Then m_display.Open(New FrameSource)
       End Set
     End Property
+
+    ''' <summary>Creates the display when the program first needs one (the SDL window, with QB.Compatibility.Sdl: <c>SdlBackend.Use()</c>).</summary>
+    Public Shared Property DisplayFactory As Func(Of IDisplay)
 
     Private Shared Sub EnsureDisplay()
       If m_display Is Nothing Then
         SyncLock m_sync
           If m_display Is Nothing Then
-            Dim d As New SdlDisplay
-            d.Open(New FrameSource)
+            Dim factory = DisplayFactory
+            Dim d As IDisplay = If(factory Is Nothing, New TerminalDisplay, factory())
+            m_textOut = TryCast(d, ITextOutput)
             m_display = d
+            d.Open(New FrameSource)
           End If
         End SyncLock
       End If
     End Sub
 
+    ''' <summary>Creates the display that shows graphics (the SDL window, with QB.Compatibility.Sdl); SCREEN 1 and up switches to it.</summary>
+    Public Shared Property GraphicsDisplayFactory As Func(Of IDisplay)
+
+    ' Graphics need a display that can show them: switch to the graphics display, or say what is missing.
+    Private Shared Sub RequireGraphics()
+      If TypeOf m_display Is IGraphicsDisplay Then Return
+      Dim factory = GraphicsDisplayFactory
+      If factory Is Nothing Then
+        QBError.Raise(5, "Illegal function call: graphics need a graphics display (reference QB.Compatibility.Sdl)")
+      End If
+      Display = factory()
+    End Sub
+
+    Friend Shared Sub RingBell()
+      m_textOut?.Bell()
+    End Sub
+
+    Private Shared Sub Positional()
+      EnsureDisplay()
+      m_textOut?.Positional()
+    End Sub
+
     Private Shared Sub Touch()
       EnsureDisplay()
+      Threading.Interlocked.Increment(m_textVersion)
       Threading.Volatile.Write(m_dirty, True)
       Events.Dispatch()
     End Sub
@@ -1176,6 +1227,7 @@ Namespace Global.QB
     End Function
 
     Public Shared Sub LOCATE(Optional row% = -1, Optional column% = -1, Optional cursor% = -1, Optional start% = -1, Optional [stop] As Integer = -1)
+      Positional()
       If row <> -1 Then
         If row < 1 OrElse row > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(row))
         m_cursorRow = row
@@ -1204,6 +1256,7 @@ Namespace Global.QB
 
     ''' <summary>Resets the text viewport to the whole screen.</summary>
     Public Shared Sub VIEW_PRINT()
+      Positional()
       m_viewTop = 1 : m_viewBottom = TextRows
       m_cursorRow = 1 : m_cursorCol = 1 : m_wrapPending = False
       Touch()
@@ -1211,6 +1264,7 @@ Namespace Global.QB
 
     ''' <summary>Limits text output (and scrolling) to rows <paramref name="top"/> through <paramref name="bottom"/>.</summary>
     Public Shared Sub VIEW_PRINT(top%, bottom%)
+      Positional()
       If top < 1 OrElse bottom < top OrElse bottom > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(top))
       m_viewTop = top : m_viewBottom = bottom
       m_cursorRow = top : m_cursorCol = 1 : m_wrapPending = False
@@ -1298,7 +1352,7 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Makes the whole screen the graphics viewport again.</summary>
-    Public Shared Sub VIEW()
+    Friend Shared Sub VIEW()
       m_vx1 = 0 : m_vy1 = 0 : m_vx2 = m_width - 1 : m_vy2 = m_height - 1
       m_viewSet = False : m_viewRelative = False
       ResetLastPoint()
@@ -1308,17 +1362,17 @@ Namespace Global.QB
     ''' Limits graphics to a rectangle; coordinates become relative to its top-left corner.  A
     ''' <paramref name="color"/> fills it and a <paramref name="border"/> draws a box around it.
     ''' </summary>
-    Public Shared Sub VIEW(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
+    Friend Shared Sub VIEW(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
       SetView(False, x1, y1, x2, y2, color, border)
     End Sub
 
     ''' <summary>Like VIEW, but coordinates stay relative to the whole screen (VIEW SCREEN).</summary>
-    Public Shared Sub VIEW_SCREEN(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
+    Friend Shared Sub VIEW_SCREEN(x1%, y1%, x2%, y2%, Optional color% = -1, Optional border% = -1)
       SetView(True, x1, y1, x2, y2, color, border)
     End Sub
 
     ''' <summary>Returns to physical coordinates.</summary>
-    Public Shared Sub WINDOW()
+    Friend Shared Sub WINDOW()
       m_winOn = False
       ResetLastPoint()
     End Sub
@@ -1332,12 +1386,12 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Defines logical coordinates for the viewport; y increases upward (Cartesian).</summary>
-    Public Shared Sub WINDOW(x1#, y1#, x2#, y2#)
+    Friend Shared Sub WINDOW(x1#, y1#, x2#, y2#)
       SetWindow(False, x1, y1, x2, y2)
     End Sub
 
     ''' <summary>Defines logical coordinates for the viewport; y increases downward (WINDOW SCREEN).</summary>
-    Public Shared Sub WINDOW_SCREEN(x1#, y1#, x2#, y2#)
+    Friend Shared Sub WINDOW_SCREEN(x1#, y1#, x2#, y2#)
       SetWindow(True, x1, y1, x2, y2)
     End Sub
 
@@ -1345,7 +1399,7 @@ Namespace Global.QB
     ''' Maps between logical and physical coordinates (relative to the viewport): 0 = logical x to
     ''' physical, 1 = logical y to physical, 2 = physical x to logical, 3 = physical y to logical.
     ''' </summary>
-    Public Shared Function PMAP(expression#, func%) As Double
+    Friend Shared Function PMAP(expression#, func%) As Double
       Dim offX = If(m_viewRelative, m_vx1, 0)
       Dim offY = If(m_viewRelative, m_vy1, 0)
       Select Case func
@@ -1370,15 +1424,15 @@ Namespace Global.QB
 
     ' ---- Points -------------------------------------------------------------------------------
 
-    Public Shared Sub PSET(x#, y#)
+    Friend Shared Sub PSET(x#, y#)
       PSET(False, x, y, -1)
     End Sub
 
-    Public Shared Sub PSET(x#, y#, color%)
+    Friend Shared Sub PSET(x#, y#, color%)
       PSET(False, x, y, color)
     End Sub
 
-    Public Shared Sub PSET([step] As Boolean, x#, y#, Optional color% = -1)
+    Friend Shared Sub PSET([step] As Boolean, x#, y#, Optional color% = -1)
       StepPoint([step], x, y)
       m_lastX = x : m_lastY = y
       Dim px, py As Integer
@@ -1388,15 +1442,15 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Like PSET, but uses the background color unless a color is given.</summary>
-    Public Shared Sub PRESET(x#, y#)
+    Friend Shared Sub PRESET(x#, y#)
       PSET(False, x, y, m_bgColor)
     End Sub
 
-    Public Shared Sub PRESET(x#, y#, color%)
+    Friend Shared Sub PRESET(x#, y#, color%)
       PSET(False, x, y, color)
     End Sub
 
-    Public Shared Sub PRESET([step] As Boolean, x#, y#, Optional color% = -1)
+    Friend Shared Sub PRESET([step] As Boolean, x#, y#, Optional color% = -1)
       PSET([step], x, y, If(color = -1, m_bgColor, color))
     End Sub
 
@@ -1406,11 +1460,11 @@ Namespace Global.QB
     End Sub
 
     ''' <summary>Circle, arc or ellipse.  Angles are in radians; negative angles also draw a line to the center.</summary>
-    Public Shared Sub CIRCLE(x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
+    Friend Shared Sub CIRCLE(x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
       CIRCLE(False, x, y, radius, attribute, start, [end], aspect)
     End Sub
 
-    Public Shared Sub CIRCLE([step] As Boolean, x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
+    Friend Shared Sub CIRCLE([step] As Boolean, x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
 
       If m_mode = 0 Then QBError.Raise(5, "Illegal function call")
       StepPoint([step], x, y)
@@ -1612,51 +1666,51 @@ allplotted:
 
     End Sub
 
-    Public Shared Sub PAINT(x#, y#)
+    Friend Shared Sub PAINT(x#, y#)
       PAINT(False, x, y, -1, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, color%)
+    Friend Shared Sub PAINT(x#, y#, color%)
       PAINT(False, x, y, color, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, color%, border%)
+    Friend Shared Sub PAINT(x#, y#, color%, border%)
       PAINT(False, x, y, color, border, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, color%, border%, background$)
+    Friend Shared Sub PAINT(x#, y#, color%, border%, background$)
       PAINT(False, x, y, color, border, background)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x#, y#)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#)
       PAINT([step], x, y, -1, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, color%)
       PAINT([step], x, y, color, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%)
       PAINT([step], x, y, color, border, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, tile$)
+    Friend Shared Sub PAINT(x#, y#, tile$)
       PAINT(False, x, y, tile, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, tile$, border%)
+    Friend Shared Sub PAINT(x#, y#, tile$, border%)
       PAINT(False, x, y, tile, border, Nothing)
     End Sub
 
-    Public Shared Sub PAINT(x#, y#, tile$, border%, background$)
+    Friend Shared Sub PAINT(x#, y#, tile$, border%, background$)
       PAINT(False, x, y, tile, border, background)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, tile$)
       PAINT([step], x, y, tile, -1, Nothing)
     End Sub
 
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%)
       PAINT([step], x, y, tile, border, Nothing)
     End Sub
 
@@ -1667,7 +1721,7 @@ allplotted:
     ''' <paramref name="background"/> slice is accepted for compatibility; because every pixel up to the border is
     ''' repainted, painting over an already painted area works without it.
     ''' </summary>
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%, background$)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%, background$)
 
       If m_mode = 0 Then QBError.Raise(5, "Illegal function call")
       If String.IsNullOrEmpty(tile) OrElse tile.Length > 64 Then Throw New ArgumentException("Illegal function call")
@@ -1761,7 +1815,7 @@ allplotted:
     ''' Fills the area around (x, y) with <paramref name="color"/> up to pixels of color <paramref name="border"/>
     ''' (both default to the foreground color).  Filling stays inside the graphics viewport.
     ''' </summary>
-    Public Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%, background$)
+    Friend Shared Sub PAINT([step] As Boolean, x#, y#, color%, border%, background$)
 
       'TODO: The background$ tile pattern is not supported.
 
@@ -1856,11 +1910,11 @@ allplotted:
     ''' Draws from the last point using QBasic's graphics macro language: U D L R E F G H (move up, down,
     ''' left, right and diagonally by n), M x,y (move to; with + or - relative), B (move without drawing),
     ''' N (draw then return), A n (angle 0 to 3), TA n (angle in degrees), C n (color), S n (scale, 4 = 1:1),
-    ''' P paint,border (fill).  The X (execute) command and =variable arguments aren't supported.
+    ''' P paint,border (fill), X with VARPTR$ (execute a string).  =variable arguments aren't supported.
     ''' </summary>
-    Public Shared Sub DRAW(commands As String)
+    Friend Shared Sub DRAW(commands As String)
 
-      Dim s = If(commands, "").ToUpperInvariant()
+      Dim s = If(Core.ExpandExecute(commands), "").ToUpperInvariant()
       Dim i = 0
 
       Dim ix, iy As Integer
@@ -1973,12 +2027,12 @@ allplotted:
     End Sub
 
     ''' <summary>Draws a line from the last point referenced to (x2, y2).</summary>
-    Public Shared Sub LINE(x2#, y2#)
+    Friend Shared Sub LINE(x2#, y2#)
       LINE(False, m_lastX, m_lastY, False, x2, y2, -1, LineOption.None, &HFFFF)
     End Sub
 
     ''' <summary>Draws a line from the last point referenced; with STEP, (x2, y2) is relative to it.</summary>
-    Public Shared Sub LINE([step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
+    Friend Shared Sub LINE([step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
       LINE(False, m_lastX, m_lastY, [step2], x2, y2, attr, lo, style)
     End Sub
 
@@ -1986,12 +2040,12 @@ allplotted:
     ''' Draws a line, box (B) or filled box (BF).  <paramref name="style"/> is a 16-bit dash pattern
     ''' (most significant bit first) that repeats along the line.
     ''' </summary>
-    Public Shared Sub LINE(x1#, y1#, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
+    Friend Shared Sub LINE(x1#, y1#, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
       LINE(False, x1, y1, False, x2, y2, attr, lo, style)
     End Sub
 
     ''' <summary>The first point is relative to the last point with STEP; the second is relative to the first with STEP.</summary>
-    Public Shared Sub LINE([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
+    Friend Shared Sub LINE([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, Optional attr% = -1, Optional lo As LineOption = LineOption.None, Optional style% = &HFFFF)
 
       StepPoint([step1], x1, y1)
       If [step2] Then x2 += x1 : y2 += y1
@@ -2079,21 +2133,21 @@ allplotted:
       Return Buffer.ByteLength(image) \ image.Length
     End Function
 
-    Public Shared Sub PUT(x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
+    Friend Shared Sub PUT(x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
       PUT(False, x, y, image, action, index)
     End Sub
 
     ' (Whole-number coordinates need their own overload: otherwise PUT(10, 20, image) would match the
     ' file form PUT(filenum, record, value), which is a better fit for Integers.)
-    Public Shared Sub PUT(x As Integer, y As Integer, image As Array)
+    Friend Shared Sub PUT(x As Integer, y As Integer, image As Array)
       PUT(False, CDbl(x), CDbl(y), image, PutOption.PUT_XOR, 0)
     End Sub
 
-    Public Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption)
+    Friend Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption)
       PUT(False, CDbl(x), CDbl(y), image, action, 0)
     End Sub
 
-    Public Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption, index As Integer)
+    Friend Shared Sub PUT(x As Integer, y As Integer, image As Array, action As PutOption, index As Integer)
       PUT(False, CDbl(x), CDbl(y), image, action, index)
     End Sub
 
@@ -2102,7 +2156,7 @@ allplotted:
     ''' <paramref name="index"/>) with its top-left corner at (x, y), clipped to the viewport.
     ''' The default action is XOR, as in QBasic.
     ''' </summary>
-    Public Shared Sub PUT([step] As Boolean, x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
+    Friend Shared Sub PUT([step] As Boolean, x#, y#, image As Array, Optional action As PutOption = PutOption.PUT_XOR, Optional index% = 0)
 
       StepPoint([step], x, y)
       m_lastX = x : m_lastY = y
@@ -2162,7 +2216,7 @@ allplotted:
 
     End Sub
 
-    Public Shared Sub [GET](x1#, y1#, x2#, y2#, image As Array, Optional index% = 0)
+    Friend Shared Sub [GET](x1#, y1#, x2#, y2#, image As Array, Optional index% = 0)
       [GET](False, x1, y1, False, x2, y2, image, index)
     End Sub
 
@@ -2171,7 +2225,7 @@ allplotted:
     ''' format, starting at element <paramref name="index"/>.  The array must be big enough, as in QBasic:
     ''' 4 + INT((width * bits-per-pixel + 7) / 8) * planes * height bytes.
     ''' </summary>
-    Public Shared Sub [GET]([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, image As Array, Optional index% = 0)
+    Friend Shared Sub [GET]([step1] As Boolean, x1#, y1#, [step2] As Boolean, x2#, y2#, image As Array, Optional index% = 0)
 
       StepPoint([step1], x1, y1)
       If [step2] Then x2 += x1 : y2 += y1
@@ -2267,6 +2321,8 @@ allplotted:
         m_fgBlink = fg > 15
         m_fgColor = fg And 15
         m_bgColor = bg And 7
+        EnsureDisplay()
+        m_textOut?.SetColors(m_fgColor, m_bgColor, m_fgBlink)
       Else
         m_fgBlink = False
         m_fgColor = fg
@@ -2287,10 +2343,13 @@ allplotted:
           ClearCells(1, TextRows)
           m_hasBlink = False
           m_cursorRow = m_viewTop : m_cursorCol = 1 : m_wrapPending = False
+          EnsureDisplay()
+          m_textOut?.ClearScreen()
         Case 1
           RawRect(m_vx1, m_vy1, m_vx2, m_vy2, m_bgColor, True)
           ResetLastPoint()
         Case 2
+          Positional()
           Dim y0 = (m_viewTop - 1) * m_textH
           Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask), y0 * m_width, (m_viewBottom - m_viewTop + 1) * m_textH * m_width)
           ClearCells(m_viewTop, m_viewBottom)
@@ -2312,6 +2371,7 @@ allplotted:
     ''' color attribute (foreground + 16 * background, + 128 if blinking, in SCREEN 0).
     ''' </summary>
     Public Shared Function SCREEN%(row%, column%, Optional colr% = 0)
+      Positional()
       If row < 1 OrElse row > TextRows Then Throw New ArgumentOutOfRangeException(NameOf(row))
       If column < 1 OrElse column > TextCols Then Throw New ArgumentOutOfRangeException(NameOf(column))
       If colr = 0 Then Return m_chars(row - 1, column - 1)
@@ -2345,7 +2405,7 @@ allplotted:
     End Sub
 
     ''' <summary>Copies the contents (pixels and text) of one page to another.</summary>
-    Public Shared Sub PCOPY(source%, destination%)
+    Friend Shared Sub PCOPY(source%, destination%)
       If source < 0 OrElse source >= m_pages.Length Then Throw New ArgumentOutOfRangeException(NameOf(source))
       If destination < 0 OrElse destination >= m_pages.Length Then Throw New ArgumentOutOfRangeException(NameOf(destination))
       SyncLock m_sync
@@ -2377,6 +2437,7 @@ allplotted:
       End Select
 
       EnsureDisplay()
+      If mode <> 0 Then RequireGraphics()
 
       m_fgColor = If(mode = 0, 7, Math.Min(15, ColorMaskOf(mode)))
       m_bgColor = 0
@@ -2388,6 +2449,7 @@ allplotted:
         ResetPalette()
         m_dirty = True
       End SyncLock
+      If mode = 0 Then m_textOut?.ClearScreen()
 
     End Sub
 
@@ -2400,6 +2462,7 @@ allplotted:
     Public Shared Sub WIDTH(Optional columns% = -1, Optional rows% = -1)
 
       EnsureDisplay()
+      If (columns <> -1 AndAlso columns <> TextCols) OrElse (rows <> -1 AndAlso rows <> TextRows) Then Positional()
 
       Dim cols = If(columns = -1, TextCols, columns)
       Dim rws = If(rows = -1, TextRows, rows)
@@ -2455,7 +2518,7 @@ allplotted:
     End Sub
 
     ''' <summary>Restores the default palette of the current screen mode.</summary>
-    Public Shared Sub PALETTE()
+    Friend Shared Sub PALETTE()
       ResetPalette()
       Touch()
     End Sub
@@ -2465,7 +2528,7 @@ allplotted:
     ''' SCREEN 1, 2, 7, 8: 0 to 15 (the standard 16 colors); SCREEN 0 and 9: 0 to 63 (EGA);
     ''' SCREEN 10: 0 to 8 (shades); SCREEN 11, 12, 13: 65536 * blue + 256 * green + red, each 0 to 63.
     ''' </summary>
-    Public Shared Sub PALETTE(color%, display%)
+    Friend Shared Sub PALETTE(color%, display%)
 
       If color < 0 OrElse color > ColorMaskOf(m_mode) Then
         Throw New ArgumentOutOfRangeException(NameOf(color))
@@ -2501,7 +2564,7 @@ allplotted:
     ''' Assigns palette entries from a numeric array, starting at element <paramref name="index"/>
     ''' (that element is attribute 0); an element of -1 leaves its entry unchanged.
     ''' </summary>
-    Public Shared Sub PALETTE_USING(values As Array, Optional index% = 0)
+    Friend Shared Sub PALETTE_USING(values As Array, Optional index% = 0)
       Dim count = Math.Min(values.Length - index, ColorMaskOf(m_mode) + 1)
       For i = 0 To count - 1
         Dim v = Convert.ToInt32(values.GetValue(index + i))
@@ -2538,7 +2601,7 @@ allplotted:
     End Sub
 
     Private Shared Sub OnProcessExit()
-      If Not m_waitAtExit OrElse m_windowClosed OrElse m_display Is Nothing OrElse Not (TypeOf m_display Is SdlDisplay) Then Return
+      If Not m_waitAtExit OrElse m_windowClosed OrElse m_display Is Nothing OrElse Not (TypeOf m_display Is IWindowDisplay) Then Return
       Try
         PRINT()
         PRINT("Press any key to continue", True)
@@ -2671,7 +2734,7 @@ allplotted:
 #End Region
 
     ''' <summary>Returns the color of a pixel, or -1 when outside the viewport.</summary>
-    Public Shared Function POINT%(x#, y#)
+    Friend Shared Function POINT%(x#, y#)
       Dim px, py As Integer
       ToPhysical(x, y, px, py)
       If px < m_vx1 OrElse py < m_vy1 OrElse px > m_vx2 OrElse py > m_vy2 Then Return -1
@@ -2679,7 +2742,7 @@ allplotted:
     End Function
 
     ''' <summary>The graphics cursor: 0 = physical x, 1 = physical y, 2 = logical x, 3 = logical y.</summary>
-    Public Shared Function POINT(func%) As Double
+    Friend Shared Function POINT(func%) As Double
       Select Case func
         Case 0 : Return PMAP(m_lastX, 0)
         Case 1 : Return PMAP(m_lastY, 1)
@@ -2712,6 +2775,8 @@ allplotted:
     End Function
 
     Private Shared Sub NewLine()
+      EnsureDisplay()
+      m_textOut?.NewLine()
       m_wrapPending = False
       m_cursorCol = 1
       If m_cursorRow >= m_viewBottom Then
@@ -2747,12 +2812,14 @@ allplotted:
 
     Private Shared Sub WriteText(text As String)
       If text Is Nothing Then Return
+      EnsureDisplay()
       For Each c In text
         Dim code = AscW(c)
         Select Case code
-          Case 13 : m_cursorCol = 1
+          Case 13 : m_cursorCol = 1 : m_textOut?.CarriageReturn()
           Case 10 : NewLine()
-          Case 7 : Multimedia.BEEP() ' Bell
+          Case 7 ' Bell
+            If m_textOut IsNot Nothing Then m_textOut.Bell() Else Multimedia.BEEP()
           Case 9 ' Next 14-column print zone.
             Dim target = ((m_cursorCol - 1) \ 14 + 1) * 14 + 1
             If target > TextCols Then NewLine() Else PadTo(target)
@@ -2797,6 +2864,7 @@ allplotted:
 
       If m_wrapPending Then NewLine()
       DrawCell(code)
+      m_textOut?.WriteChar(code)
 
       m_cursorCol += 1
       If m_cursorCol > TextCols Then
@@ -2820,6 +2888,7 @@ allplotted:
         Do
           Dim k = INKEY()
           If k = "" Then
+            If TypeOf m_display Is IInputEnd AndAlso DirectCast(m_display, IInputEnd).InputEnded Then QBError.Raise(62, "Input past end of file")
             Threading.Thread.Sleep(5)
           ElseIf k = ChrW(13) Then
             If Not keepCursor Then NewLine() ' (INPUT; leaves the cursor where the typing ended.)
@@ -2830,6 +2899,7 @@ allplotted:
               sb.Length -= 1
               If m_wrapPending Then m_wrapPending = False Else m_cursorCol -= 1
               DrawCell(32)
+              m_textOut?.EraseBack()
               Touch()
             End If
           ElseIf k.Length = 1 AndAlso AscW(k(0)) >= 32 Then

@@ -1,4 +1,4 @@
-Option Explicit On
+﻿Option Explicit On
 Option Strict On
 Option Infer On
 
@@ -21,7 +21,7 @@ Namespace Global.QB
     ''' 3 = y of B.  As in QBasic, STICK(0) reads all four, and the others return what STICK(0) read.
     ''' Joysticks are the first two that SDL finds; without one the value is 0.
     ''' </summary>
-    Public Shared Function STICK(n As Integer) As Integer
+    Friend Shared Function STICK(n As Integer) As Integer
       If n < 0 OrElse n > 3 Then Throw New ArgumentException("Illegal function call")
       If n = 0 Then
         Dim input = Video.GameInput()
@@ -36,7 +36,7 @@ Namespace Global.QB
     ''' A joystick button, as -1 (true) or 0: 0 = lower trigger of A pressed since the last STRIG(0), 1 = pressed now,
     ''' 2 and 3 the same for the lower trigger of B, 4 and 5 for the upper trigger of A, 6 and 7 for the upper trigger of B.
     ''' </summary>
-    Public Shared Function STRIG(n As Integer) As Integer
+    Friend Shared Function STRIG(n As Integer) As Integer
       If n < 0 OrElse n > 7 Then Throw New ArgumentException("Illegal function call")
       Dim input = Video.GameInput()
       If input Is Nothing Then Return 0
@@ -55,7 +55,7 @@ Namespace Global.QB
     ''' 6 and 7 = character row and column of the last press, 8 and 9 = row and column it was last at.
     ''' Coordinates are screen pixels of the current mode.
     ''' </summary>
-    Public Shared Function PEN(n As Integer) As Integer
+    Friend Shared Function PEN(n As Integer) As Integer
       If n < 0 OrElse n > 9 Then Throw New ArgumentException("Illegal function call")
       Dim input = Video.GameInput()
       If input Is Nothing Then Return 0

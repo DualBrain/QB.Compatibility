@@ -53,6 +53,20 @@ Namespace QB2VB
       Next
     End Sub
 
+    ''' <summary>The program draws, reads the joystick or the pen, or uses SCREEN 1 and up: it needs the graphics display (QB.Graphics).</summary>
+    Public ReadOnly Property UsesGraphics As Boolean
+
+    ''' <summary>The program uses SOUND or PLAY: it needs audio (QB.Speaker).</summary>
+    Public ReadOnly Property UsesSound As Boolean
+
+    Friend Sub Feature(kind As String) Implements IContext.Feature
+      If kind = "graphics" Then m_usesGraphics = True
+      If kind = "sound" Then m_usesSound = True
+    End Sub
+
+    Private m_usesGraphics As Boolean
+    Private m_usesSound As Boolean
+
     Private Sub Note(message As String) Implements IContext.Note
       m_notes.Add($"line {m_currentLine}: {message}")
     End Sub
@@ -314,6 +328,8 @@ Namespace QB2VB
       m_target = m_mainLines
 
       Pass2()
+      _UsesGraphics = m_usesGraphics
+      _UsesSound = m_usesSound
 
       Dim sb As New StringBuilder
       sb.AppendLine("' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.")
@@ -328,9 +344,9 @@ Namespace QB2VB
       sb.AppendLine("Imports QB.Devices")
       sb.AppendLine("Imports QB.Events")
       sb.AppendLine("Imports QB.File")
-      sb.AppendLine("Imports QB.Multimedia")
+      sb.AppendLine(If(m_usesSound, "Imports QB.Speaker", "Imports QB.Multimedia"))
       sb.AppendLine("Imports QB.Printer")
-      sb.AppendLine("Imports QB.Video")
+      sb.AppendLine(If(m_usesGraphics, "Imports QB.Graphics", "Imports QB.Video"))
       sb.AppendLine()
       sb.AppendLine("Module " & moduleName)
       sb.AppendLine()

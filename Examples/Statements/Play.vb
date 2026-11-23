@@ -3,8 +3,8 @@
 
 Imports QB
 Imports QB.Core
-Imports QB.Multimedia
-Imports QB.Video
+Imports QB.Speaker
+Imports QB.Graphics
 
 Namespace Examples
 

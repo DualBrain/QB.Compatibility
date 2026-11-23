@@ -1,4 +1,4 @@
-Imports QB.Video
+﻿Imports QB.Video
 
 Namespace Examples
 
@@ -39,6 +39,7 @@ Namespace Examples
         Return
       End If
 
+      QB.SdlBackend.Use()   ' (These examples draw and play sound, so they need the SDL window and audio.)
       Reset()
       entry.Run()
       SLEEP() ' Keep the window until a key is pressed.

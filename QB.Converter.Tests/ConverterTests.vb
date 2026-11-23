@@ -156,10 +156,10 @@ Namespace QB2VB.Tests
     Public Sub UnsupportedStatementsAreFlaggedNotDropped()
       Dim notes As New List(Of String)
       Dim vb As String
-      Dim c As New Converter("WRITE 1")
+      Dim c As New Converter("CHAIN ""x""")
       vb = c.Convert("T")
       Assert.Contains("TODO(QB2VB)", vb)
-      Assert.Contains("WRITE 1", vb)
+      Assert.Contains("CHAIN ""x""", vb)
       Assert.NotEmpty(c.Notes)
     End Sub
 
@@ -283,11 +283,43 @@ Namespace QB2VB.Tests
     Public Sub MoneyConvertsAndCompiles()
       Dim c As New Converter(IO.File.ReadAllText(FindSample("MONEY.BAS"), Text.Encoding.Latin1))
       Dim vb = c.Convert("MONEY")
-      ' Only CALL ABSOLUTE (machine code) is left.
-      Assert.Equal(2, c.Notes.Count)
-      Assert.All(c.Notes, Sub(n) Assert.Contains("Absolute", n))
+      ' Only the machine code (CALL ABSOLUTE and the addresses it needs) is left.
+      Assert.NotEmpty(c.Notes)
+      Assert.All(c.Notes, Sub(n) Assert.True(n.Contains("Absolute") OrElse n.Contains("VARPTR") OrElse n.Contains("VARSEG"), n))
       Dim errors = VbCompiler.Compile(vb, "MONEY")
       Assert.True(errors = "", errors)
+    End Sub
+
+    <Theory>
+    <InlineData("PRINT ""hi""" & vbLf & "SCREEN 0" & vbLf & "LOCATE 2, 2", False, False)>
+    <InlineData("BEEP", False, False)>
+    <InlineData("SCREEN 9", True, False)>
+    <InlineData("m% = 9" & vbLf & "SCREEN m%", True, False)>
+    <InlineData("PSET (1, 1)", True, False)>
+    <InlineData("x = POINT(1, 1)", True, False)>
+    <InlineData("a% = STICK(0)", True, False)>
+    <InlineData("PLAY ""C""", False, True)>
+    <InlineData("SOUND 440, 1", False, True)>
+    <InlineData("SCREEN 12" & vbLf & "PLAY ""C""", True, True)>
+    Public Sub TheImportsFollowWhatTheProgramUses(source As String, graphics As Boolean, sound As Boolean)
+      Dim c As New Converter(source)
+      Dim vb = c.Convert("T")
+      Assert.Equal(graphics, c.UsesGraphics)
+      Assert.Equal(sound, c.UsesSound)
+      Assert.Contains(If(graphics, "Imports QB.Graphics", "Imports QB.Video"), vb)
+      Assert.Contains(If(sound, "Imports QB.Speaker", "Imports QB.Multimedia"), vb)
+      Assert.DoesNotContain(If(graphics, "Imports QB.Video", "Imports QB.Graphics"), vb)
+    End Sub
+
+    <Fact>
+    Public Sub TheProjectReferencesTheSdlAssemblyOnlyWhenNeeded()
+      Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False)
+      Assert.Contains("QB.Compatibility.vbproj", text)
+      Assert.DoesNotContain("QB.Compatibility.Sdl", text)
+      Assert.DoesNotContain("PublishAot", text)
+      Dim withSdl = Program.ProjectText("T", "T.vb", "/work/T", "/lib", True, True)
+      Assert.Contains("QB.Compatibility.Sdl.vbproj", withSdl)
+      Assert.Contains("<PublishAot>true</PublishAot>", withSdl)
     End Sub
 
     <Fact>

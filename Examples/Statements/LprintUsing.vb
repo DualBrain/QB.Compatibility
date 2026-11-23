@@ -4,7 +4,7 @@
 Imports QB
 Imports QB.File
 Imports QB.Printer
-Imports QB.Video
+Imports QB.Graphics
 
 Namespace Examples
 

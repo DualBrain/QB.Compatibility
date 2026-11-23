@@ -37,6 +37,11 @@ Namespace QB2VB.Tests
 
     ''' <summary>The compiler's error lines (empty when the source compiles).</summary>
     Friend Shared Function Compile(vbSource As String, mainModule As String) As String
+      Return Compile({vbSource}, mainModule)
+    End Function
+
+    ''' <summary>Compiles several source files together (one assembly).</summary>
+    Friend Shared Function Compile(vbSources As IEnumerable(Of String), mainModule As String) As String
 
       Dim root = DotnetRoot()
       Dim vbc = IO.Path.Combine(Newest(IO.Path.Combine(root, "sdk"), IO.Path.Combine("Roslyn", "bincore", "vbc.dll")), "Roslyn", "bincore", "vbc.dll")
@@ -44,8 +49,12 @@ Namespace QB2VB.Tests
       Dim work = IO.Path.Combine(IO.Path.GetTempPath(), "qb2vb-" & Guid.NewGuid().ToString("N"))
       IO.Directory.CreateDirectory(work)
       Try
-        Dim src = IO.Path.Combine(work, "program.vb")
-        IO.File.WriteAllText(src, vbSource)
+        Dim sources As New List(Of String)
+        For Each sourceText In vbSources
+          Dim file = IO.Path.Combine(work, "program" & sources.Count & ".vb")
+          IO.File.WriteAllText(file, sourceText)
+          sources.Add(file)
+        Next
 
         Dim psi As New ProcessStartInfo("dotnet") With {.RedirectStandardOutput = True, .RedirectStandardError = True}
         psi.ArgumentList.Add(vbc)
@@ -58,7 +67,10 @@ Namespace QB2VB.Tests
           psi.ArgumentList.Add("-r:" & r)
         Next
         psi.ArgumentList.Add("-r:" & GetType(QB.Video).Assembly.Location)
-        psi.ArgumentList.Add(src)
+        psi.ArgumentList.Add("-r:" & GetType(QB.Graphics).Assembly.Location)
+        For Each file In sources
+          psi.ArgumentList.Add(file)
+        Next
 
         Using p = Process.Start(psi)
           Dim output = p.StandardOutput.ReadToEnd() & p.StandardError.ReadToEnd()

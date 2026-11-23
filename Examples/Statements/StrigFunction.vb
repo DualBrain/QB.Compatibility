@@ -4,8 +4,8 @@
 Imports QB
 Imports QB.Devices
 Imports QB.Events
-Imports QB.Multimedia
-Imports QB.Video
+Imports QB.Speaker
+Imports QB.Graphics
 
 Namespace Examples
 

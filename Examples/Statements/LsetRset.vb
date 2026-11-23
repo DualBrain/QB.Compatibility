@@ -5,7 +5,7 @@
 
 Imports QB
 Imports QB.File
-Imports QB.Video
+Imports QB.Graphics
 
 Namespace Examples
 

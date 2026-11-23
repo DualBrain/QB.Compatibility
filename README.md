@@ -12,15 +12,23 @@ Examples of projects that have been converted using the library:
 - NIBBLES.BAS
 - GORILLA.BAS
 
-## Platforms
+## Platforms and what a program needs
 
-QB.Compatibility targets .NET 10 and runs on Windows and Linux (no WinForms).
+QB.Compatibility targets .NET 10 and runs on Windows, Linux and macOS (no WinForms).  What a program needs follows from what it uses:
 
-- Text mode (`QB.Console`) uses `System.Console`; Windows-only extras in `ConsoleEx` do nothing elsewhere.
-- Graphics (`QB.Video`) draw into an in-memory screen of palette indices (like VGA memory) that is shown in an SDL2 window, opened the first time something is drawn or `SCREEN` is called. SDL2 is bundled for Windows; on Linux install it (Debian/Ubuntu: `sudo apt install libsdl2-2.0-0`).
-- The window keeps the screen at 4:3 and leaves the OS screen saver enabled.
-- A different display can be plugged in through `QB.IDisplay` (`Video.Display = ...`); `HeadlessDisplay` is provided for tests.
-- See the `Example` project for a small program (`SCREEN 13`, `LINE`, `CIRCLE`, `PAINT`, `PRINT`).
+| The program uses | Import | Reference | Shown in |
+|---|---|---|---|
+| text only: `PRINT`, `INPUT`, `LOCATE`, `COLOR`, `CLS`, files, errors, `BEEP` | `QB.Video` | `QB.Compatibility` | the terminal |
+| graphics (`SCREEN` 1 and up, `PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`/`PUT`, `DRAW`, `PALETTE`, `VIEW`, `WINDOW`), the joystick or the pen | `QB.Graphics` (instead of `QB.Video`) | plus `QB.Compatibility.Sdl` | an SDL2 window |
+| `SOUND` and `PLAY` | `QB.Speaker` (instead of `QB.Multimedia`) | plus `QB.Compatibility.Sdl` | SDL2 audio |
+
+Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` installs the audio.  A program that uses neither doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project DIR` chooses the imports and writes a project that references only what the program needs.
+
+**The terminal.**  Text programs run in the terminal by default.  A program that only prints and reads lines scrolls like any command-line tool; if the output is redirected it stays plain text (no escape sequences).  The first time a program uses the screen by position (`LOCATE`, `VIEW PRINT`, `WIDTH`, the `SCREEN` function) the terminal switches to a full-screen view of the 80 x 25 text screen (the terminal's alternate screen), redrawn when the text changes, and the last picture is left in the terminal when the program ends.  A terminal smaller than the screen is asked to resize (many honor it); otherwise the rows around the cursor are shown.  On Windows virtual terminal processing is switched on for the console.  Keys come from `Console.ReadKey`, or from the input when it is redirected (reading past the end is QBasic's "Input past end of file").  `BEEP` rings the bell when there is no audio device.
+
+**The window.**  Graphics draw into an in-memory screen of palette indices (like VGA memory) that is shown in an SDL2 window.  The package brings SDL2 for Windows and Linux; on Linux a system SDL2 can be used instead (Debian/Ubuntu: `sudo apt install libsdl2-2.0-0`).  The window keeps the screen at 4:3 and leaves the OS screen saver enabled.  `QB.SdlBackend.Use()` makes a text program use the window too.
+
+A different display can be plugged in through `QB.IDisplay` (`Video.Display = ...`); `HeadlessDisplay` is provided for tests.  See the `Examples` project for small programs.
 
 ## Random-access files
 
@@ -91,7 +99,7 @@ no hardware), `BSAVE`/`BLOAD` (the simulated memory) and, in `QB.File`, `LOCK`/`
 
 ## Sound
 
-`SOUND`, `BEEP` and `PLAY` (in `QB.Multimedia`) make square-wave tones through SDL2 audio.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).
+`SOUND` and `PLAY` (in `QB.Speaker`, which needs `QB.Compatibility.Sdl`) make square-wave tones through SDL2 audio; `BEEP` (in `QB.Multimedia`) rings the terminal bell when there is no audio device.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).
 
 ## Examples
 
@@ -105,7 +113,7 @@ dotnet run --project Examples -- --headless out                 # run them all w
 
 File examples (`OPEN`, `WRITE #`, `INPUT #`, `LINE INPUT #`, ...) use `Imports QB.File` together with `Imports QB.Video`:
 `OPEN("LIST", OpenMode.Output, 1)`, `WRITE(1, name, age)`, `INPUT(1, rec1, rec2)`, `LINE_INPUT(1, rec)`, `CLOSE(1)`.  VB can't import one name from two
-classes, so the file-number forms of `PRINT`, `WRITE`, `INPUT`, `LINE_INPUT` and `INPUT$` are overloads in `QB.Video` (and `QB.Console`), while
+classes, so the file-number forms of `PRINT`, `WRITE`, `INPUT`, `LINE_INPUT` and `INPUT$` are overloads in `QB.Video`, while
 `OPEN`, `CLOSE`, `EOF`, `LOF`, `LOC`, `SEEK`, `FREEFILE`, `KILL`, `NAME`, `MKDIR`, `RMDIR` and `CHDIR` are in `QB.File`.  A comma after an `INPUT`
 prompt (no question mark) is `INPUT(prompt, value, False)`, and `INPUT;` (the cursor stays after the typing) adds a fourth argument: `INPUT(prompt, value, False, True)`; `LINE_INPUT(prompt, value, True)` is `LINE INPUT;`.  `FILES(spec)` lists a directory.  `INPUT$(n)` from the keyboard is `InputStr(n)` (VB can't overload it with `INPUT`); `INPUT$(n, #1)` is `INPUT$(n, 1)` or `InputStr(n, 1)`.
 
@@ -121,4 +129,6 @@ dotnet run --project QB.Converter -- Samples/REMLINE.BAS -o REMLINE.vb
 
 The output is deliberately literal: one QBasic statement becomes one library call on the same line, and labels, GOTOs, comments, QBasic variable names (suffixes included) and the layout are kept. What has to change is limited to what VB requires (`CONST`/`DIM SHARED`/`TYPE`/`DATA` move to the top of the module, `SUB ... STATIC` gets `Static` locals, `Resume` handlers that live at module level are copied into the procedure that names them, reserved words are renamed). Anything the converter can't convert yet is left as a `' TODO(QB2VB):` comment and listed in the report printed at the end.
 
-Converted so far: `REMLINE.BAS`, `NIBBLES.BAS`, `GORILLA.BAS` and `MONEY.BAS` (all compile against the library and run; MONEY still has two `CALL ABSOLUTE` machine-code calls flagged). A `GOSUB` routine in the module-level code becomes a `Sub` (the module's variables become module-level so it can share them); inside a `SUB` or `FUNCTION` it becomes a lambda over the procedure's locals (a routine that uses `ON ERROR` is expanded where it is called, since a lambda can't hold an error handler). `ON ... GOSUB/GOTO` becomes a `Select Case`, a one-line `DEF FN` becomes a `Function`, array parameters get their number of dimensions from how the procedure indexes them, and `FIELD` names become the numbered fields of a `FieldRecord` (`LSET name$ = x` is `Fields1.LSET(0, x)`). The graphics statements (`PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`, `PUT`, `VIEW`, `WINDOW`) keep their shape: `LINE (1, 2)-(3, 4), 5, BF` becomes `LINE(1, 2, 3, 4, 5, LineOption.BF)`. Loops that wait on `TIMER`, and empty `FOR` loops, get an `EMPTYLOOP()` call (`QB.Core.EmptyLoopMicroseconds`, 400 by default) so programs that calibrate themselves by counting get a measurable result. Still to come: `CALL ABSOLUTE`, multi-line `DEF FN`, and the `WRITE` statement.
+Converted so far: `REMLINE.BAS`, `NIBBLES.BAS`, `GORILLA.BAS` and `MONEY.BAS` (all compile against the library and run; MONEY still has two `CALL ABSOLUTE` machine-code calls flagged). A `GOSUB` routine in the module-level code becomes a `Sub` (the module's variables become module-level so it can share them); inside a `SUB` or `FUNCTION` it becomes a lambda over the procedure's locals (a routine that uses `ON ERROR` is expanded where it is called, since a lambda can't hold an error handler). `ON ... GOSUB/GOTO` becomes a `Select Case`, a one-line `DEF FN` becomes a `Function`, array parameters get their number of dimensions from how the procedure indexes them, and `FIELD` names become the numbered fields of a `FieldRecord` (`LSET name$ = x` is `Fields1.LSET(0, x)`). The graphics statements (`PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`, `PUT`, `VIEW`, `WINDOW`) keep their shape: `LINE (1, 2)-(3, 4), 5, BF` becomes `LINE(1, 2, 3, 4, 5, LineOption.BF)`. Loops that wait on `TIMER`, and empty `FOR` loops, get an `EMPTYLOOP()` call (`QB.Core.EmptyLoopMicroseconds`, 400 by default) so programs that calibrate themselves by counting get a measurable result. `VARPTR$` and the `X` command of `DRAW` and `PLAY` work together (`DRAW "C2 X" + VARPTR$(shape$)`). Still to come: `CALL ABSOLUTE`, `VARPTR`/`VARSEG` (addresses of variables) and multi-line `DEF FN`.
+
+The converter's output for every program in `Samples` and every manual example in `Samples/Manual` is kept in `QB.Converter.Tests/Golden`; the tests convert them again and compare, and compile them all together. After a change to the converter that alters the output on purpose, run `UPDATE_GOLDEN=1 dotnet test QB.Converter.Tests` and review the difference with `git diff` before committing.

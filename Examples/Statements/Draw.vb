@@ -3,7 +3,7 @@
 
 Imports QB
 Imports QB.Core
-Imports QB.Video
+Imports QB.Graphics
 
 Namespace Examples
 

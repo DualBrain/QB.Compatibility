@@ -14,7 +14,12 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="Golden\**" />
+    <None Include="Golden\**" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\QB.Converter\QB.Converter.vbproj" />
     <ProjectReference Include="..\QB.Compatibility\QB.Compatibility.vbproj" />
+    <ProjectReference Include="..\QB.Compatibility.Sdl\QB.Compatibility.Sdl.vbproj" />
   </ItemGroup>
 </Project>
