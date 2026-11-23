@@ -1,4 +1,4 @@
-Option Explicit On
+﻿Option Explicit On
 Option Strict On
 Option Infer On
 
@@ -99,11 +99,11 @@ Namespace Global.QB
         Using p = Process.Start(info)
           p.StandardInput.Write(text.ToString)
           p.StandardInput.Close()
-          If Not p.WaitForExit(30000) Then Throw New IOException("Device timeout")
-          If p.ExitCode <> 0 Then Throw New IOException("Device unavailable")
+          If Not p.WaitForExit(30000) Then QBError.Raise(24, "Device timeout")
+          If p.ExitCode <> 0 Then QBError.Raise(25, "Device fault")
         End Using
       Catch ex As System.ComponentModel.Win32Exception
-        Throw New IOException("Device unavailable", ex)
+        QBError.Raise(25, "Device fault")
       End Try
     End Sub
 

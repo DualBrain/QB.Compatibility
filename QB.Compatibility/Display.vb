@@ -249,6 +249,7 @@ Namespace Global.QB
           Select Case e.type
             Case SDL.SDL_EventType.SDL_QUIT
               m_running = False
+              Video.WindowClosed()
               Environment.Exit(0) ' Closing the window ends the program, as it would in QBasic.
             Case SDL.SDL_EventType.SDL_WINDOWEVENT
               redraw = True
@@ -429,6 +430,8 @@ Namespace Global.QB
       End Select
     End Sub
 
+    Private m_suppressTextUntil As Long   ' Alt+key combinations also produce text input; it is ignored.
+
     Private Sub HandleKeyDown(k As SDL.SDL_Keysym)
 
       Dim shift = (k.mod And SDL.SDL_Keymod.KMOD_SHIFT) <> 0
@@ -456,8 +459,36 @@ Namespace Global.QB
         Case SDL.SDL_Keycode.SDLK_F1 To SDL.SDL_Keycode.SDLK_F12
           key = CType(CInt(ConsoleKey.F1) + (CInt(k.sym) - CInt(SDL.SDL_Keycode.SDLK_F1)), ConsoleKey)
         Case SDL.SDL_Keycode.SDLK_a To SDL.SDL_Keycode.SDLK_z
+          If alt AndAlso Not ctrl Then
+            ' Alt+letter is Chr(0) and the letter's scan code.
+            m_suppressTextUntil = Environment.TickCount64 + 80
+            m_keys.Enqueue(KeyCodec.Extended(KeyCodec.LetterScan(ChrW(CInt(k.sym) - 32))))
+            Return
+          End If
           ' Ctrl+letter gives the control character; plain letters arrive as text input.
           If ctrl Then ch = ChrW(CInt(k.sym) - CInt(SDL.SDL_Keycode.SDLK_a) + 1)
+        Case SDL.SDL_Keycode.SDLK_0 To SDL.SDL_Keycode.SDLK_9
+          If alt Then ' Alt+1 to Alt+9 and Alt+0.
+            m_suppressTextUntil = Environment.TickCount64 + 80
+            m_keys.Enqueue(KeyCodec.Extended(If(k.sym = SDL.SDL_Keycode.SDLK_0, 129, 119 + CInt(k.sym) - CInt(SDL.SDL_Keycode.SDLK_0))))
+          End If
+          Return
+        Case SDL.SDL_Keycode.SDLK_KP_1 To SDL.SDL_Keycode.SDLK_KP_9, SDL.SDL_Keycode.SDLK_KP_0, SDL.SDL_Keycode.SDLK_KP_PERIOD
+          ' With NumLock on the keypad types digits (text input); with it off the keys are cursor keys.
+          If (k.mod And SDL.SDL_Keymod.KMOD_NUM) <> 0 Then Return
+          Select Case k.sym
+            Case SDL.SDL_Keycode.SDLK_KP_8 : key = ConsoleKey.UpArrow
+            Case SDL.SDL_Keycode.SDLK_KP_2 : key = ConsoleKey.DownArrow
+            Case SDL.SDL_Keycode.SDLK_KP_4 : key = ConsoleKey.LeftArrow
+            Case SDL.SDL_Keycode.SDLK_KP_6 : key = ConsoleKey.RightArrow
+            Case SDL.SDL_Keycode.SDLK_KP_7 : key = ConsoleKey.Home
+            Case SDL.SDL_Keycode.SDLK_KP_1 : key = ConsoleKey.End
+            Case SDL.SDL_Keycode.SDLK_KP_9 : key = ConsoleKey.PageUp
+            Case SDL.SDL_Keycode.SDLK_KP_3 : key = ConsoleKey.PageDown
+            Case SDL.SDL_Keycode.SDLK_KP_0 : key = ConsoleKey.Insert
+            Case SDL.SDL_Keycode.SDLK_KP_PERIOD : key = ConsoleKey.Delete
+            Case Else : Return ' (KP_5 has no key.)
+          End Select
         Case Else
           Return
       End Select
@@ -468,6 +499,7 @@ Namespace Global.QB
     End Sub
 
     Private Sub HandleText(e As SDL.SDL_Event)
+      If Environment.TickCount64 < m_suppressTextUntil Then Return
       ' The text lives in a fixed buffer SDL2-CS exposes awkwardly; read it from the raw event.
       Dim size = Marshal.SizeOf(Of SDL.SDL_Event)()
       Dim p = Marshal.AllocHGlobal(size)

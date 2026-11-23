@@ -1,4 +1,4 @@
-Option Explicit On
+﻿Option Explicit On
 Option Strict On
 Option Infer On
 
@@ -12,6 +12,19 @@ Namespace Global.QB
 
     ' Extended keys return Chr(0) followed by a scan code.
     Friend Shared Function Encode(key As ConsoleKey, ch As Char, shift As Boolean, ctrl As Boolean, alt As Boolean) As String
+
+      ' Ctrl with the cursor keys, and Shift+Tab, have codes of their own.
+      If ctrl Then
+        Select Case key
+          Case ConsoleKey.LeftArrow : Return Extended(115)
+          Case ConsoleKey.RightArrow : Return Extended(116)
+          Case ConsoleKey.End : Return Extended(117)
+          Case ConsoleKey.PageDown : Return Extended(118)
+          Case ConsoleKey.Home : Return Extended(119)
+          Case ConsoleKey.PageUp : Return Extended(132)
+        End Select
+      End If
+      If key = ConsoleKey.Tab AndAlso shift Then Return Extended(15)
 
       Select Case key
         Case ConsoleKey.Delete : Return Extended(83)
@@ -46,7 +59,18 @@ Namespace Global.QB
 
     End Function
 
-    Private Shared Function Extended(scan As Integer) As String
+    ''' <summary>The scan code of a letter key (A to Z), as QBasic's Alt+letter codes use it.</summary>
+    Friend Shared Function LetterScan(letter As Char) As Integer
+      Dim row1 = "QWERTYUIOP".IndexOf(letter)
+      If row1 >= 0 Then Return &H10 + row1
+      Dim row2 = "ASDFGHJKL".IndexOf(letter)
+      If row2 >= 0 Then Return &H1E + row2
+      Dim row3 = "ZXCVBNM".IndexOf(letter)
+      If row3 >= 0 Then Return &H2C + row3
+      Return -1
+    End Function
+
+    Friend Shared Function Extended(scan As Integer) As String
       Return ChrW(0) & ChrW(scan)
     End Function
 

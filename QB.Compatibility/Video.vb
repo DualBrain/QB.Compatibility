@@ -1406,7 +1406,7 @@ Namespace Global.QB
 
     Public Shared Sub CIRCLE([step] As Boolean, x#, y#, radius#, Optional attribute% = -1, Optional start As Double? = Nothing, Optional [end] As Double? = Nothing, Optional aspect As Double? = Nothing)
 
-      If m_mode = 0 Then Throw New InvalidOperationException
+      If m_mode = 0 Then QBError.Raise(5, "Illegal function call")
       StepPoint([step], x, y)
       m_lastX = x : m_lastY = y
 
@@ -1455,8 +1455,8 @@ Namespace Global.QB
       line_from_end = 0 : If ([end] < 0) Then line_from_end = 1 : [end] = -[end]
 
       ' error checking
-      If (start > pi2) Then Throw New InvalidOperationException
-      If ([end] > pi2) Then Throw New InvalidOperationException
+      If (start > pi2) Then QBError.Raise(5, "Illegal function call")
+      If ([end] > pi2) Then QBError.Raise(5, "Illegal function call")
 
       ' when end<start, the arc of the circle that wouldn't have been drawn if start & end 
       ' were swapped is drawn
@@ -1663,7 +1663,7 @@ allplotted:
     ''' </summary>
     Public Shared Sub PAINT([step] As Boolean, x#, y#, tile$, border%, background$)
 
-      If m_mode = 0 Then Throw New InvalidOperationException
+      If m_mode = 0 Then QBError.Raise(5, "Illegal function call")
       If String.IsNullOrEmpty(tile) OrElse tile.Length > 64 Then Throw New ArgumentException("Illegal function call")
 
       StepPoint([step], x, y)
@@ -2064,7 +2064,7 @@ allplotted:
         Case 7, 8, 9, 12 : bitsPerPixel = 1 : planes = 4
         Case 10 : bitsPerPixel = 1 : planes = 2
         Case 13 : bitsPerPixel = 8 : planes = 1
-        Case Else : Throw New InvalidOperationException("GET and PUT need a graphics screen mode.")
+        Case Else : QBError.Raise(5, "Illegal function call")
       End Select
     End Sub
 
@@ -2503,6 +2503,113 @@ allplotted:
       Next
     End Sub
 
+    ' ---- Waiting at the end of the program --------------------------------------------------------
+
+    Private Shared m_waitAtExit As Boolean
+    Private Shared m_exitHooked As Boolean
+    Private Shared m_windowClosed As Boolean
+
+    ''' <summary>
+    ''' When True, a program that ends leaves its window open until a key is pressed (or the window is closed), as a QBasic
+    ''' program leaves its screen up, instead of the window closing at once.
+    ''' </summary>
+    Public Shared Property WaitForKeyAtExit As Boolean
+      Get
+        Return m_waitAtExit
+      End Get
+      Set(value As Boolean)
+        m_waitAtExit = value
+        If value AndAlso Not m_exitHooked Then
+          m_exitHooked = True
+          AddHandler AppDomain.CurrentDomain.ProcessExit, Sub(sender, e) OnProcessExit()
+        End If
+      End Set
+    End Property
+
+    ' Called by the SDL window when it is closed (the program is on its way out; nothing should wait for a key).
+    Friend Shared Sub WindowClosed()
+      m_windowClosed = True
+    End Sub
+
+    Private Shared Sub OnProcessExit()
+      If Not m_waitAtExit OrElse m_windowClosed OrElse m_display Is Nothing OrElse Not (TypeOf m_display Is SdlDisplay) Then Return
+      Try
+        PRINT()
+        PRINT("Press any key to continue", True)
+        Do While Not m_windowClosed AndAlso INKEY() = ""
+          Threading.Thread.Sleep(10)
+        Loop
+      Catch
+      End Try
+    End Sub
+
+    ' ---- The function key bar (KEY ON, KEY OFF, KEY LIST, KEY n, text) --------------------------------
+
+    Private Shared ReadOnly m_softKeys() As String = {"LIST ", "RUN" & vbCr, "LOAD""", "SAVE""", "CONT" & vbCr, ",""LPT1:""", "TRON" & vbCr, "TROFF" & vbCr, "KEY ", "SCREEN 0,0,0" & vbCr}
+    Private Shared m_keyBar As Boolean
+    Private Shared m_barReservedRow As Boolean
+
+    Private Shared Function SoftKeyLabel(n As Integer) As String
+      Dim t = m_softKeys(n).Replace(vbCr, "")
+      Return If(t.Length > 6, t.Substring(0, 6), t.PadRight(6))
+    End Function
+
+    Private Shared Sub DrawKeyBar()
+      If m_mode <> 0 OrElse Not m_keyBar Then Return
+      Dim savedRow = m_cursorRow, savedCol = m_cursorCol, savedFg = m_fgColor, savedBg = m_bgColor, savedBlink = m_fgBlink
+      m_fgBlink = False
+      Dim width = Math.Max(5, TextCols \ 10)
+      m_cursorRow = TextRows
+      For c = 1 To TextCols
+        m_cursorCol = c : m_fgColor = 7 : m_bgColor = 0 : DrawCell(32)
+      Next
+      For n = 0 To 9
+        Dim x = n * width + 1
+        If x + 6 > TextCols Then Exit For
+        m_cursorCol = x : m_fgColor = 7 : m_bgColor = 0
+        DrawCell(AscW(CStr(If(n = 9, 0, n + 1))(0)))
+        Dim label = SoftKeyLabel(n)
+        For i = 0 To 5
+          m_cursorCol = x + 1 + i : m_fgColor = 0 : m_bgColor = 7
+          DrawCell(AscW(label(i)))
+        Next
+      Next
+      m_cursorRow = savedRow : m_cursorCol = savedCol : m_fgColor = savedFg : m_bgColor = savedBg : m_fgBlink = savedBlink
+      Touch()
+    End Sub
+
+    ''' <summary>KEY ON (true) or KEY OFF (false): shows or hides the function key bar on the last line of a text screen.</summary>
+    Friend Shared Sub ShowKeyBar(visible As Boolean)
+      If m_mode <> 0 Then m_keyBar = visible : Return
+      If visible = m_keyBar Then Return
+      m_keyBar = visible
+      If visible Then
+        If m_viewBottom = TextRows Then m_viewBottom = TextRows - 1 : m_barReservedRow = True
+        If m_cursorRow = TextRows Then m_cursorRow = TextRows - 1
+        DrawKeyBar()
+      Else
+        Dim y0 = (TextRows - 1) * m_textH
+        Array.Fill(m_pixels, CByte(m_bgColor And m_colorMask), y0 * m_width, m_textH * m_width)
+        ClearCells(TextRows, TextRows)
+        If m_barReservedRow Then m_viewBottom = TextRows : m_barReservedRow = False
+        Touch()
+      End If
+    End Sub
+
+    ''' <summary>KEY LIST: prints the function key definitions.</summary>
+    Friend Shared Sub ListSoftKeys()
+      For n = 0 To 9
+        PRINT("F" & (n + 1).ToString(Globalization.CultureInfo.InvariantCulture) & " " & m_softKeys(n).Replace(vbCr, QBChr(27)))
+      Next
+    End Sub
+
+    ''' <summary>KEY n, text: defines the text of function key n (1 to 10, up to 15 characters).</summary>
+    Friend Shared Sub SetSoftKey(n As Integer, text As String)
+      If n < 1 OrElse n > 10 OrElse text Is Nothing OrElse text.Length > 15 Then Throw New ArgumentException("Illegal function call")
+      m_softKeys(n - 1) = text
+      DrawKeyBar()
+    End Sub
+
     ''' <summary>Returns the next key pressed (as QBasic encodes it) or an empty string.</summary>
     Public Shared Function INKEY$()
       EnsureDisplay()
@@ -2882,7 +2989,7 @@ allplotted:
         Dim full = IO.Path.GetFullPath(filespec)
         dir = IO.Path.GetDirectoryName(full) : pattern = IO.Path.GetFileName(full)
       End If
-      If Not IO.Directory.Exists(dir) Then Throw New IO.DirectoryNotFoundException("Path not found")
+      If Not IO.Directory.Exists(dir) Then QBError.Raise(76, "Path not found")
 
       Dim names As New List(Of String)
       For Each d In IO.Directory.GetDirectories(dir, pattern).OrderBy(Function(x) x, StringComparer.OrdinalIgnoreCase)
@@ -2891,7 +2998,7 @@ allplotted:
       For Each f In IO.Directory.GetFiles(dir, pattern).OrderBy(Function(x) x, StringComparer.OrdinalIgnoreCase)
         names.Add(IO.Path.GetFileName(f).ToUpperInvariant())
       Next
-      If names.Count = 0 Then Throw New IO.FileNotFoundException("File not found", filespec)
+      If names.Count = 0 Then QBError.Raise(53, "File not found")
 
       PRINT(dir.ToUpperInvariant())
       Dim columns = Math.Max(1, TextCols \ 16)
@@ -2911,6 +3018,67 @@ allplotted:
       End Try
       PRINT(free.ToString("N0", Globalization.CultureInfo.InvariantCulture) & " Bytes free")
 
+    End Sub
+
+    ' ---- INPUT with several variables ---------------------------------------------------------------
+
+    ' Splits a typed line at the commas outside quotes; quoted fields lose their quotes.
+    Private Shared Function SplitInputFields(line As String) As List(Of String)
+      Dim fields As New List(Of String)
+      Dim sb As New Text.StringBuilder
+      Dim inQuotes = False
+      Dim quoted = False
+      For Each c In line
+        If c = """"c Then
+          inQuotes = Not inQuotes : quoted = True
+        ElseIf c = ","c AndAlso Not inQuotes Then
+          fields.Add(If(quoted, sb.ToString, sb.ToString.Trim)) : sb.Clear() : quoted = False
+        Else
+          sb.Append(c)
+        End If
+      Next
+      fields.Add(If(quoted, sb.ToString, sb.ToString.Trim))
+      Return fields
+    End Function
+
+    ' Reads at least <count> comma-separated fields (QBasic asks "??" for the missing ones); Nothing when there are too many.
+    Private Shared Function ReadInputFields(prompt As String, question As Boolean, count As Integer) As List(Of String)
+      PRINT(prompt & If(question, "? ", ""), True)
+      Dim fields As New List(Of String)
+      Do
+        fields.AddRange(SplitInputFields(ReadLineEcho()))
+        If fields.Count >= count Then Exit Do
+        PRINT("?? ", True)
+      Loop
+      Return If(fields.Count = count, fields, Nothing)
+    End Function
+
+    ''' <summary>
+    ''' INPUT "prompt"; a, b: reads values separated by commas (String or any numeric type), asking again ("Redo from start") if
+    ''' there are too many or one isn't a valid number.  <paramref name="question"/> False is the INPUT "prompt", a, b form.
+    ''' </summary>
+    Public Shared Sub INPUT(Of T1, T2)(prompt$, ByRef value1 As T1, ByRef value2 As T2, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 2)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 3)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) Then Return
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
+    Public Shared Sub INPUT(Of T1, T2, T3, T4)(prompt$, ByRef value1 As T1, ByRef value2 As T2, ByRef value3 As T3, ByRef value4 As T4, Optional question As Boolean = True)
+      Do
+        Dim f = ReadInputFields(prompt, question, 4)
+        If f IsNot Nothing AndAlso File.TryConvertField(f(0), value1) AndAlso File.TryConvertField(f(1), value2) AndAlso File.TryConvertField(f(2), value3) AndAlso File.TryConvertField(f(3), value4) Then Return
+        PRINT("Redo from start")
+      Loop
     End Sub
 
     ''' <summary>INPUT$(n) from the keyboard: waits for n keys and returns them (without showing them).</summary>

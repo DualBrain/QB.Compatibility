@@ -66,6 +66,29 @@ INTEGER is a VB `Short`, a LONG an `Integer`); `MKSMBF`, `MKDMBF`, `CVSMBF` and 
 `RSET(variable, text)` justify text inside a string variable, keeping its length.  Variables can't be bound to a file buffer in VB, so `FIELD` is numbered:
 `Dim f = FIELD(1, 20, 4)` (`FIELD #1, 20 AS name$, 4 AS score$`), `f.LSET(0, "Mary")`, `f.RSET(1, MKS(99.0F))`, `PUT_FIELD(1, 1)` (`PUT #1, 1`), `GET_FIELD(1, 1)` and `f(0)`.
 
+## DATA, PEEK and POKE
+
+QBasic's `DATA` lines become calls, in order: `DATA_LABEL("Pieces") : DATA(1, 2, "three")`.  `READ(x)` reads the next item into a `Short`, `Integer`, `Long`, `Single`, `Double`
+or `String` (numbers and strings are kept as text, so either can be read into either), `RESTORE()` starts again and `RESTORE("Pieces")` jumps to a label.  Running out of data
+raises QBasic error 4 and text read into a number error 2, so `Err.Number` works in a handler.  `DEF_SEG(segment)`, `PEEK(offset)` and `POKE(offset, value)` use simulated memory
+(a sparse array of bytes that starts out 0, with `DEF_SEG()` returning to the default segment): enough for the usual keyboard-flag reads and restores at `DEF_SEG(0)`, `PEEK(1047)`,
+but there is no real hardware or screen memory behind it.  Several `FIELD` statements for one file overlay the same buffer, as in QBasic.
+
+## Errors, devices and the rest of the system statements
+
+**QBasic error numbers.**  Library errors carry QBasic's numbers, so code written for `ON ERROR` (`SELECT CASE ERR`) works with VB's `Err.Number`: 4 Out of DATA, 24 Device timeout, 25 Device fault,
+50 FIELD overflow, 52 Bad file name or number, 53 File not found, 54 Bad file mode, 55 File already open, 58 File already exists, 59 Bad record length, 62 Input past end of file, 63 Bad record number,
+64 Bad file name, 67 Too many files, 70 Permission denied, 76 Path not found, and 5 Illegal function call.  `ERROR_(n)` is the `ERROR n` statement (`ERDEV` and `ERDEV_STR` are stubs).
+
+**Device files.**  `OPEN("CON", OpenMode.Output, 1)` (also `"SCRN:"`, `"CONS:"`) prints to the screen, `"KYBD:"` reads the keyboard, `"NUL"` discards, `"LPT1:"` is the printer and `"COM1:..."` a serial port.
+
+**Keyboard.**  `INPUT(prompt, a, b, c)` reads up to four comma-separated values (asking `??` for missing ones and "Redo from start" for bad ones); `INKEY$` also returns the keypad cursor keys (NumLock off), Alt+letter and Alt+digit,
+Ctrl+cursor keys and Shift+Tab with QBasic's codes.  `KEY_ON()`, `KEY_OFF()`, `KEY_LIST()` and `KEY_SET(n, text)` (in `QB.Events`) show, hide and list the function key bar.
+`Video.WaitForKeyAtExit = True` keeps a finished program's window open until a key is pressed, as QBasic leaves the last screen up.
+
+**System statements** (in `QB.Development`): `SHELL(command)`, `SYSTEM()`, `RESET()`, `CLEAR()`, `ENVIRON$(name)` / `ENVIRON_SET("NAME=value")`, `COMMAND$()`, `FRE(x)`, `TRON`/`TROFF`/`WAIT`/`INP`/`OUT` (accepted,
+no hardware), `BSAVE`/`BLOAD` (the simulated memory) and, in `QB.File`, `LOCK`/`UNLOCK` and `FILEATTR`.  Not supported: `VARPTR`/`CALL ABSOLUTE`, `CHAIN`, `IOCTL` and setting the date or time.
+
 ## Sound
 
 `SOUND`, `BEEP` and `PLAY` (in `QB.Multimedia`) make square-wave tones through SDL2 audio.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).

@@ -1,4 +1,4 @@
-Option Explicit On
+﻿Option Explicit On
 Option Strict On
 Option Infer On
 
@@ -16,9 +16,8 @@ Namespace Global.QB
     Private ReadOnly m_widths() As Integer
     Private ReadOnly m_offsets() As Integer
 
-    Friend Sub New(recordLength As Integer, widths() As Integer)
-      Buffer = New Byte(recordLength - 1) {}
-      Array.Fill(Buffer, CByte(32))
+    Friend Sub New(buffer() As Byte, widths() As Integer)
+      Me.Buffer = buffer
       m_widths = widths
       ReDim m_offsets(widths.Length - 1)
       Dim offset = 0

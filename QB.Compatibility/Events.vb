@@ -333,6 +333,26 @@ Namespace Global.QB
       End If
     End Sub
 
+    ''' <summary>KEY ON: shows the function key bar on the last line of a text screen.</summary>
+    Public Shared Sub KEY_ON()
+      Video.ShowKeyBar(True)
+    End Sub
+
+    ''' <summary>KEY OFF: hides the function key bar.</summary>
+    Public Shared Sub KEY_OFF()
+      Video.ShowKeyBar(False)
+    End Sub
+
+    ''' <summary>KEY LIST: prints the function key definitions.</summary>
+    Public Shared Sub KEY_LIST()
+      Video.ListSoftKeys()
+    End Sub
+
+    ''' <summary>KEY n, text: defines function key n (1 to 10).</summary>
+    Public Shared Sub KEY_SET(n As Integer, text As String)
+      Video.SetSoftKey(n, text)
+    End Sub
+
     ''' <summary>KEY(n) ON (n = 0 for all keys that have a handler).</summary>
     Public Shared Sub KEY_ON(n As Integer)
       SetKeyState(n, [On])
@@ -346,16 +366,6 @@ Namespace Global.QB
       SetKeyState(n, Suspended)
     End Sub
 
-    Private Shared Function LetterScan(letter As Char) As Integer
-      Dim row1 = "QWERTYUIOP".IndexOf(letter)
-      If row1 >= 0 Then Return &H10 + row1
-      Dim row2 = "ASDFGHJKL".IndexOf(letter)
-      If row2 >= 0 Then Return &H1E + row2
-      Dim row3 = "ZXCVBNM".IndexOf(letter)
-      If row3 >= 0 Then Return &H2C + row3
-      Return -1
-    End Function
-
     ' The keyboard flag and scan code of a key (as INKEY$ returns it), where it has one.
     Private Shared Function Decode(key As String, ByRef flags As Integer, ByRef scan As Integer) As Boolean
       If key.Length <> 1 Then Return False
@@ -367,9 +377,9 @@ Namespace Global.QB
         Case 9 : scan = &HF : Return True
         Case 8 : scan = &HE : Return True
         Case 32 : scan = &H39 : Return True
-        Case 1 To 26 : flags = 4 : scan = LetterScan(ChrW(c - 1 + AscW("A"c))) : Return True ' Ctrl+letter
-        Case AscW("a"c) To AscW("z"c) : scan = LetterScan(ChrW(c - 32)) : Return True
-        Case AscW("A"c) To AscW("Z"c) : flags = 1 : scan = LetterScan(ChrW(c)) : Return True
+        Case 1 To 26 : flags = 4 : scan = KeyCodec.LetterScan(ChrW(c - 1 + AscW("A"c))) : Return True ' Ctrl+letter
+        Case AscW("a"c) To AscW("z"c) : scan = KeyCodec.LetterScan(ChrW(c - 32)) : Return True
+        Case AscW("A"c) To AscW("Z"c) : flags = 1 : scan = KeyCodec.LetterScan(ChrW(c)) : Return True
         Case AscW("1"c) To AscW("9"c) : scan = 2 + c - AscW("1"c) : Return True
         Case AscW("0"c) : scan = 11 : Return True
       End Select

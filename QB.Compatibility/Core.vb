@@ -438,50 +438,74 @@ Namespace Global.QB
 
     ' Arrays and Data
 
+    ' ---- DATA, READ and RESTORE ---------------------------------------------------------------------
+    ' DATA is a statement in QBasic's program text; here the program lists its data with DATA(...) (calls run in order,
+    ' typically once at the start) and marks the places RESTORE can jump to with DATA_LABEL.
+
     Private Shared ReadOnly m_data As New List(Of String)
+    Private Shared ReadOnly m_dataLabels As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
     Private Shared m_dataIndex As Integer = 0
 
-    Public Shared Sub DATA(ParamArray values%())
+    ''' <summary>DATA item, item, ...: adds numbers and strings to the data READ reads (numbers are kept as text, as in a DATA line).</summary>
+    Public Shared Sub DATA(ParamArray values() As Object)
       For Each value In values
-        m_data.Add(value.ToString)
+        m_data.Add(Convert.ToString(value, Globalization.CultureInfo.InvariantCulture))
       Next
     End Sub
 
-    Public Shared Sub DATA(ParamArray values$())
-      For Each value In values$
-        m_data.Add(value)
-      Next
+    ''' <summary>A label in front of a DATA statement (<c>Pieces: DATA ...</c>): DATA_LABEL("Pieces") before the DATA(...) call; RESTORE("Pieces") returns to it.</summary>
+    Public Shared Sub DATA_LABEL(name$)
+      m_dataLabels(name) = m_data.Count
     End Sub
+
+    ''' <summary>RESTORE: READ starts again from the first DATA item.</summary>
+    Public Shared Sub RESTORE()
+      m_dataIndex = 0
+    End Sub
+
+    ''' <summary>RESTORE label: READ continues from the DATA item following DATA_LABEL(label).</summary>
+    Public Shared Sub RESTORE(label$)
+      Dim index As Integer
+      If Not m_dataLabels.TryGetValue(label, index) Then Throw New ArgumentException("Label not defined")
+      m_dataIndex = index
+    End Sub
+
+    Private Shared Function NextData() As String
+      If m_dataIndex >= m_data.Count Then QBError.Raise(4, "Out of DATA")
+      m_dataIndex += 1
+      Return m_data(m_dataIndex - 1)
+    End Function
+
+    Private Shared Function NextNumber() As Double
+      Dim d As Double
+      If Not Double.TryParse(NextData().Trim, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) Then
+        QBError.Raise(2, "Syntax error")
+      End If
+      Return d
+    End Function
 
     Public Shared Sub READ(ByRef value$)
-      If m_dataIndex < m_data.Count Then
-        value$ = m_data(m_dataIndex)
-        m_dataIndex += 1
-      Else
-        Throw New IndexOutOfRangeException()
-      End If
+      value = NextData()
+    End Sub
+
+    Public Shared Sub READ(ByRef value As Short)
+      value = CShort(Math.Round(NextNumber(), MidpointRounding.ToEven))
     End Sub
 
     Public Shared Sub READ(ByRef value%)
-      If m_dataIndex < m_data.Count Then
-        value = CInt(m_data(m_dataIndex))
-        m_dataIndex += 1
-      Else
-        Throw New IndexOutOfRangeException()
-      End If
+      value = CInt(Math.Round(NextNumber(), MidpointRounding.ToEven))
     End Sub
 
     Public Shared Sub READ(ByRef value&)
-      If m_dataIndex < m_data.Count Then
-        value = CLng(m_data(m_dataIndex))
-        m_dataIndex += 1
-      Else
-        Throw New IndexOutOfRangeException()
-      End If
+      value = CLng(Math.Round(NextNumber(), MidpointRounding.ToEven))
     End Sub
 
-    Public Shared Sub RESTORE()
-      m_dataIndex = 0
+    Public Shared Sub READ(ByRef value!)
+      value = CSng(NextNumber())
+    End Sub
+
+    Public Shared Sub READ(ByRef value#)
+      value = NextNumber()
     End Sub
 
     ' Math

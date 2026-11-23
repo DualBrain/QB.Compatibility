@@ -30,7 +30,12 @@ Namespace Global.QB
       Friend Column As Integer = 1       ' Print column, for TAB and print zones.
       Friend Width As Integer = 0        ' Line width for WIDTH #n (0 = no wrapping).
       Friend IsPrinter As Boolean        ' Opened on LPT1: to LPT3:.
-      Friend Field As FieldRecord        ' The FIELD buffer of a random file.
+      Friend ReadOnly Property IsKeyboard As Boolean  ' Opened on KYBD: (reading ahead past a CR would wait for another key).
+        Get
+          Return TypeOf Stream Is KeyboardStream
+        End Get
+      End Property
+      Friend RecordBuffer() As Byte      ' The FIELD buffer of a random file (shared by all its FIELD statements).
       Friend RecordLength As Integer = 128
       Friend NextRecord As Long = 1      ' Random files: the record the next GET or PUT uses.
       Friend LastRecord As Long = 0      ' Random files: the record last read or written.
@@ -68,7 +73,7 @@ Namespace Global.QB
           Return Stream.Position - If(m_peek >= 0, 1, 0)
         End Get
         Set(value As Long)
-          If Port IsNot Nothing Then Throw New IOException("Bad file mode")
+          If Port IsNot Nothing Then QBError.Raise(54, "Bad file mode")
           Stream.Position = value
           m_peek = -2
         End Set
@@ -88,19 +93,19 @@ Namespace Global.QB
 
     Private Shared Function GetEntry(filenum As Integer) As FileEntry
       Dim e As FileEntry = Nothing
-      If Not m_files.TryGetValue(filenum, e) Then Throw New ArgumentException("Bad file name or number")
+      If Not m_files.TryGetValue(filenum, e) Then QBError.Raise(52, "Bad file name or number")
       Return e
     End Function
 
     Private Shared Function ReadableEntry(filenum As Integer) As FileEntry
       Dim e = GetEntry(filenum)
-      If e.Mode = OpenMode.Output OrElse e.Mode = OpenMode.Append Then Throw New IOException("Bad file mode")
+      If e.Mode = OpenMode.Output OrElse e.Mode = OpenMode.Append Then QBError.Raise(54, "Bad file mode")
       Return e
     End Function
 
     Private Shared Function WritableEntry(filenum As Integer) As FileEntry
       Dim e = GetEntry(filenum)
-      If e.Mode = OpenMode.Input Then Throw New IOException("Bad file mode")
+      If e.Mode = OpenMode.Input Then QBError.Raise(54, "Bad file mode")
       Return e
     End Function
 
@@ -108,11 +113,26 @@ Namespace Global.QB
 
     Public Shared Sub OPEN(file$, accessMode As OpenMode, filenum%)
 
-      If filenum < 1 OrElse filenum > 255 Then Throw New ArgumentException("Bad file name or number")
-      If m_files.ContainsKey(filenum) Then Throw New IOException("File already open")
+      If filenum < 1 OrElse filenum > 255 Then QBError.Raise(52, "Bad file name or number")
+      If m_files.ContainsKey(filenum) Then QBError.Raise(55, "File already open")
+
+      ' The screen, keyboard and null devices (REMLINE.BAS opens "CON" for output).
+      Select Case file.ToUpperInvariant()
+        Case "CON", "CON:", "SCRN:", "CONS:"
+          If accessMode = OpenMode.Input Then QBError.Raise(54, "Bad file mode")
+          m_files.Add(filenum, New FileEntry(New ScreenStream, accessMode))
+          Return
+        Case "KYBD:"
+          If accessMode = OpenMode.Output OrElse accessMode = OpenMode.Append Then QBError.Raise(54, "Bad file mode")
+          m_files.Add(filenum, New FileEntry(New KeyboardStream, OpenMode.Input))
+          Return
+        Case "NUL", "NUL:"
+          m_files.Add(filenum, New FileEntry(Stream.Null, accessMode))
+          Return
+      End Select
 
       If IsLptSpec(file) Then
-        If accessMode = OpenMode.Input Then Throw New IOException("Bad file mode")
+        If accessMode = OpenMode.Input Then QBError.Raise(54, "Bad file mode")
         Dim printerEntry As New FileEntry(New PrinterStream, accessMode) With {.IsPrinter = True}
         m_files.Add(filenum, printerEntry)
         Return
@@ -131,25 +151,25 @@ Namespace Global.QB
         Return
       End If
 
-      Dim stream As FileStream
+      Dim fileStream As FileStream
       Select Case accessMode
         Case OpenMode.Input
-          stream = New FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
+          fileStream = New FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)
         Case OpenMode.Output
-          stream = New FileStream(file, FileMode.Create, FileAccess.Write, FileShare.Read)
+          fileStream = New FileStream(file, FileMode.Create, FileAccess.Write, FileShare.Read)
         Case OpenMode.Append
-          stream = New FileStream(file, FileMode.Append, FileAccess.Write, FileShare.Read)
+          fileStream = New FileStream(file, FileMode.Append, FileAccess.Write, FileShare.Read)
         Case Else ' Binary, Random
-          stream = New FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite)
+          fileStream = New FileStream(file, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite)
       End Select
 
-      m_files.Add(filenum, New FileEntry(stream, accessMode))
+      m_files.Add(filenum, New FileEntry(fileStream, accessMode))
 
     End Sub
 
     ''' <summary>OPEN with a record length (used for random files).</summary>
     Public Shared Sub OPEN(file$, accessMode As OpenMode, filenum%, recordLength%)
-      If recordLength < 1 Then Throw New ArgumentException("Bad record length")
+      If recordLength < 1 Then QBError.Raise(59, "Bad record length")
       OPEN(file, accessMode, filenum)
       m_files(filenum).RecordLength = recordLength
     End Sub
@@ -217,11 +237,37 @@ Namespace Global.QB
       Return Records.SizeOf(value)
     End Function
 
+    ''' <summary>LOCK #n [, record]: locks part of a file (nothing else shares the file here, so nothing happens).</summary>
+    Public Shared Sub LOCK(filenum%, Optional first As Long = -1, Optional last As Long = -1)
+      GetEntry(filenum)
+    End Sub
+
+    Public Shared Sub UNLOCK(filenum%, Optional first As Long = -1, Optional last As Long = -1)
+      GetEntry(filenum)
+    End Sub
+
+    ''' <summary>FILEATTR(n, 1): the mode a file was opened in (1 input, 2 output, 4 random, 8 append, 32 binary); FILEATTR(n, 2): a handle number.</summary>
+    Public Shared Function FILEATTR(filenum%, attribute%) As Integer
+      Dim e = GetEntry(filenum)
+      Select Case attribute
+        Case 1
+          Select Case e.Mode
+            Case OpenMode.Input : Return 1
+            Case OpenMode.Output : Return 2
+            Case OpenMode.Random : Return 4
+            Case OpenMode.Append : Return 8
+            Case Else : Return 32
+          End Select
+        Case 2 : Return filenum + 4
+        Case Else : Throw New ArgumentException("Illegal function call")
+      End Select
+    End Function
+
     Public Shared Function FREEFILE() As Integer
       For index = 1 To 255
         If Not m_files.ContainsKey(index) Then Return index
       Next
-      Throw New IOException("Too many files")
+      QBError.Raise(67, "Too many files")
     End Function
 
 #End Region
@@ -273,7 +319,7 @@ Namespace Global.QB
           Case "O" : parity = IO.Ports.Parity.Odd
           Case "S" : parity = IO.Ports.Parity.Space
           Case "M" : parity = IO.Ports.Parity.Mark
-          Case Else : Throw New ArgumentException("Bad file name")
+          Case Else : QBError.Raise(64, "Bad file name")
         End Select
       End If
       If options.Count > 2 AndAlso options(2) <> "" Then data = Integer.Parse(options(2), CultureInfo.InvariantCulture)
@@ -282,7 +328,7 @@ Namespace Global.QB
           Case "1" : stopBits = IO.Ports.StopBits.One
           Case "1.5" : stopBits = IO.Ports.StopBits.OnePointFive
           Case "2" : stopBits = IO.Ports.StopBits.Two
-          Case Else : Throw New ArgumentException("Bad file name")
+          Case Else : QBError.Raise(64, "Bad file name")
         End Select
       ElseIf baud <= 110 Then
         stopBits = IO.Ports.StopBits.Two
@@ -364,13 +410,13 @@ Namespace Global.QB
     ''' <summary>Reads a line (up to a CR LF, CR or LF).</summary>
     Friend Shared Sub LINE_INPUT(filenum%, ByRef value$)
       Dim e = ReadableEntry(filenum)
-      If e.PeekByte() = -1 Then Throw New EndOfStreamException("Input past end of file")
+      If e.PeekByte() = -1 Then QBError.Raise(62, "Input past end of file")
       Dim sb As New StringBuilder
       Do
         Dim b = e.ReadByte()
         If b = -1 OrElse b = 10 Then Exit Do
         If b = 13 Then
-          If e.PeekByte() = 10 Then e.ReadByte()
+          If Not e.IsKeyboard AndAlso e.PeekByte() = 10 Then e.ReadByte()
           Exit Do
         End If
         sb.Append(Cp437.ToChar(CByte(b)))
@@ -384,7 +430,7 @@ Namespace Global.QB
       Dim sb As New StringBuilder
       For i = 1 To n
         Dim b = e.ReadByte()
-        If b = -1 Then Throw New EndOfStreamException("Input past end of file")
+        If b = -1 Then QBError.Raise(62, "Input past end of file")
         sb.Append(Cp437.ToChar(CByte(b)))
       Next
       Return sb.ToString
@@ -397,7 +443,7 @@ Namespace Global.QB
       Do While b = 32 OrElse b = 9
         e.ReadByte() : b = e.PeekByte()
       Loop
-      If b = -1 Then Throw New EndOfStreamException("Input past end of file")
+      If b = -1 Then QBError.Raise(62, "Input past end of file")
 
       Dim sb As New StringBuilder
       If b = 34 Then
@@ -423,7 +469,7 @@ Namespace Global.QB
         e.ReadByte()
       ElseIf b = 13 Then
         e.ReadByte()
-        If e.PeekByte() = 10 Then e.ReadByte()
+        If Not e.IsKeyboard AndAlso e.PeekByte() = 10 Then e.ReadByte()
       ElseIf b = 10 Then
         e.ReadByte()
       End If
@@ -437,6 +483,22 @@ Namespace Global.QB
       Dim d As Double
       If Not Double.TryParse(field.Trim, NumberStyles.Float, CultureInfo.InvariantCulture, d) Then d = 0
       Return DirectCast(System.Convert.ChangeType(d, GetType(T), CultureInfo.InvariantCulture), T)
+    End Function
+
+    ' A field converted strictly: False when it isn't a valid number (or doesn't fit) for a numeric variable.
+    Friend Shared Function TryConvertField(Of T)(field As String, ByRef value As T) As Boolean
+      If GetType(T) Is GetType(String) Then
+        value = DirectCast(DirectCast(field, Object), T)
+        Return True
+      End If
+      Dim d As Double
+      If Not Double.TryParse(field.Trim, NumberStyles.Float, CultureInfo.InvariantCulture, d) Then Return False
+      Try
+        value = DirectCast(System.Convert.ChangeType(d, GetType(T), CultureInfo.InvariantCulture), T)
+        Return True
+      Catch ex As OverflowException
+        Return False
+      End Try
     End Function
 
     ''' <summary>Reads a value (String or any numeric type) from a file, as INPUT # does.</summary>
@@ -471,13 +533,13 @@ Namespace Global.QB
 
     Private Shared Function RecordEntry(filenum As Integer) As FileEntry
       Dim e = GetEntry(filenum)
-      If e.Mode <> OpenMode.Random AndAlso e.Mode <> OpenMode.Binary Then Throw New IOException("Bad file mode")
+      If e.Mode <> OpenMode.Random AndAlso e.Mode <> OpenMode.Binary Then QBError.Raise(54, "Bad file mode")
       Return e
     End Function
 
     ' Where a GET or PUT starts, and (random files) which record it is.
     Private Shared Function StartOf(e As FileEntry, hasPosition As Boolean, position As Long, ByRef record As Long) As Long
-      If hasPosition AndAlso position < 1 Then Throw New ArgumentException("Bad record number")
+      If hasPosition AndAlso position < 1 Then QBError.Raise(63, "Bad record number")
       If e.Mode = OpenMode.Random Then
         record = If(hasPosition, position, e.NextRecord)
         Return (record - 1) * e.RecordLength
@@ -489,11 +551,11 @@ Namespace Global.QB
 
       Dim e = RecordEntry(filenum)
       Dim size = Records.SizeOf(value)
-      If e.Mode = OpenMode.Random AndAlso size > e.RecordLength Then Throw New IOException("Bad record length")
+      If e.Mode = OpenMode.Random AndAlso size > e.RecordLength Then QBError.Raise(59, "Bad record length")
 
       Dim record As Long
       Dim start = StartOf(e, hasPosition, position, record)
-      If start >= e.Stream.Length AndAlso size > 0 Then Throw New EndOfStreamException("Input past end of file")
+      If start >= e.Stream.Length AndAlso size > 0 Then QBError.Raise(62, "Input past end of file")
 
       e.Position = start
       Dim buf(size - 1) As Byte
@@ -503,7 +565,7 @@ Namespace Global.QB
         If n = 0 Then Exit Do
         got += n
       Loop
-      If e.Mode = OpenMode.Binary AndAlso got < size Then Throw New EndOfStreamException("Input past end of file")
+      If e.Mode = OpenMode.Binary AndAlso got < size Then QBError.Raise(62, "Input past end of file")
 
       value = Records.FromBytes(buf, value)
 
@@ -517,7 +579,7 @@ Namespace Global.QB
 
       Dim e = RecordEntry(filenum)
       Dim bytes = Records.ToBytes(value)
-      If e.Mode = OpenMode.Random AndAlso bytes.Length > e.RecordLength Then Throw New IOException("Bad record length")
+      If e.Mode = OpenMode.Random AndAlso bytes.Length > e.RecordLength Then QBError.Raise(59, "Bad record length")
 
       Dim record As Long
       Dim start = StartOf(e, hasPosition, position, record)
@@ -540,30 +602,33 @@ Namespace Global.QB
     ''' <summary>FIELD #n, w1 AS a$, w2 AS b$ ...: splits the record buffer of a random file into fields (see <see cref="FieldRecord"/>).</summary>
     Public Shared Function FIELD(filenum%, ParamArray widths%()) As FieldRecord
       Dim e = GetEntry(filenum)
-      If e.Mode <> OpenMode.Random Then Throw New IOException("Bad file mode")
+      If e.Mode <> OpenMode.Random Then QBError.Raise(54, "Bad file mode")
       If widths.Length = 0 OrElse widths.Any(Function(w) w < 1) Then Throw New ArgumentException("Illegal function call")
-      If widths.Sum() > e.RecordLength Then Throw New IOException("Field overflow")
-      e.Field = New FieldRecord(e.RecordLength, widths)
-      Return e.Field
+      If widths.Sum() > e.RecordLength Then QBError.Raise(50, "FIELD overflow")
+      If e.RecordBuffer Is Nothing Then
+        e.RecordBuffer = New Byte(e.RecordLength - 1) {}
+        Array.Fill(e.RecordBuffer, CByte(32))
+      End If
+      Return New FieldRecord(e.RecordBuffer, widths)
     End Function
 
     Private Shared Function FieldEntry(filenum As Integer) As FileEntry
       Dim e = GetEntry(filenum)
-      If e.Mode <> OpenMode.Random Then Throw New IOException("Bad file mode")
-      If e.Field Is Nothing Then Throw New IOException("No FIELD for this file")
+      If e.Mode <> OpenMode.Random Then QBError.Raise(54, "Bad file mode")
+      If e.RecordBuffer Is Nothing Then QBError.Raise(54, "Bad file mode (no FIELD for this file)")
       Return e
     End Function
 
     ''' <summary>GET #n, record: reads a record into the FIELD buffer.</summary>
     Public Shared Sub GET_FIELD(filenum%, record As Long)
       Dim e = FieldEntry(filenum)
-      If record < 1 Then Throw New ArgumentException("Bad record number")
+      If record < 1 Then QBError.Raise(63, "Bad record number")
       Dim start = (record - 1) * e.RecordLength
-      If start >= e.Stream.Length Then Throw New EndOfStreamException("Input past end of file")
+      If start >= e.Stream.Length Then QBError.Raise(62, "Input past end of file")
       e.Position = start
       Dim got = 0
       Do While got < e.RecordLength
-        Dim n = e.Stream.Read(e.Field.Buffer, got, e.RecordLength - got)
+        Dim n = e.Stream.Read(e.RecordBuffer, got, e.RecordLength - got)
         If n = 0 Then Exit Do
         got += n
       Loop
@@ -578,9 +643,9 @@ Namespace Global.QB
     ''' <summary>PUT #n, record: writes the FIELD buffer as a record.</summary>
     Public Shared Sub PUT_FIELD(filenum%, record As Long)
       Dim e = FieldEntry(filenum)
-      If record < 1 Then Throw New ArgumentException("Bad record number")
+      If record < 1 Then QBError.Raise(63, "Bad record number")
       e.Position = (record - 1) * e.RecordLength
-      e.Stream.Write(e.Field.Buffer, 0, e.RecordLength)
+      e.Stream.Write(e.RecordBuffer, 0, e.RecordLength)
       e.LastRecord = record : e.NextRecord = record + 1
     End Sub
 
@@ -598,14 +663,14 @@ Namespace Global.QB
       Dim dir = Path.GetDirectoryName(filespec)
       If String.IsNullOrEmpty(dir) Then dir = "."
       Dim matches = Directory.GetFiles(dir, Path.GetFileName(filespec))
-      If matches.Length = 0 Then Throw New FileNotFoundException("File not found", filespec)
+      If matches.Length = 0 Then QBError.Raise(53, "File not found")
       For Each f In matches
         IO.File.Delete(f)
       Next
     End Sub
 
     Public Shared Sub NAME(oldfilespec$, newfilespec$)
-      If IO.File.Exists(newfilespec) Then Throw New IOException("File already exists")
+      If IO.File.Exists(newfilespec) Then QBError.Raise(58, "File already exists")
       IO.File.Move(oldfilespec, newfilespec)
     End Sub
 
