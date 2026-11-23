@@ -1,4 +1,4 @@
-# QB.Compatibility
+﻿# QB.Compatibility
 
 QuickBASIC 4.5 and QBasic Compatibility Library for Visual Basic (.NET).
 
@@ -11,3 +11,64 @@ Examples of projects that have been converted using the library:
 - REMLINE.BAS
 - NIBBLES.BAS
 - GORILLA.BAS
+
+## Platforms
+
+QB.Compatibility targets .NET 10 and runs on Windows and Linux (no WinForms).
+
+- Text mode (`QB.Console`) uses `System.Console`; Windows-only extras in `ConsoleEx` do nothing elsewhere.
+- Graphics (`QB.Video`) draw into an in-memory screen of palette indices (like VGA memory) that is shown in an SDL2 window, opened the first time something is drawn or `SCREEN` is called. SDL2 is bundled for Windows; on Linux install it (Debian/Ubuntu: `sudo apt install libsdl2-2.0-0`).
+- The window keeps the screen at 4:3 and leaves the OS screen saver enabled.
+- A different display can be plugged in through `QB.IDisplay` (`Video.Display = ...`); `HeadlessDisplay` is provided for tests.
+- See the `Example` project for a small program (`SCREEN 13`, `LINE`, `CIRCLE`, `PAINT`, `PRINT`).
+
+## Random-access files
+
+`OPEN(file, OpenMode.Random, n, LEN(record))`, then `PUT(n, record#, value)` and `[GET](n, record#, value)` (the record number may be left out: `PUT(n, value)`); `OpenMode.Binary` files use byte positions.  `SEEK`, `LOC` and `LOF` follow the file mode.  A value can be a number (a QBasic `INTEGER` is a VB `Short`, a `LONG` an `Integer`), a string (as it is), or a record (a QBasic `TYPE`).  A record is a Structure that implements `IFileRecord` (`WriteTo` and `ReadFrom`, using `RecordWriter.WriteString(value, length)` for fixed-length strings); this works everywhere, including AOT.  A Structure that doesn't implement it is read and written by reflection (strings need `<VBFixedString(n)>`), which doesn't work in a Native AOT build.
+
+## Native AOT
+
+The library and the examples can be compiled ahead of time, for example (`gcc` can stand in for `clang`; Windows needs the Visual Studio C++ tools):
+
+```bash
+dotnet publish Examples -c Release -r linux-x64 -p:PublishAot=true -p:CppCompilerAndLinker=gcc
+```
+
+The window, sound, files and all the examples work in that build.  Things that need reflection (records without `IFileRecord`) don't, and the examples are listed in `Examples/Registry.vb` rather than found by reflection for that reason: add a line there when adding an example.
+
+## Events, joysticks, the pen and serial ports
+
+**Events** (`QB.Events`): `ON_TIMER(5, AddressOf Tick) : TIMER_ON()`, `ON_KEY(n, AddressOf H) : KEY_ON(n)` (`KEY_DEFINE(15, &H4, &H1F)` for user keys),
+`ON_PLAY(n, ...) : PLAY_ON()`, `ON_STRIG(n, ...) : STRIG_ON(n)`, `ON_PEN(...) : PEN_ON()` and `ON_COM(n, ...) : COM_ON(n)`, each with `_OFF` and `_STOP`.
+A handler is a `Sub` with no arguments.  Handlers never interrupt the program from another thread: the event is noted when it happens and the handler runs, on
+the program's own thread, the next time the program calls into the library (drawing, `INKEY`, `SLEEP`, `PLAY`, ...) or `Events.Poll()`.  A loop that calls
+nothing from the library has to call `Poll()`.  While a handler runs its event is stopped, as in QBasic.  (`ON ERROR` is VB's own.)
+
+**Joysticks and the pen** (`QB.Devices`): `STICK(n)` (0 to 200, 100 is the center), `STRIG(n)` and `PEN(n)` read the first two joysticks SDL finds (A and B; button 0
+is the lower trigger, 1 the upper) and the mouse, which is the light pen (left button = pen switch; coordinates are screen pixels of the current mode).
+
+**Serial ports**: `OPEN("COM1:9600,N,8,1", OpenMode.Random, 1)` opens a port (`System.IO.Ports`; COM1 is `/dev/ttyS0` off Windows, and a device path such as
+`/dev/ttyUSB0:9600,N,8,1` works too).  `PRINT #`, `INPUT #`, `LINE INPUT #`, `INPUT$`, `EOF` (nothing waiting), `LOC` (bytes waiting), `LOF` (free transmit
+space) and `CLOSE` work on it.  The handshake and time-out options are accepted and ignored.
+
+## Sound
+
+`SOUND`, `BEEP` and `PLAY` (in `QB.Multimedia`) make square-wave tones through SDL2 audio.  `PLAY` understands the music macro language (notes, `O`, `<`, `>`, `N`, `L`, `P`, `T`, `MF`/`MB`, `MN`/`ML`/`MS`, dots, sharps and flats), `MB` plays in the background, and `PLAY(0)` returns the number of notes still waiting.  If there is no sound device the timing is kept silently.  `Multimedia.Audio` can be set to another `IAudioDevice` (`HeadlessAudio` records the tones for tests).
+
+## Examples
+
+The `Examples` project collects VB translations of the examples in the QBasic manual (https://qbasic.net/en/qb-manual/overview.htm), one file per statement in `Examples/Statements`.  Each file names the manual page it comes from and notes where VB differs (for example a QBasic `INTEGER` is a VB `Short`, `DIM` arrays start at 0, `;` becomes `&` or `PRINT(text, True)`).
+
+```bash
+dotnet run --project Examples                                   # list the examples
+dotnet run --project Examples -- CIRCLE                         # run one in a window
+dotnet run --project Examples -- --headless out                 # run them all without a window, saving out/NAME.ppm
+```
+
+File examples (`OPEN`, `WRITE #`, `INPUT #`, `LINE INPUT #`, ...) use `Imports QB.File` together with `Imports QB.Video`:
+`OPEN("LIST", OpenMode.Output, 1)`, `WRITE(1, name, age)`, `INPUT(1, rec1, rec2)`, `LINE_INPUT(1, rec)`, `CLOSE(1)`.  VB can't import one name from two
+classes, so the file-number forms of `PRINT`, `WRITE`, `INPUT`, `LINE_INPUT` and `INPUT$` are overloads in `QB.Video` (and `QB.Console`), while
+`OPEN`, `CLOSE`, `EOF`, `LOF`, `LOC`, `SEEK`, `FREEFILE`, `KILL`, `NAME`, `MKDIR`, `RMDIR` and `CHDIR` are in `QB.File`.  A comma after an `INPUT`
+prompt (no question mark) is `INPUT(prompt, value, False)`, and `INPUT;` (the cursor stays after the typing) adds a fourth argument: `INPUT(prompt, value, False, True)`; `LINE_INPUT(prompt, value, True)` is `LINE INPUT;`.  `FILES(spec)` lists a directory.  `INPUT$(n)` from the keyboard is `InputStr(n)` (VB can't overload it with `INPUT`); `INPUT$(n, #1)` is `INPUT$(n, 1)` or `InputStr(n, 1)`.
+
+To add one, copy a file in `Examples/Statements` (a module with a `Run` sub) and add a line for it to `Examples/Registry.vb`.

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- On Windows, launch as a GUI app so no console window appears. -->
+    <OutputType Condition="$([MSBuild]::IsOSPlatform('Windows'))">WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>
+    </RootNamespace>
+    <StartupObject>Examples.Program</StartupObject>
+    <OptionStrict>On</OptionStrict>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\QB.Compatibility\QB.Compatibility.vbproj" />
+  </ItemGroup>
+</Project>
