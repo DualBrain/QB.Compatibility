@@ -102,7 +102,11 @@ Namespace QB2VB
         End Try
       End If
       Dim d As Double
-      If t <> "" AndAlso Double.TryParse(t, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) Then Return t
+      If t <> "" AndAlso Double.TryParse(t, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) Then
+        ' (A number as VB writes it: no "1." or ".5".)
+        If t.IndexOfAny({"."c, "e"c, "E"c, "d"c, "D"c}) < 0 Then Return t
+        Return d.ToString("R", Globalization.CultureInfo.InvariantCulture)
+      End If
       Return ExprParser.Quote(t)
     End Function
 
@@ -176,12 +180,13 @@ Namespace QB2VB
           Return i + 1
 
         Case "CONST"
-          If m_curProc Is Nothing Then
-            m_hoisted.AddRange(HoistedConst(t))
-            Flush(m_target)
-            m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
-            Return i + 1
-          End If
+          ' (constants are program-wide here, so one declared inside a procedure is hoisted too)
+          For Each c In HoistedConst(t)
+            If Not m_hoisted.Contains(c) Then m_hoisted.Add(c)
+          Next
+          Flush(m_target)
+          m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
+          Return i + 1
 
         Case "DATA"
           Flush(m_target)
@@ -669,8 +674,10 @@ Namespace QB2VB
       For Each part In SplitTopLevel(t, p, t.Count)
         If part.Count = 0 Then Continue For
         Dim name = part(0).Text
+        If part(0).Kind <> TokKind.Ident Then Throw New ConvertException("this isn't a QBasic DIM: " & ChrW(34) & part(0).Text & ChrW(34) & " isn't a variable name")
         Dim q = 1
         Dim dims As New List(Of String)
+        Dim lowers As New List(Of Integer)
         Dim isArray = False
         If q < part.Count AndAlso part(q).Is_("(") Then
           isArray = True
@@ -684,6 +691,7 @@ Namespace QB2VB
           Loop
           For Each dimPart In SplitTopLevel(part, startDims, q - 1)
             dims.Add(DimBound(dimPart))
+            lowers.Add(LowerBoundOf(dimPart))
           Next
         End If
         Dim asType = QT.Unknown, userType = "", fixedLen = 0
@@ -699,10 +707,30 @@ Namespace QB2VB
             Continue For
           End If
         End If
+        ' A variable that a procedure SHAREs lives at module level: this DIM sizes it there instead of declaring a second one.
+        If Not hoist AndAlso m_curProc Is Nothing AndAlso keyword <> "ReDim" Then
+          Dim hasSfx As Boolean, bareName As String = ""
+          Dim mq = TypeOfName(name, hasSfx, bareName)
+          If asType <> QT.Unknown Then mq = asType
+          Dim mv As VarSym = Nothing
+          If m_module.Vars.TryGetValue(KeyOf(bareName, mq, isArray), mv) AndAlso mv.IsShared AndAlso Not mv.IsConst Then
+            If userType <> "" Then mv.UserType = userType
+            If fixedLen > 0 Then mv.FixedLen = fixedLen
+            If isArray Then
+              mv.Dims = String.Join(", ", dims) : mv.LowerBounds = lowers
+              If dims.Any(Function(d) Not Integer.TryParse(d, Nothing)) Then
+                mv.DeferRank = dims.Count
+                redims.Add(ExprParser.VarText(mv) & "(" & mv.Dims & ")")
+              End If
+              If mv.FixedLen > 0 Then fills.Add("FixedString.Fill(" & ExprParser.VarText(mv) & ", " & mv.FixedLen & ")")
+            End If
+            Continue For
+          End If
+        End If
         Dim v = DeclareVariable(m_scope, name, isArray, asType, userType)
         v.Declared = True
         If fixedLen > 0 Then v.FixedLen = fixedLen
-        If isArray Then v.Dims = String.Join(", ", dims)
+        If isArray Then v.Dims = String.Join(", ", dims) : v.LowerBounds = lowers
         ' GOSUB routines are lambdas at the top of the procedure: its locals must be declared there too, and sized where the DIM was.
         ' (The same for the program's own variables when GOSUB routines are procedures: they need module-level variables.)
         If ((m_curProc IsNot Nothing AndAlso m_procGosubTargets.Count > 0 AndAlso Not m_procStatic) OrElse (m_curProc Is Nothing AndAlso m_gosubTargets.Count > 0)) AndAlso Not hoist Then
@@ -737,6 +765,17 @@ Namespace QB2VB
       If items.Count > 0 Then result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & String.Join(", ", items))
       If hoist Then m_mainPrologue.AddRange(fills) Else result.AddRange(fills)
       Return String.Join(" : ", result)
+    End Function
+
+    ' The lower bound that a dimension was declared with (0 when it is only n, or isn't a number that is known).
+    Private Function LowerBoundOf(toks As List(Of Token)) As Integer
+      Dim toIdx = -1
+      For k = 0 To toks.Count - 1
+        If toks(k).IsWord("TO") Then toIdx = k : Exit For
+      Next
+      If toIdx < 0 Then Return 0
+      Dim lo = New ExprParser(toks.GetRange(0, toIdx), 0, Me).ParseExpr()
+      Return If(lo.IsLiteral, CInt(lo.LiteralValue), 0)
     End Function
 
     ' One dimension: "n" or "lo TO hi" (the array keeps a spare element when the lower bound is above 0).

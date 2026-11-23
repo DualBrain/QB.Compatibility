@@ -159,7 +159,24 @@ Namespace QB2VB
         Dim qty = TypeOfName(name, hasSuffix, bare)
         Dim key = KeyOf(bare, qty, isArray)
         Dim v As VarSym = Nothing
-        If m_main.Vars.TryGetValue(key, v) Then
+        If Not m_main.Vars.TryGetValue(key, v) AndAlso Not hasSuffix Then
+          ' (a variable declared AS some TYPE or STRING * n is keyed by that type, not by the default one)
+          For Each kv In m_main.Vars
+            If kv.Value.QbName.Equals(bare, StringComparison.OrdinalIgnoreCase) AndAlso kv.Value.IsArray = isArray AndAlso kv.Value.DeclaredAs Then
+              key = kv.Key : v = kv.Value
+              Exit For
+            End If
+          Next
+        End If
+        If v Is Nothing AndAlso Not hasSuffix AndAlso Not m_module.Vars.ContainsKey(key) Then
+          For Each kv In m_module.Vars
+            If kv.Value.QbName.Equals(bare, StringComparison.OrdinalIgnoreCase) AndAlso kv.Value.IsArray = isArray AndAlso kv.Value.DeclaredAs Then
+              key = kv.Key
+              Exit For
+            End If
+          Next
+        End If
+        If v IsNot Nothing Then
           m_main.Vars.Remove(key)
           m_main.Locals.Remove(v)
           m_module.Vars(key) = v

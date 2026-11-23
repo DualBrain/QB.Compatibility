@@ -112,6 +112,7 @@ Namespace QB2VB
     Public UserType As String = ""
     Public Dims As String = ""           ' for implicit arrays: the bounds text
     Public FixedLen As Integer           ' STRING * n
+    Public LowerBounds As New List(Of Integer)   ' of an array declared with lo TO hi: lo for each dimension (what LBOUND returns)
     Public DeferRank As Integer          ' an array whose DIM is in a procedure with GOSUB routines: declared at the top without bounds, sized by ReDim where the DIM was
     Public FieldVar As String = ""       ' a FIELD variable: the FieldRecord that holds it, and its index in it
     Public FieldIndex As Integer

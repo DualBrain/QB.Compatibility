@@ -111,7 +111,7 @@ Namespace QB2VB
     End Function
 
     Private Function ChooseVbName(bare As String, qty As QT, hasSuffix As Boolean, scope As Scope) As String
-      Dim n = bare
+      Dim n = bare.Replace("."c, "_"c)    ' (QBasic names may have dots; VB's can't)
       If Keywords.IsVbReserved(n) OrElse s_shadowRisk.Contains(n) OrElse m_procs.ContainsKey(n) Then
         n = If(hasSuffix OrElse s_shadowRisk.Contains(n) OrElse m_procs.ContainsKey(n), n & "_", "[" & n & "]")
       End If
@@ -223,10 +223,19 @@ Namespace QB2VB
       ' A record member: rec.field.
       Dim dot = name.IndexOf("."c)
       If dot > 0 Then
-        Dim recName = name.Substring(0, dot)
-        Dim rv = FindRecord(recName)
+        Dim parts = name.Split("."c)
+        Dim rv = FindRecord(parts(0))
         If rv IsNot Nothing Then
-          Dim fieldType = FieldTypeOf(rv, name.Substring(dot + 1))
+          ' rec.field, and a field of a field (rec.inner.field).
+          Dim userType = rv.UserType, vbName = rv.VbName, fieldType = QT.Unknown, found = True
+          For k = 1 To parts.Length - 1
+            Dim fq As QT, fut As String = ""
+            If Not FieldOfCore(userType, parts(k), fq, fut) Then found = False : Exit For
+            vbName &= "." & ExprParser.FieldName(parts(k))
+            fieldType = fq : userType = fut
+          Next
+          If found Then Return New VarSym With {.QbName = name, .Qt = fieldType, .VbName = vbName, .HasSuffix = False, .UserType = userType}
+          fieldType = FieldTypeOf(rv, name.Substring(dot + 1))
           Return New VarSym With {.QbName = name, .Qt = fieldType, .VbName = rv.VbName & "." & ExprParser.FieldName(name.Substring(dot + 1)), .HasSuffix = False}
         End If
       End If

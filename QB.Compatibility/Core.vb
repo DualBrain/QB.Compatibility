@@ -43,6 +43,13 @@ Namespace Global.QB
       value2 = temp
     End Sub
 
+    ''' <summary>Swaps two records (variables of a TYPE).</summary>
+    Public Shared Sub SWAP(Of T As Structure)(ByRef value1 As T, ByRef value2 As T)
+      Dim temp = value1
+      value1 = value2
+      value2 = temp
+    End Sub
+
 #End Region
 
 

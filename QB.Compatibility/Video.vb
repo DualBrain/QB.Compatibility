@@ -2954,6 +2954,10 @@ allplotted:
       Loop
     End Sub
 
+    Public Shared Sub INPUT(ByRef value As Short)
+      INPUT("", value)
+    End Sub
+
     Public Shared Sub INPUT(ByRef value%)
       INPUT("", value)
     End Sub

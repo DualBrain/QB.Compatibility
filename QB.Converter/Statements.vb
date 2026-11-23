@@ -174,6 +174,7 @@ Namespace QB2VB
             Throw New ConvertException("this form of DEF isn't converted yet")
 
           Case "VIEW"
+            If n = 1 Then Return "VIEW()"
             If n >= 2 AndAlso t(s + 1).IsWord("SCREEN") Then Return ViewWindowStatement("VIEW_SCREEN", t, s, e, 2)
             If n >= 2 AndAlso Not t(s + 1).IsWord("PRINT") Then Return ViewWindowStatement("VIEW", t, s, e)
             If n >= 2 AndAlso t(s + 1).IsWord("PRINT") Then
@@ -328,6 +329,16 @@ Namespace QB2VB
           Case "CLOSE"
             If n = 1 Then Return "CLOSE()"
             Return "CLOSE(" & ArgList(t, s + 1, e) & ")"
+
+          Case "ERASE"
+            Dim erased As New List(Of String)
+            For Each part In SplitTopLevel(t, s + 1, e)
+              If part.Count = 0 Then Continue For
+              Dim v = ResolveVariableCore(part(0).Text, True)
+              erased.Add("Array.Clear(" & ExprParser.VarText(v) & ", 0, " & ExprParser.VarText(v) & ".Length)")
+              If v.FixedLen > 0 Then erased.Add("FixedString.Fill(" & ExprParser.VarText(v) & ", " & v.FixedLen & ")")
+            Next
+            Return String.Join(" : ", erased)
 
           Case "NAME"
             Dim asIdx = FindWord(t, s, e, "AS")
@@ -743,6 +754,7 @@ Namespace QB2VB
       If tail(2) = "&HFFFF" Then tail.RemoveAt(2)
       If tail.Count = 1 AndAlso tail(0) = "-1" Then tail.Clear()
       If tail.Count = 2 AndAlso tail(1) = "LineOption.None" Then tail.RemoveAt(1) : If tail(0) = "-1" Then tail.Clear()
+      If Not hasFirst AndAlso Not st2 AndAlso tail.Count > 0 Then args.Insert(0, "False")   ' (LINE -(x, y), color: the overload that takes the STEP flag)
       args.AddRange(tail)
       Return "LINE(" & String.Join(", ", args) & ")"
     End Function
@@ -870,7 +882,13 @@ Namespace QB2VB
       If Not ParseCoord(t, p, e, st, x1, y1) OrElse p >= e OrElse Not t(p).Is_("-") Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
       p += 1
       If Not ParseCoord(t, p, e, st, x2, y2) Then Throw New ConvertException(name & " needs (x1, y1)-(x2, y2)")
-      Dim args As New List(Of String) From {x1, y1, x2, y2}
+      Dim args As New List(Of String)
+      If name.StartsWith("VIEW", StringComparison.Ordinal) Then
+        ' (VIEW takes whole numbers.)
+        args.AddRange({WholeNumber(x1), WholeNumber(y1), WholeNumber(x2), WholeNumber(y2)})
+      Else
+        args.AddRange({x1, y1, x2, y2})
+      End If
       If name.StartsWith("VIEW", StringComparison.Ordinal) Then
         Dim parts = TailParts(t, p, e)
         If parts.Count > 0 Then args.Add(IntText(TailExpr(parts, 0)))
@@ -896,6 +914,11 @@ Namespace QB2VB
       If m_curProc IsNot Nothing AndAlso Not m_procGosubTargets.Contains(label) Then Throw New ConvertException("GOSUB to a label outside the procedure")
       Dim routine = If(m_curProc IsNot Nothing, GosubName(label), "AddressOf " & GosubName(label))
       Return "ON_" & kind & "(" & If(arg <> "", arg & ", ", "") & routine & ")"
+    End Function
+
+    Private Shared Function WholeNumber(text As String) As String
+      Dim n As Integer
+      Return If(Integer.TryParse(text, n), text, "CInt(" & text & ")")
     End Function
 
     ' DEF FNname (params) = expression: a function, with its parameters by value.
@@ -1091,9 +1114,31 @@ Namespace QB2VB
       Return "LINE_INPUT(" & String.Join(", ", args) & ")" & If(v.FixedLen > 0, " : " & FitStatement(v), "")
     End Function
 
+    ' OPEN "I", #1, "file" [, record length]: the old form, with the mode as a letter.
+    Private Function OldOpenStatement(t As List(Of Token), s As Integer, e As Integer) As String
+      Dim parts = SplitTopLevel(t, s + 1, e)
+      If parts.Count < 3 OrElse parts(0).Count <> 1 OrElse parts(0)(0).Kind <> TokKind.String Then Throw New ConvertException("this form of OPEN isn't converted yet")
+      Dim mode As String
+      Select Case parts(0)(0).Text.ToUpperInvariant()
+        Case "I" : mode = "OpenMode.Input"
+        Case "O" : mode = "OpenMode.Output"
+        Case "A" : mode = "OpenMode.Append"
+        Case "R" : mode = "OpenMode.Random"
+        Case "B" : mode = "OpenMode.Binary"
+        Case Else : Throw New ConvertException("OPEN mode " & parts(0)(0).Text)
+      End Select
+      Dim numTokens = parts(1)
+      If numTokens.Count > 0 AndAlso numTokens(0).Is_("#") Then numTokens = numTokens.GetRange(1, numTokens.Count - 1)
+      Dim num = ExprParser.Coerce(Expr(numTokens, 0, numTokens.Count), QT.Long)
+      Dim fileName = Expr(parts(2), 0, parts(2).Count).Text
+      Dim extra = If(parts.Count > 3 AndAlso parts(3).Count > 0, ", " & ExprParser.Coerce(Expr(parts(3), 0, parts(3).Count), QT.Long), "")
+      Return "OPEN(" & fileName & ", " & mode & ", " & num & extra & ")"
+    End Function
+
     Private Function OpenStatement(t As List(Of Token), s As Integer, e As Integer) As String
       Dim forIdx = FindWord(t, s, e, "FOR")
       Dim asIdx = FindWord(t, s, e, "AS")
+      If forIdx < 0 AndAlso asIdx < 0 Then Return OldOpenStatement(t, s, e)
       If forIdx < 0 OrElse asIdx < 0 Then Throw New ConvertException("this form of OPEN isn't converted yet")
       Dim fileName = Expr(t, s + 1, forIdx).Text
       If System.Text.RegularExpressions.Regex.IsMatch(fileName, "^\s*""(COM[0-9]|/dev/)", System.Text.RegularExpressions.RegexOptions.IgnoreCase) Then m_usesSerial = True

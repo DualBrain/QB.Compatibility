@@ -256,8 +256,15 @@ Namespace QB2VB
       Return ParseComparison()
     End Function
 
+    ' QBasic's AND, OR, XOR, NOT, \ and MOD round floating point operands to integers first; VB wants integers.
+    Private Shared Function Integral(e As E) As E
+      If Types.Rank(e.Vb) > Types.Rank(QT.Long) Then Return New E("CInt(" & e.Text & ")", QT.Long, QT.Long, True)
+      Return e
+    End Function
+
     Private Shared Function Not_(e As E) As E
       Dim isBool = e.Qt = QT.Bool OrElse e.Vb = QT.Bool
+      If Not isBool Then e = Integral(e)
       Dim t = If(isBool, QT.Bool, e.Qt)
       Dim v = If(isBool, QT.Bool, e.Vb)
       Return New E("Not " & Paren(e), t, v, False)
@@ -269,7 +276,7 @@ Namespace QB2VB
       If lb AndAlso rb Then
         Return New E(Paren(l) & " " & op & " " & Paren(r), QT.Bool, QT.Bool, False)
       End If
-      Dim a = Numeric(l), b = Numeric(r)
+      Dim a = Integral(Numeric(l)), b = Integral(Numeric(r))
       Dim t = Types.Wider(If(Types.Rank(a.Qt) >= 0, a.Qt, QT.Short), If(Types.Rank(b.Qt) >= 0, b.Qt, QT.Short))
       Dim v = Types.Wider(If(Types.Rank(a.Vb) >= 0, a.Vb, QT.Short), If(Types.Rank(b.Vb) >= 0, b.Vb, QT.Short))
       Return New E(Paren(a) & " " & op & " " & Paren(b), t, v, False)
@@ -333,9 +340,9 @@ Namespace QB2VB
     Private Shared Function Arith(op As String, l As E, r As E) As E
       Dim a = Numeric(l), b = Numeric(r)
       ' QBasic's MOD rounds its operands to integers first (VB's Mod works on the floating point numbers).
-      If op = "Mod" Then
-        If Types.Rank(a.Vb) > Types.Rank(QT.Long) Then a = New E("CInt(" & a.Text & ")", QT.Long, QT.Long, True)
-        If Types.Rank(b.Vb) > Types.Rank(QT.Long) Then b = New E("CInt(" & b.Text & ")", QT.Long, QT.Long, True)
+      If op = "Mod" OrElse op = "\" Then
+        a = Integral(a)
+        b = Integral(b)
       End If
       If a.Qt = QT.String OrElse b.Qt = QT.String Then
         ' String concatenation.
@@ -478,7 +485,12 @@ Namespace QB2VB
           e.IsLiteral = True : e.LiteralValue = num
           Return e
         Case Else
-          ' SINGLE: a VB literal with a decimal point is Double, so say Single.
+          ' SINGLE: a VB literal with a decimal point is Double, so say Single.  (One too big for a Single is a Double.)
+          If Math.Abs(num) > 3.4028234663852886E+38 Then
+            Dim big = New E(body & "#", QT.Double, QT.Double, True)
+            big.IsLiteral = True : big.LiteralValue = num
+            Return big
+          End If
           Dim e = New E(body & "!", QT.Single, QT.Single, True)
           e.IsLiteral = True : e.LiteralValue = num
           Return e
@@ -486,9 +498,35 @@ Namespace QB2VB
     End Function
 
     ' A name: a variable, an array element, a function call.
+    ' LBOUND(array[, dimension]) and UBOUND(array[, dimension]): the array is named, without parentheses.
+    Private Function ParseBound(isLower As Boolean) As E
+      m_pos += 1                        ' (
+      Dim arrayTok = Cur
+      m_pos += 1
+      Dim v = m_ctx.ResolveVariable(arrayTok.Text, True)
+      Dim dimension As E = Nothing
+      If Cur IsNot Nothing AndAlso Cur.Is_(",") Then
+        m_pos += 1
+        dimension = ParseExpr()
+      End If
+      Expect(")")
+      Dim d = If(dimension Is Nothing, 1, If(dimension.IsLiteral, CInt(dimension.LiteralValue), 0))
+      If isLower AndAlso d >= 1 AndAlso d <= v.LowerBounds.Count Then
+        Dim lit = New E(v.LowerBounds(d - 1).ToString(CultureInfo.InvariantCulture), QT.Long, QT.Long, True)
+        lit.IsLiteral = True : lit.LiteralValue = v.LowerBounds(d - 1)
+        Return lit
+      End If
+      Dim text = If(isLower, "LBound(", "UBound(") & VarText(v) & If(dimension IsNot Nothing, ", " & Coerce(dimension, QT.Long), "") & ")"
+      Return New E(text, QT.Long, QT.Long, True)
+    End Function
+
     Private Function ParseName() As E
 
       Dim nameTok = Cur
+      If (nameTok.IsWord("LBOUND") OrElse nameTok.IsWord("UBOUND")) AndAlso m_pos + 1 < m_toks.Count AndAlso m_toks(m_pos + 1).Is_("(") Then
+        m_pos += 1
+        Return ParseBound(nameTok.IsWord("LBOUND"))
+      End If
       m_pos += 1
       Dim name = nameTok.Text
       Dim hasParen = Cur IsNot Nothing AndAlso Cur.Is_("(")
@@ -567,7 +605,7 @@ Namespace QB2VB
         End Select
         ' Arguments that VB wants as Integer.
         Select Case upper
-          Case "SPACE$", "LEFT$", "RIGHT$", "CHR$", "STRING$", "MID$", "TAB", "SPC", "INSTR", "INPUT$"
+          Case "SPACE$", "LEFT$", "RIGHT$", "CHR$", "STRING$", "MID$", "TAB", "SPC", "INSTR", "INPUT$", "EOF", "LOF", "LOC", "SEEK"
             For i = 0 To texts.Count - 1
               If args(i).Qt <> QT.String Then texts(i) = Coerce(args(i), QT.Long)
             Next
@@ -610,7 +648,11 @@ Namespace QB2VB
 
     Private Shared Function TypeOfLibrary(name As String, upper As String) As QT
       If name.EndsWith("$", StringComparison.Ordinal) Then Return QT.String
-      If Builtins.NumericLibrary.Contains(upper) Then Return QT.Short
+      Select Case upper
+        Case "PMAP", "CVDMBF" : Return QT.Double
+        Case "CVSMBF" : Return QT.Single
+        Case "FRE", "LPOS", "FILEATTR" : Return QT.Long
+      End Select
       Return QT.Short
     End Function
 
@@ -642,6 +684,7 @@ Namespace QB2VB
 
     Friend Shared Function ProcName(p As ProcSym) As String
       Dim n = p.QbName
+      If n.Equals("Main", StringComparison.OrdinalIgnoreCase) Then n = "Main_"   ' (the program's own entry point is Main)
       If Keywords.IsVbReserved(n) Then n = If(p.HasSuffix, n & "_", "[" & n & "]")
       Return n & If(p.HasSuffix, Types.VbSuffix(p.RetQt), "")
     End Function

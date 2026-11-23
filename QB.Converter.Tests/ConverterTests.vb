@@ -420,6 +420,61 @@ Namespace QB2VB.Tests
     End Sub
 
     <Fact>
+    Public Sub LBoundAndUBoundNameTheArray()
+      Dim vb = Convert("DIM a(1 TO 10)" & vbLf & "FOR i% = LBOUND(a) TO UBOUND(a)" & vbLf & "NEXT")
+      Assert.Contains("For i = 1 To CShort(UBound(a))", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors & vbLf & vb)
+    End Sub
+
+    <Fact>
+    Public Sub FloatingPointOperandsOfIntegerOperatorsAreRounded()
+      Dim m = Main("x = 7.5" & vbLf & "a = x AND 3" & vbLf & "b = NOT x" & vbLf & "c = x \ 2")
+      Dim text = String.Join(vbLf, m)
+      Assert.Contains("CInt(x) And 3", text)
+      Assert.Contains("Not CInt(x)", text)
+      Assert.Contains("CInt(x) \ 2", text)
+    End Sub
+
+    <Fact>
+    Public Sub FieldsOfFieldsAndDottedNamesWork()
+      Dim vb = Convert("TYPE A" & vbLf & "n AS INTEGER" & vbLf & "END TYPE" & vbLf & "TYPE B" & vbLf & "inner AS A" & vbLf & "END TYPE" & vbLf & "DIM r AS B" & vbLf & "r.inner.n = 3" & vbLf & "my.var = r.inner.n")
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors & vbLf & vb)
+      Assert.Contains("my_var", vb)
+    End Sub
+
+    <Fact>
+    Public Sub AUserSubNamedMainDoesNotClashWithTheEntryPoint()
+      Dim vb = Convert("DECLARE SUB Main ()" & vbLf & "Main" & vbLf & "SUB Main" & vbLf & "PRINT 1" & vbLf & "END SUB")
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors & vbLf & vb)
+    End Sub
+
+    <Fact>
+    Public Sub TheOldFormOfOpenAndEraseAreConverted()
+      Dim m = Main("OPEN ""I"", #1, ""f.txt""" & vbLf & "OPEN ""R"", 2, ""g"", 20" & vbLf & "DIM a(5)" & vbLf & "ERASE a")
+      Dim text = String.Join(vbLf, m)
+      Assert.Contains("OPEN(""f.txt"", OpenMode.Input, 1)", text)
+      Assert.Contains("OPEN(""g"", OpenMode.Random, 2, 20)", text)
+      Assert.Contains("Array.Clear(a, 0, a.Length)", text)
+    End Sub
+
+    <Fact>
+    Public Sub DataNumbersAreWrittenTheWayVBReadsThem()
+      Dim vb = Convert("READ a, b, c" & vbLf & "DATA 1., .5, -2.25e2")
+      Assert.Contains("DATA(1, 0.5, -225)", vb)
+    End Sub
+
+    <Fact>
+    Public Sub FileNumberFunctionsAndViewTakeWholeNumbers()
+      Dim m = Main("f = FREEFILE" & vbLf & "x = EOF(f)" & vbLf & "w = 254" & vbLf & "VIEW (0, 0)-(w / 2, 10)")
+      Dim text = String.Join(vbLf, m)
+      Assert.Contains("EOF(CInt(f))", text)
+      Assert.Contains("VIEW(0, 0, CInt(w / 2), 10)", text)
+    End Sub
+
+    <Fact>
     Public Sub TheProjectReferencesTheSdlAssemblyOnlyWhenNeeded()
       Dim text = Program.ProjectText("T", "T.vb", "/work/T", "/lib", False, False, False)
       Assert.Contains("QB.Compatibility.vbproj", text)
@@ -468,6 +523,34 @@ Namespace QB2VB.Tests
     Public Sub ControlZEndsTheSource()
       Dim m = Main("PRINT 1" & vbLf & ChrW(26) & "garbage ((")
       Assert.Equal({"PRINT(Str$(1) & "" "")"}, m)
+    End Sub
+
+    <Fact>
+    Public Sub SharedRecordArraysAndDimmedSharedNamesCompile()
+      Dim src = "TYPE MT" & vbLf & "  Number AS INTEGER" & vbLf & "END TYPE" & vbLf &
+                "DEFINT A-Z" & vbLf & "DECLARE SUB S (K)" & vbLf &
+                "DIM MD(1 TO 12) AS MT, Name$, Cnt%" & vbLf & "S 2" & vbLf &
+                "SUB S (K) STATIC" & vbLf & "  SHARED MD() AS MT, Name$, Cnt%" & vbLf &
+                "  MD(K).Number = 3 : Name$ = ""x"" : Cnt% = Cnt% + MD(K).Number" & vbLf & "  SWAP MD(1), MD(2)" & vbLf & "END SUB"
+      Dim vb = Convert(src)
+      Assert.DoesNotContain("Name_Str", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub ConstantsInsideProceduresAreDeclared()
+      Dim vb = Convert("DECLARE SUB S ()" & vbLf & "S" & vbLf & "SUB S" & vbLf & "  CONST A = 8, B = 80 \ A" & vbLf & "  PRINT A; B" & vbLf & "END SUB")
+      Assert.Contains("Const A As Short = 8", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub LineFromTheLastPointWithAColorAndBareViewCompile()
+      Dim vb = Convert("SCREEN 12" & vbLf & "VIEW" & vbLf & "LINE -(10, 10), (3 - 1)" & vbLf & "X = PMAP(5, 0)")
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
     End Sub
 
     <Fact>
