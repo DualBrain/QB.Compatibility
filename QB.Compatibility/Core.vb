@@ -240,7 +240,9 @@ Namespace Global.QB
 
       '┘ └ ┌ ┐ ─ │ ├ ├ ╟ ╙ ╓ ╥ ╨ ┬ ┴ ║ ┤
 
-      'Return ChrW(value%)
+      ' The control characters (0 to 31) are the characters themselves, so that CHR$(9), CHR$(13) and the like compare equal to
+      ' text read from files and typed in; the screen draws their code page 437 pictures (smileys and so on) all the same.
+      If value% >= 0 AndAlso value% < 32 Then Return ChrW(value%)
 
       Select Case value%
 

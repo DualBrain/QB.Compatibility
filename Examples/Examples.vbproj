@@ -7,6 +7,8 @@
     <RootNamespace>
     </RootNamespace>
     <StartupObject>Examples.Program</StartupObject>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
     <OptionStrict>On</OptionStrict>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>

@@ -1,0 +1,483 @@
+Option Explicit On
+Option Strict On
+Option Infer On
+
+Imports System.Text
+
+Namespace QB2VB
+
+  Partial Friend Class Converter
+
+    ' ---- Pass 2: the lines ---------------------------------------------------------------------------------
+
+    Private Function VbComment(comment As String) As String
+      If comment.StartsWith("'", StringComparison.Ordinal) Then Return comment
+      If comment.StartsWith("REM", StringComparison.OrdinalIgnoreCase) Then Return "'" & comment.Substring(3)
+      Return "' " & comment
+    End Function
+
+    Private Sub Pass2()
+
+      EmitData()
+
+      Dim i = 0
+      Do While i < m_lines.Count
+        m_currentLine = m_lines(i).Number
+        Try
+          i = EmitLine(i)
+        Catch ex As ConvertException
+          Todo(m_lines(i), ex.Message)
+          i += 1
+        End Try
+      Loop
+
+      FinishModule()
+
+    End Sub
+
+    Private Sub Todo(ln As SourceLine, message As String)
+      Note(message)
+      Flush(m_target)
+      m_target.Add(ln.Indent & "' TODO(QB2VB): " & message & ":")
+      m_target.Add(ln.Indent & "'   " & ln.Raw.Trim())
+    End Sub
+
+    ' The DATA statements, at the start of the program, in order (QBasic's DATA is static; a label becomes DATA_LABEL).
+    Private Sub EmitData()
+      For Each idx In m_dataLines
+        Dim ln = m_lines(idx)
+        Dim back = idx - 1
+        Dim labels As New List(Of String)
+        Do While back >= 0 AndAlso (m_lines(back).IsBlank OrElse m_lines(back).IsCommentOnly OrElse (m_lines(back).Tokens.Count = 0 AndAlso (m_lines(back).Label <> "" OrElse m_lines(back).LineNumber <> "")))
+          If m_lines(back).Label <> "" Then labels.Insert(0, m_lines(back).Label)
+          If m_lines(back).LineNumber <> "" Then labels.Insert(0, m_lines(back).LineNumber)
+          back -= 1
+        Loop
+        For Each l In labels
+          m_mainLines.Add("DATA_LABEL(" & ExprParser.Quote(l) & ")")
+        Next
+        If ln.Label <> "" Then m_mainLines.Add("DATA_LABEL(" & ExprParser.Quote(ln.Label) & ")")
+        If ln.LineNumber <> "" Then m_mainLines.Add("DATA_LABEL(" & ExprParser.Quote(ln.LineNumber) & ")")
+        Dim raw = ln.Raw
+        Dim p = raw.IndexOf("DATA", StringComparison.OrdinalIgnoreCase)
+        Dim body = raw.Substring(p + 4)
+        ' Items: separated by commas outside quotes; a ' outside quotes starts a comment.
+        Dim items As New List(Of String)
+        Dim sb As New StringBuilder
+        Dim inQ = False
+        Dim quotedItem = False
+        For Each c In body
+          If c = """"c Then
+            inQ = Not inQ : quotedItem = True
+          ElseIf c = "'"c AndAlso Not inQ Then
+            Exit For
+          ElseIf c = ","c AndAlso Not inQ Then
+            items.Add(DataItem(sb.ToString, quotedItem)) : sb.Clear() : quotedItem = False
+          Else
+            sb.Append(c)
+          End If
+        Next
+        items.Add(DataItem(sb.ToString, quotedItem))
+        m_mainLines.Add("DATA(" & String.Join(", ", items) & ")")
+      Next
+      If m_dataLines.Count > 0 Then m_mainLines.Add("")
+    End Sub
+
+    Private Shared Function DataItem(text As String, quoted As Boolean) As String
+      Dim t = text.Trim()
+      If quoted Then
+        If t.Length >= 2 AndAlso t.StartsWith(""", StringComparison.Ordinal) AndAlso t.EndsWith(""", StringComparison.Ordinal) Then t = t.Substring(1, t.Length - 2)
+        Return ExprParser.Quote(t)
+      End If
+      Dim d As Double
+      If t <> "" AndAlso Double.TryParse(t, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) Then Return t
+      Return ExprParser.Quote(t)
+    End Function
+
+    ''' <summary>Converts the line at <paramref name="i"/>; returns the index of the next line to convert.</summary>
+    Private Function EmitLine(i As Integer) As Integer
+
+      Dim ln = m_lines(i)
+
+      If ln.IsBlank Then
+        m_pending.Add("")
+        Return i + 1
+      End If
+      If ln.IsCommentOnly Then
+        m_pending.Add(ln.Indent & VbComment(ln.Comment))
+        Return i + 1
+      End If
+
+      Dim t = ln.Tokens
+      Dim first = If(t.Count > 0, t(0).Upper(), "")
+      Dim labelPrefix = If(ln.Label <> "", ln.Label & ":", If(ln.LineNumber <> "", ln.LineNumber & ":", ""))
+
+      ' A label alone on its line.
+      If t.Count = 0 Then
+        Flush(m_target)
+        m_target.Add(labelPrefix & If(ln.Comment <> "", "  " & VbComment(ln.Comment), ""))
+        Return i + 1
+      End If
+
+      Select Case first
+
+        Case "SUB", "FUNCTION"
+          BeginProc(i)
+          Return i + 1
+
+        Case "END"
+          If t.Count > 1 AndAlso (t(1).IsWord("SUB") OrElse t(1).IsWord("FUNCTION")) Then
+            EndProc(i)
+            Return i + 1
+          End If
+
+        Case "TYPE"
+          Return EmitTypeBlock(i)
+
+        Case "DECLARE", "DEFINT", "DEFSNG", "DEFDBL", "DEFLNG", "DEFSTR"
+          Flush(m_target)
+          m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
+          Return i + 1
+
+        Case "OPTION"
+          If t.Count > 2 AndAlso t(1).IsWord("BASE") AndAlso t(2).Text <> "0" Then Note("OPTION BASE " & t(2).Text & ": VB arrays start at 0")
+          Flush(m_target)
+          m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
+          Return i + 1
+
+        Case "CONST"
+          If m_curProc Is Nothing Then
+            m_hoisted.AddRange(HoistedConst(t))
+            Flush(m_target)
+            m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
+            Return i + 1
+          End If
+
+        Case "DATA"
+          Flush(m_target)
+          m_target.Add(ln.Indent & "' " & ln.Raw.Trim() & "   (DATA is listed at the start of the program)")
+          Return i + 1
+
+        Case "DIM", "COMMON"
+          If m_curProc Is Nothing AndAlso t.Count > 1 AndAlso t(1).IsWord("SHARED") Then
+            m_hoisted.Add(DimText(t, "Dim", True))
+            Flush(m_target)
+            m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
+            Return i + 1
+          End If
+
+        Case "SHARED"
+          If m_curProc IsNot Nothing Then
+            Flush(m_target)
+            m_target.Add(ln.Indent & "' " & ln.Raw.Trim() & "   (shared variables are declared at module level)")
+            Return i + 1
+          End If
+
+      End Select
+
+      Dim statements = ParseStatementList(t, 0, t.Count)
+      If statements.Count = 0 Then
+        If ln.Comment <> "" Then m_pending.Add(ln.Indent & VbComment(ln.Comment))
+        Return i + 1
+      End If
+
+      Flush(m_target)
+      Dim text = ln.Indent & labelPrefix & If(labelPrefix <> "", " ", "") & String.Join(" : ", statements)
+      If ln.Comment <> "" Then text &= "  " & VbComment(ln.Comment)
+      m_target.Add(text)
+      Return i + 1
+
+    End Function
+
+    ' ---- Procedures ---------------------------------------------------------------------------------------------
+
+    Private Function ParamText(v As VarSym, prm As ParamSym) As String
+      Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+      Dim sb As New StringBuilder("ByRef " & name)
+      If prm.IsArray Then sb.Append("()")
+      If Not v.HasSuffix Then
+        If v.UserType <> "" Then
+          sb.Append(" As " & v.UserType)
+        Else
+          sb.Append(" As " & Types.VbName(v.Qt))
+        End If
+      End If
+      Return sb.ToString
+    End Function
+
+    Private Sub BeginProc(i As Integer)
+      Dim ln = m_lines(i)
+      Dim t = ln.Tokens
+      Dim sym = FindProcCore(t(1).Text)
+      Dim scope = m_procScopes(sym.QbName)
+      m_scope = scope
+      m_curProc = sym
+      m_procStatic = sym.IsStatic
+      m_neededHandlers.Clear()
+
+      Flush(m_procLines)
+      m_target = m_procLines
+
+      Dim parms As New List(Of String)
+      For Each prm In sym.Params
+        Dim v = DeclareVariable(scope, prm.QbName & If(prm.HasSuffix, Types.Suffix(prm.Qt), ""), prm.IsArray, If(prm.HasSuffix, QT.Unknown, If(prm.UserType <> "" OrElse prm.Qt <> QT.Unknown, prm.Qt, QT.Unknown)), prm.UserType, True)
+        parms.Add(ParamText(v, prm))
+      Next
+      Dim head = If(sym.IsFunction, "Function ", "Sub ") & ExprParser.ProcName(sym) & "(" & String.Join(", ", parms) & ")"
+      If sym.IsFunction AndAlso Not sym.HasSuffix Then head &= " As " & Types.VbName(sym.RetQt)
+      m_procLines.Add(ln.Indent & head & If(ln.Comment <> "", "  " & VbComment(ln.Comment), ""))
+      m_procDeclAt = m_procLines.Count
+    End Sub
+
+    Private Function DeclKeyword() As String
+      Return If(m_procStatic, "Static", "Dim")
+    End Function
+
+    ' A declaration (without the keyword) of a variable found by use.
+    Private Shared Function DeclItem(v As VarSym) As String
+      Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+      Dim dims = If(v.IsArray, "(" & If(v.Dims <> "", v.Dims, "10") & ")", "")
+      If v.UserType <> "" Then Return name & dims & " As " & v.UserType
+      If v.HasSuffix Then Return name & dims
+      Return name & dims & " As " & Types.VbName(v.Qt)
+    End Function
+
+    Private Sub EndProc(i As Integer)
+      Dim ln = m_lines(i)
+      Flush(m_target)
+
+      ' Variables used without being declared.
+      Dim decls As New List(Of String)
+      For Each v In m_scope.Locals
+        If Not v.Declared AndAlso Not v.IsParam AndAlso Not v.IsShared AndAlso Not v.IsConst Then
+          decls.Add(ln.Indent & "  " & DeclKeyword() & " " & DeclItem(v))
+          v.Declared = True
+        End If
+      Next
+      m_procLines.InsertRange(m_procDeclAt, decls)
+
+      ' Error handlers that are module-level in QBasic are copied in, so that Resume works in this procedure.
+      If m_neededHandlers.Count > 0 Then
+        m_procLines.Add("  " & If(m_curProc.IsFunction, "Exit Function", "Exit Sub"))
+        Dim done As New HashSet(Of Integer)
+        For Each label In m_neededHandlers
+          Dim start As Integer
+          If Not m_mainLabels.TryGetValue(label, start) Then Continue For
+          Dim [end] = HandlerRegionEnd(start)
+          If done.Contains(start) Then Continue For
+          For k = start To [end]
+            done.Add(k)
+            Dim hl = m_lines(k)
+            m_currentLine = hl.Number
+            Try
+              Dim saved = m_target
+              EmitLine(k)
+            Catch ex As ConvertException
+              Todo(hl, ex.Message)
+            End Try
+          Next
+        Next
+        Flush(m_target)
+        m_neededHandlers.Clear()
+      End If
+
+      m_procLines.Add(ln.Indent & If(m_curProc.IsFunction, "End Function", "End Sub"))
+      m_procLines.Add("")
+      m_scope = m_main
+      m_curProc = Nothing
+      m_procStatic = False
+    End Sub
+
+    ' ---- Error handler regions ----------------------------------------------------------------------------------------
+
+    ' The last line of the handler that starts at a label in the module-level code: up to the point where flow can't continue.
+    Private Function HandlerRegionEnd(start As Integer) As Integer
+      Dim depth = 0
+      Dim blocks As New Stack(Of (HasElse As Boolean, AllTerm As Boolean, CurTerm As Boolean))
+      Dim last = start
+      For k = start To m_lines.Count - 1
+        Dim ln = m_lines(k)
+        Dim t = ln.Tokens
+        If t.Count > 0 AndAlso (t(0).IsWord("SUB") OrElse t(0).IsWord("FUNCTION")) Then Return last
+        last = k
+        If t.Count = 0 Then Continue For
+        Dim first = t(0).Upper()
+        Dim terminal = first = "RESUME" OrElse first = "RETURN" OrElse first = "GOTO" OrElse (first = "END" AndAlso t.Count = 1) OrElse first = "SYSTEM"
+        Dim isBlockIf = first = "IF" AndAlso t(t.Count - 1).IsWord("THEN")
+
+        If isBlockIf Then
+          blocks.Push((False, True, False))
+        ElseIf first = "ELSEIF" AndAlso blocks.Count > 0 Then
+          Dim b = blocks.Pop()
+          blocks.Push((b.HasElse, b.AllTerm AndAlso b.CurTerm, False))
+        ElseIf first = "ELSE" AndAlso blocks.Count > 0 Then
+          Dim b = blocks.Pop()
+          blocks.Push((True, b.AllTerm AndAlso b.CurTerm, False))
+        ElseIf first = "END" AndAlso t.Count > 1 AndAlso t(1).IsWord("IF") AndAlso blocks.Count > 0 Then
+          Dim b = blocks.Pop()
+          Dim allTerm = b.AllTerm AndAlso b.CurTerm
+          Dim blockTerminates = b.HasElse AndAlso allTerm
+          If blocks.Count = 0 Then
+            If blockTerminates Then Return k
+          ElseIf blockTerminates Then
+            Dim parent = blocks.Pop()
+            blocks.Push((parent.HasElse, parent.AllTerm, True))
+          End If
+        ElseIf terminal Then
+          If blocks.Count = 0 Then Return k
+          Dim b = blocks.Pop()
+          blocks.Push((b.HasElse, b.AllTerm, True))
+        End If
+      Next
+      Return last
+    End Function
+
+    ' ---- Declarations -------------------------------------------------------------------------------------------------
+
+    Private Function HoistedConst(t As List(Of Token)) As List(Of String)
+      Dim result As New List(Of String)
+      m_scope = m_module
+      For Each part In SplitTopLevel(t, 1, t.Count)
+        If part.Count < 3 OrElse Not part(1).Is_("=") Then Continue For
+        Dim v = ResolveVariableCore(part(0).Text, False)
+        Dim ep As New ExprParser(part, 2, Me)
+        Dim e = ep.ParseExpr()
+        v.IsConst = True : v.IsShared = True
+        If e.Qt = QT.String Then
+          v.Qt = QT.String
+          result.Add("Const " & ExprParser.VarText(v) & If(v.HasSuffix, "", " As String") & " = " & e.Text)
+        Else
+          Dim qty = e.Qt
+          If Types.Rank(qty) < 0 Then qty = QT.Short
+          v.Qt = If(v.HasSuffix, v.Qt, qty)
+          result.Add("Const " & v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), " As " & Types.VbName(v.Qt)) & " = " & ExprParser.Coerce(e, v.Qt))
+        End If
+      Next
+      m_scope = If(m_curProc Is Nothing, m_main, m_scope)
+      Return result
+    End Function
+
+    ''' <summary>The VB for a DIM/REDIM/STATIC/COMMON statement.</summary>
+    Private Function DimText(t As List(Of Token), keyword As String, hoist As Boolean) As String
+      Dim p = 1
+      If p < t.Count AndAlso t(p).IsWord("SHARED") Then p += 1
+      Dim items As New List(Of String)
+      Dim savedScope = m_scope
+      If hoist Then m_scope = m_module
+      For Each part In SplitTopLevel(t, p, t.Count)
+        If part.Count = 0 Then Continue For
+        Dim name = part(0).Text
+        Dim q = 1
+        Dim dims As New List(Of String)
+        Dim isArray = False
+        If q < part.Count AndAlso part(q).Is_("(") Then
+          isArray = True
+          Dim depth = 0
+          Dim startDims = q + 1
+          Do While q < part.Count
+            If part(q).Is_("(") Then depth += 1
+            If part(q).Is_(")") Then depth -= 1
+            q += 1
+            If depth = 0 Then Exit Do
+          Loop
+          For Each dimPart In SplitTopLevel(part, startDims, q - 1)
+            dims.Add(DimBound(dimPart))
+          Next
+        End If
+        Dim asType = QT.Unknown, userType = "", fixedLen = 0
+        If q < part.Count AndAlso part(q).IsWord("AS") Then
+          q += 1
+          asType = ParseAsType(part, q, userType, fixedLen)
+        End If
+        Dim v = DeclareVariable(m_scope, name, isArray, asType, userType)
+        v.Declared = True
+        If isArray Then v.Dims = String.Join(", ", dims)
+        Dim vbName = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
+        Dim dimSuffix = If(isArray, "(" & String.Join(", ", dims) & ")", "")
+        If v.UserType <> "" Then
+          items.Add(vbName & dimSuffix & " As " & v.UserType)
+        ElseIf v.HasSuffix Then
+          items.Add(vbName & dimSuffix)
+        ElseIf v.Qt = QT.String AndAlso fixedLen > 0 Then
+          items.Add(vbName & dimSuffix & " As String = New String("" ""c, " & fixedLen & ")")
+          Note($"{name}: STRING * {fixedLen} is an ordinary String here (not fixed length)")
+        Else
+          items.Add(vbName & dimSuffix & " As " & Types.VbName(v.Qt))
+        End If
+      Next
+      m_scope = savedScope
+      Return keyword & " " & String.Join(", ", items)
+    End Function
+
+    ' One dimension: "n" or "lo TO hi" (the array keeps a spare element when the lower bound is above 0).
+    Private Function DimBound(toks As List(Of Token)) As String
+      Dim toIdx = -1
+      For k = 0 To toks.Count - 1
+        If toks(k).IsWord("TO") Then toIdx = k : Exit For
+      Next
+      If toIdx < 0 Then
+        Dim e = New ExprParser(toks, 0, Me).ParseExpr()
+        Return ExprParser.Coerce(e, QT.Long)
+      End If
+      Dim lo = New ExprParser(toks.GetRange(0, toIdx), 0, Me).ParseExpr()
+      Dim hi = New ExprParser(toks.GetRange(toIdx + 1, toks.Count - toIdx - 1), 0, Me).ParseExpr()
+      If Not lo.IsLiteral OrElse lo.LiteralValue <> 0 Then
+        If Not lo.IsLiteral OrElse lo.LiteralValue < 0 Then
+          Note("an array with a lower bound that isn't 0 or a small positive number: check the indexes")
+        End If
+      End If
+      Return ExprParser.Coerce(hi, QT.Long)
+    End Function
+
+    Private Function EmitTypeBlock(i As Integer) As Integer
+      Dim head = m_lines(i).Tokens
+      Dim ts = m_types(head(1).Text)
+      Dim lines As New List(Of String)
+      lines.Add("Structure " & ts.QbName)
+      For Each f In ts.Fields
+        Dim ftype = If(f.UserType <> "", f.UserType, Types.VbName(f.Qt))
+        Dim hasSuffix As Boolean, bare As String = ""
+        TypeOfName(f.Name, hasSuffix, bare)
+        Dim fname = If(Keywords.IsVbReserved(bare), "[" & bare & "]", bare)
+        If f.Qt = QT.String AndAlso f.Length > 0 Then
+          lines.Add("  <VBFixedString(" & f.Length & ")> Public " & fname & " As String")
+        Else
+          lines.Add("  Public " & fname & " As " & ftype)
+        End If
+      Next
+      lines.Add("End Structure")
+      m_hoisted.AddRange(lines)
+      m_hoisted.Add("")
+      Dim k = i + 1
+      Do While k < m_lines.Count
+        Dim t = m_lines(k).Tokens
+        If t.Count >= 2 AndAlso t(0).IsWord("END") AndAlso t(1).IsWord("TYPE") Then Exit Do
+        k += 1
+      Loop
+      Flush(m_target)
+      m_target.Add("' TYPE " & ts.QbName & " (see the Structure at the top)")
+      Return k + 1
+    End Function
+
+    ' ---- The end ------------------------------------------------------------------------------------------------------
+
+    Private Sub FinishModule()
+      Flush(If(m_curProc Is Nothing, m_mainLines, m_procLines))
+      ' Module-level variables that are shared only because a procedure says so, and were never DIMmed.
+      For Each v In m_module.Locals
+        If Not v.Declared AndAlso Not v.IsConst Then
+          m_hoisted.Add("Dim " & DeclItem(v))
+          v.Declared = True
+        End If
+      Next
+      For Each v In m_main.Locals
+        If Not v.Declared AndAlso Not v.IsConst AndAlso Not v.IsParam Then
+          m_mainDecls.Add("Dim " & DeclItem(v))
+          v.Declared = True
+        End If
+      Next
+    End Sub
+
+  End Class
+
+End Namespace

@@ -110,3 +110,15 @@ classes, so the file-number forms of `PRINT`, `WRITE`, `INPUT`, `LINE_INPUT` and
 prompt (no question mark) is `INPUT(prompt, value, False)`, and `INPUT;` (the cursor stays after the typing) adds a fourth argument: `INPUT(prompt, value, False, True)`; `LINE_INPUT(prompt, value, True)` is `LINE INPUT;`.  `FILES(spec)` lists a directory.  `INPUT$(n)` from the keyboard is `InputStr(n)` (VB can't overload it with `INPUT`); `INPUT$(n, #1)` is `INPUT$(n, 1)` or `InputStr(n, 1)`.
 
 To add one, copy a file in `Examples/Statements` (a module with a `Run` sub) and add a line for it to `Examples/Registry.vb`.
+
+## Converting QBasic programs (qb2vb)
+
+`QB.Converter` builds `qb2vb`, a console tool that converts a QBasic source file to VB that calls this library:
+
+```bash
+dotnet run --project QB.Converter -- Samples/REMLINE.BAS -o REMLINE.vb
+```
+
+The output is deliberately literal: one QBasic statement becomes one library call on the same line, and labels, GOTOs, comments, QBasic variable names (suffixes included) and the layout are kept. What has to change is limited to what VB requires (`CONST`/`DIM SHARED`/`TYPE`/`DATA` move to the top of the module, `SUB ... STATIC` gets `Static` locals, `Resume` handlers that live at module level are copied into the procedure that names them, reserved words are renamed). Anything the converter can't convert yet is left as a `' TODO(QB2VB):` comment and listed in the report printed at the end.
+
+Converted so far: `REMLINE.BAS` (compiles against the library and runs). `GOSUB`/`RETURN`, `DEF FN`, `ON ... GOTO`, and the graphics, sound and `FIELD` statements are still to come.

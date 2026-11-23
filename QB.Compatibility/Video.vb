@@ -2865,6 +2865,19 @@ allplotted:
       INPUT("", value)
     End Sub
 
+    Public Shared Sub INPUT(prompt$, ByRef value As Short, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
+      Do
+        Dim s$ = ""
+        INPUT(prompt, s, question, keepCursor)
+        Dim d As Double
+        If Double.TryParse(s.Trim, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, d) AndAlso d >= -32768.5 AndAlso d <= 32767.4 Then
+          value = CShort(Math.Round(d, MidpointRounding.ToEven))
+          Return
+        End If
+        PRINT("Redo from start")
+      Loop
+    End Sub
+
     Public Shared Sub INPUT(prompt$, ByRef value&, Optional question As Boolean = True, Optional keepCursor As Boolean = False)
       Do
         Dim s$ = ""

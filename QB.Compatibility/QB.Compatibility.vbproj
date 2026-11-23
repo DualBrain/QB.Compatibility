@@ -4,6 +4,8 @@
     </RootNamespace>
     <TargetFramework>net10.0</TargetFramework>
     <AssemblyName>QB.Compatibility</AssemblyName>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
     <OptionStrict>On</OptionStrict>
     <LangVersion>latest</LangVersion>
     <IsTrimmable>true</IsTrimmable>
