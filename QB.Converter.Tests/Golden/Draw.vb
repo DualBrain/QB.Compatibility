@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,14 +11,13 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module Draw_Program
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim Triangle$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/DRAW.htm
     SCREEN(1)
-    Triangle$ = "F60 L120 E60"
+    Dim Triangle$ = "F60 L120 E60"
     DRAW("C2 X" + VARPTR$(Triangle$))
     DRAW("BD30 P1,2 C3 M-30,-30")
   End Sub

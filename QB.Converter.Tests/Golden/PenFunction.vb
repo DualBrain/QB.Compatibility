@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,11 +11,11 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module PenFunction
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim P As Single
+    Dim P!
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/PEN.htm
     Do
       P = PEN(3)

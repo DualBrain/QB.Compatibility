@@ -66,6 +66,18 @@ Namespace QB2VB
     End Sub
 
     ''' <summary>The program opens a serial port (OPEN "COM1:...", COM(n) events): it needs QB.Serial.</summary>
+    ''' <summary>True when the namespaces the program uses are imported by its project (see Imports) instead of by the file.</summary>
+    Public Property OmitImports As Boolean
+
+    Private _Imports As String() = Array.Empty(Of String)()
+
+    ''' <summary>The namespaces that the converted program uses (known after Convert).</summary>
+    Public ReadOnly Property [Imports] As IReadOnlyList(Of String)
+      Get
+        Return _Imports
+      End Get
+    End Property
+
     Public ReadOnly Property UsesSerial As Boolean
 
     Private m_usesSerial As Boolean
@@ -371,22 +383,15 @@ Namespace QB2VB
       _UsesSerial = m_usesSerial
 
       Dim sb As New StringBuilder
-      sb.AppendLine("' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.")
-      sb.AppendLine("Option Explicit On")
-      sb.AppendLine("Option Strict On")
-      sb.AppendLine("Option Infer On")
+      sb.AppendLine("' Converted from QBasic by qb2vb.TODO_HEADER")
       sb.AppendLine()
-      sb.AppendLine("Imports System.Math")
-      sb.AppendLine("Imports QB")
-      sb.AppendLine("Imports QB.Core")
-      sb.AppendLine("Imports QB.Development")
-      sb.AppendLine("Imports QB.Devices")
-      sb.AppendLine("Imports QB.Events")
-      sb.AppendLine(If(m_usesSerial, "Imports QB.Serial", "Imports QB.File"))
-      sb.AppendLine("Imports QB.Multimedia")
-      sb.AppendLine("Imports QB.Printer")
-      sb.AppendLine(If(m_usesGraphics, "Imports QB.Graphics", "Imports QB.Video"))
-      sb.AppendLine()
+      _Imports = {"System.Math", "QB", "QB.Core", "QB.Development", "QB.Devices", "QB.Events", If(m_usesSerial, "QB.Serial", "QB.File"), "QB.Multimedia", "QB.Printer", If(m_usesGraphics, "QB.Graphics", "QB.Video")}
+      If Not OmitImports Then
+        For Each name In _Imports
+          sb.AppendLine("Imports " & name)
+        Next
+        sb.AppendLine()
+      End If
       sb.AppendLine("Module " & moduleName)
       sb.AppendLine()
       For Each l In m_hoisted
@@ -417,7 +422,8 @@ Namespace QB2VB
         sb.AppendLine("  " & l)
       Next
       sb.AppendLine("End Module")
-      Return sb.ToString
+      Dim text = sb.ToString()
+      Return text.Replace("TODO_HEADER", If(text.Contains("TODO(QB2VB)"), "  Lines marked TODO(QB2VB) need attention.", ""))
 
     End Function
 

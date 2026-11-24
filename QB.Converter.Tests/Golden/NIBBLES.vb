@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,7 +11,7 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module NIBBLES
+Module Program
 
   Structure snakeBody
     Implements IFileRecord
@@ -242,8 +239,6 @@ Module NIBBLES
   'DrawScreen:
   '  Draws playing field
   Sub DrawScreen()
-    Dim row As Short
-    Dim col As Short
   
       'initialize screen
       VIEW_PRINT()
@@ -255,8 +250,8 @@ Module NIBBLES
       Center(11, "Initializing Playing Field...")
   
       'Initialize arena array
-      For row = 1 To 50
-          For col = 1 To 80
+      For row = 1S To 50S
+          For col = 1S To 80S
               arena(row, col).realRow = CShort(Int((row + 1) / 2))
               arena(row, col).sister = CShort(((row Mod 2) * 2) - 1)
           Next col
@@ -267,12 +262,10 @@ Module NIBBLES
   'EraseSnake:
   '  Erases snake to facilitate moving through playing field
   Sub EraseSnake(ByRef snake() As snaketype, ByRef snakeBod(,) As snakeBody, ByRef snakeNum As Short)
-    Dim c As Short
-    Dim b As Short
     Dim tail As Short
   
-      For c = 0 To 9
-          For b = snake(snakeNum).length - c To 0 Step -10
+      For c = 0S To 9S
+          For b As Short = snake(snakeNum).length - c To 0 Step -10
               tail = ((snake(snakeNum).head + MAXSNAKELENGTH) - b) Mod MAXSNAKELENGTH
               [Set](snakeBod(tail, snakeNum).row, snakeBod(tail, snakeNum).col, colorTable(4))
           Next b
@@ -286,9 +279,6 @@ Module NIBBLES
   Sub GetInputs(ByRef NumPlayers As Short, ByRef speed As Short, ByRef diff$, ByRef monitor$)
     Dim num$
     Dim gamespeed$
-    Dim startTime#
-    Dim i#
-    Dim stopTime#
   
       COLOR(7, 0)
       CLS()
@@ -328,9 +318,9 @@ Module NIBBLES
           monitor$ = UCase$(monitor$)
       Loop Until (monitor$ = "M") Or (monitor$ = "C")
   
-      startTime# = Timer  ' Calculate speed of system
+      Dim startTime# = Timer  ' Calculate speed of system
       For i# = 1 To 1000 : EMPTYLOOP() : Next i#  ' and do some compensation
-      stopTime# = Timer
+      Dim stopTime# = Timer
       speed = CShort((speed * .5!) / (stopTime# - startTime#))
   
   End Sub
@@ -339,11 +329,9 @@ Module NIBBLES
   'InitColors:
   'Initializes playing field colors
   Sub InitColors()
-    Dim row As Short
-    Dim col As Short
   
-      For row = 1 To 50
-          For col = 1 To 80
+      For row = 1S To 50S
+          For col = 1S To 80S
               arena(row, col).acolor = colorTable(4)
           Next col
       Next row
@@ -351,12 +339,12 @@ Module NIBBLES
       CLS()
   
       'Set (turn on) pixels for screen border
-      For col = 1 To 80
+      For col = 1S To 80S
           [Set](3, col, colorTable(3))
           [Set](50, col, colorTable(3))
       Next col
   
-      For row = 4 To 49
+      For row = 4S To 49S
           [Set](row, 1, colorTable(3))
           [Set](row, 80, colorTable(3))
       Next row
@@ -538,8 +526,6 @@ Module NIBBLES
     Dim startCol1 As Short
     Dim startRow2 As Short
     Dim startCol2 As Short
-    Dim curSpeed As Short
-    Dim gameOver As Short
     Dim number As Short
     Dim nonum As Short
     Dim playerDied As Short
@@ -547,9 +533,7 @@ Module NIBBLES
     Dim NumberCol As Short
     Dim sisterRow As Short
     Dim count As Short
-    Dim a#
     Dim kbd$
-    Dim a_Int As Short
     Dim tail As Short
   
       'Initialize Snakes
@@ -566,12 +550,12 @@ Module NIBBLES
       startRow1 = sammy(1).row : startCol1 = sammy(1).col
       startRow2 = sammy(2).row : startCol2 = sammy(2).col
   
-      curSpeed = speed
+      Dim curSpeed As Short = speed
   
       'play Nibbles until finished
   
       SpacePause(("     Level" + Str$(curLevel)) + ",  Push Space")
-      gameOver = [FALSE]
+      Dim gameOver As Short = [FALSE]
       Do
           If NumPlayers = 1 Then
               sammy(2).row = 0
@@ -618,7 +602,7 @@ Module NIBBLES
                   Case Else
               End Select
   
-              For a_Int = 1 To NumPlayers
+              For a_Int As Short = 1 To NumPlayers
                   'Move Snake
                   Select Case sammy(a_Int).direction
                       Case 1 : sammy(a_Int).row = CShort(sammy(a_Int).row - 1)
@@ -652,7 +636,7 @@ Module NIBBLES
                   End If
               Next a_Int
   
-              For a_Int = 1 To NumPlayers
+              For a_Int As Short = 1 To NumPlayers
                   'If player runs into any point, or the head of the other snake, it dies.
                   If (PointIsThere(sammy(a_Int).row, sammy(a_Int).col, colorTable(4)) Or CShort(((sammy(1).row = sammy(2).row) And (sammy(1).col = sammy(2).col)))) <> 0 Then
                       PLAY("MBO0L32EFGEFDC")
@@ -680,7 +664,7 @@ Module NIBBLES
   
           curSpeed = speed  ' reset speed to initial value
   
-          For a_Int = 1 To NumPlayers
+          For a_Int As Short = 1 To NumPlayers
               EraseSnake(sammy, sammyBody, a_Int)
   
               'If dead, then erase snake in really cool way
@@ -781,8 +765,6 @@ Module NIBBLES
   'SpacePause:
   '  Pauses game play and waits for space bar to be pressed before continuing
   Sub SpacePause(ByRef text$)
-    Dim i As Short
-    Dim j As Short
   
       COLOR(colorTable(5), colorTable(6))
       Center(11, "█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█")
@@ -792,8 +774,8 @@ Module NIBBLES
       While INKEY$() <> " " : End While
       COLOR(15, colorTable(4))
   
-      For i = 21 To 26  ' Restore the screen background
-          For j = 24 To 56
+      For i = 21S To 26S  ' Restore the screen background
+          For j = 24S To 56S
               [Set](i, j, arena(i, j).acolor)
           Next j
       Next i
@@ -804,13 +786,11 @@ Module NIBBLES
   'SparklePause:
   '  Creates flashing border for intro screen
   Sub SparklePause()
-    Dim a$
     Dim a_Int As Short
-    Dim b As Short
     Dim c As Short
   
       COLOR(4, 0)
-      a$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
+      Dim a$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
       While INKEY$() <> "" : End While  'Clear keyboard buffer
   
       While INKEY$() = ""
@@ -820,7 +800,7 @@ Module NIBBLES
               LOCATE(22, 1)
               PRINT(Mid$(a$, 6 - a_Int, 80), True)
   
-              For b = 2 To 21  'Print Vertical sparkles
+              For b = 2S To 21S  'Print Vertical sparkles
                   c = CShort((a_Int + b) Mod 5)
                   If c = 1 Then
                       LOCATE(b, 80)

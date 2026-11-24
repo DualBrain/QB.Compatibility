@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,17 +11,16 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module LprintUsing
+Module Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim a As Single
     Dim a_Str$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/LPRINT%20USING.htm
-    a = 123.4567!
+    Dim a! = 123.4567!
     PRINT_USING("###.##", a)
     LPRINT_USING("+###.####", a)
     a_Str$ = "ABCDEFG"

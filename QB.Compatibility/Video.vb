@@ -3017,7 +3017,7 @@ allplotted:
     ' ---- Files (the file number forms of PRINT, WRITE, INPUT and LINE INPUT) -------------------
 
     ''' <summary>PRINT # to a file: text and a CR LF (unless <paramref name="noCr"/>).</summary>
-    Public Shared Sub PRINT(filenum%, text$, Optional noCr As Boolean = False)
+    Public Shared Sub PRINT(filenum%, Optional text$ = "", Optional noCr As Boolean = False)
       File.PRINT(filenum, text, noCr)
     End Sub
 

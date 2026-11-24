@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,11 +11,10 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module Cls_Program
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim Count As Single
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/CLS.htm
     RANDOMIZE(CInt(Timer))
     SCREEN(1)
@@ -28,7 +24,7 @@ Module Cls_Program
     VIEW_PRINT(12, 24)
     ' Print a message on the screen outside the text viewport.
     LOCATE(25, 1) : PRINT("Press any key to stop.")
-    Count = 0
+    Dim Count = 0!
     Do
        ' Draw a circle with a random radius.
        CIRCLE(50, 40, Int(((35 - 4) * Rnd()) + 5), (CInt(Count) Mod 4))

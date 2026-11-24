@@ -16,7 +16,8 @@ Namespace QB2VB.Tests
       Dim lines = vb.Replace(vbCrLf, vbLf).Split(vbLf(0)).Select(Function(l) l.Trim()).ToList()
       Dim s = lines.IndexOf("Public Sub Main()")
       Dim e = lines.IndexOf("End Sub", s)
-      Return lines.GetRange(s + 1, e - s - 1).Where(Function(l) l <> "" AndAlso Not l.Contains(".WaitForKeyAtExit") AndAlso l <> "#If QB_WINDOW Then" AndAlso l <> "QB.SdlBackend.Use()" AndAlso l <> "#End If" AndAlso Not l.StartsWith("Dim ", StringComparison.Ordinal)).ToList()
+      Dim body = lines.GetRange(s + 1, e - s - 1).Select(Function(l) Text.RegularExpressions.Regex.Replace(Text.RegularExpressions.Regex.Replace(l, "^Dim ([\w$%&!#\[\]]+)( As \w+)? = ", "$1 = "), "^For ([\w$%&!#]+) As \w+ = ", "For $1 = ")).ToList()
+      Return body.Where(Function(l) l <> "" AndAlso Not l.Contains(".WaitForKeyAtExit") AndAlso l <> "#If QB_WINDOW Then" AndAlso l <> "QB.SdlBackend.Use()" AndAlso l <> "#End If" AndAlso Not l.StartsWith("Dim ", StringComparison.Ordinal)).ToList()
     End Function
 
     Private Shared Function Convert(source As String) As String
@@ -54,7 +55,7 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub ControlFlowKeepsItsShape()
-      AssertMain("FOR i = 1 TO 10 STEP 2" & vbLf & "NEXT i", "For i = 1 To 10 Step 2 : EMPTYLOOP()", "Next i")
+      AssertMain("FOR i = 1 TO 10 STEP 2" & vbLf & "NEXT i", "For i = 1! To 10! Step 2! : EMPTYLOOP()", "Next i")
       AssertMain("WHILE a$ <> """"" & vbLf & "WEND", "While a$ <> """"", "End While")
       AssertMain("DO UNTIL x = 3" & vbLf & "LOOP", "Do Until x = 3", "Loop")
       AssertMain("IF x = 1 THEN y = 2 ELSE y = 3", "If x = 1 Then y = 2 Else y = 3")
@@ -95,8 +96,8 @@ Namespace QB2VB.Tests
     <Fact>
     Public Sub IntegerIsShortAndLongUsesVbsPercent()
       Dim vb = Convert("a% = 1" & vbLf & "b& = 2")
-      Assert.Contains("Dim a As Short", vb)
-      Assert.Contains("Dim b%", vb)
+      Assert.Contains("Dim a = 1S", vb)
+      Assert.Contains("Dim b% = 2", vb)
       Assert.Contains("b% = 2", vb)
     End Sub
 
@@ -131,7 +132,7 @@ Namespace QB2VB.Tests
     <Fact>
     Public Sub SubWithStaticGetsStaticLocals()
       Dim vb = Convert("DECLARE SUB Foo ()" & vbLf & "Foo" & vbLf & "SUB Foo STATIC" & vbLf & "n = 1" & vbLf & "END SUB")
-      Assert.Contains("Static n As Single", vb)
+      Assert.Contains("Static n!", vb)
       Assert.Contains("Foo()", vb)
     End Sub
 
@@ -218,9 +219,9 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub EmptyLoopsGetADelay()
-      AssertMain("FOR i = 1 TO 1000: NEXT i", "For i = 1 To 1000 : EMPTYLOOP() : Next i")
+      AssertMain("FOR i = 1 TO 1000: NEXT i", "For i = 1! To 1000! : EMPTYLOOP() : Next i")
       Dim m = Main("FOR i = 1 TO 5" & vbLf & "' wait" & vbLf & "NEXT")
-      Assert.Contains("For i = 1 To 5 : EMPTYLOOP()", m)
+      Assert.Contains("For i = 1! To 5! : EMPTYLOOP()", m)
       Assert.DoesNotContain("EMPTYLOOP()", String.Join(vbLf, Main("FOR i = 1 TO 5" & vbLf & "PRINT i" & vbLf & "NEXT")))
     End Sub
 
@@ -389,7 +390,7 @@ Namespace QB2VB.Tests
       Dim m = Main("a$ = INPUT$(1)" & vbLf & "b$ = INPUT$(3, #1)" & vbLf & "x = EOF(#1)")
       Assert.Contains("a$ = InputStr(1)", m)
       Assert.Contains("b$ = InputStr(3, 1)", m)
-      Assert.Contains("x = CSng(EOF(1))", m.Select(Function(l) l.Replace("x = EOF(1)", "x = CSng(EOF(1))")).ToList())
+      Assert.Contains("x! = CSng(EOF(1))", m)
     End Sub
 
     <Fact>
@@ -421,7 +422,7 @@ Namespace QB2VB.Tests
     <Fact>
     Public Sub LBoundAndUBoundNameTheArray()
       Dim vb = Convert("DIM a(1 TO 10)" & vbLf & "FOR i% = LBOUND(a) TO UBOUND(a)" & vbLf & "NEXT")
-      Assert.Contains("For i = 1 To CShort(UBound(a))", vb)
+      Assert.Contains("For i As Short = 1 To CShort(UBound(a))", vb)
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", errors & vbLf & vb)
     End Sub
@@ -556,7 +557,7 @@ Namespace QB2VB.Tests
     Public Sub MultiLineDefFnIsAFunctionOverTheProgramsVariables()
       Dim vb = Convert("Total = 10" & vbLf & "DEF FNMax (A, B)" & vbLf & "  IF A > B THEN FNMax = A ELSE FNMax = B" & vbLf & "  Total = Total + 1" & vbLf & "END DEF" & vbLf & "PRINT FNMax(3, 4)")
       Assert.Contains("Function FNMax(ByVal A As Single, ByVal B As Single) As Single", vb)
-      Assert.Contains("Dim Total As Single", vb)
+      Assert.Contains("Dim Total!", vb)
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", errors)
     End Sub
@@ -627,6 +628,88 @@ Namespace QB2VB.Tests
       Assert.Empty(c.Notes)
       Assert.Contains("Function StrSpn(ByRef InString$, ByRef Separator$) As Short", vb)
       Assert.Contains("DATA_LABEL(""KeyData"")", vb)
+    End Sub
+
+    <Fact>
+    Public Sub QuickBasicExamplesGapsCompile()
+      Dim source = String.Join(vbLf, {
+        "TYPE Rec", "  N AS INTEGER", "END TYPE",
+        "DIM R AS Rec, Names$(1 TO 5), Values(1 TO 5)",
+        "DEFINT A-Z",
+        "DECLARE SUB Test (Year%)",
+        "OPEN ""o.txt"" FOR OUTPUT AS #2",
+        "PRINT #2,",
+        "CLOSE",
+        "Flag = 0",
+        "Test 1999",
+        "END",
+        "Bad:",
+        "  Flag = -1",
+        "  RESUME NEXT",
+        "SUB Test (Year) STATIC",
+        "  CONST LEAP = 366 MOD 7",
+        "  ON ERROR GOTO Bad",
+        "  Bits& = &H80000000 AND &H7FFFFFFF",
+        "  PRINT Year + LEAP, ABS(Bits& <> 0)",
+        "END SUB"})
+      Dim vb = Convert(source)
+      Assert.DoesNotContain("Static Year", vb)
+      Assert.Contains("Integer.MinValue", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub VariablesAreDeclaredWhereTheyAreFirstUsed()
+      Dim vb = Convert(String.Join(vbLf, {
+        "suffix$ = ""s""",
+        "FOR bottles = 4 TO 1 STEP -1",
+        "  PRINT bottles; suffix$",
+        "NEXT",
+        "FOR i = 1 TO 3: PRINT i: NEXT",
+        "FOR i = 1 TO 3",
+        "  PRINT i * k",
+        "NEXT",
+        "IF suffix$ = ""s"" THEN k = 3",
+        "x = 1",
+        "x = x + 1",
+        "PRINT k, x"}))
+      Assert.Contains("Dim suffix$ = ""s""", vb)
+      Assert.Contains("For bottles = 4! To 1! Step -1!", vb)
+      Assert.Equal(2, vb.Split(New String() {"For i = 1! To 3!"}, StringSplitOptions.None).Length - 1)
+      Assert.Contains("Dim x = 1!", vb)
+      ' k is first used inside an IF: it can't be declared there, so it is declared at the start
+      Assert.Contains("Dim k!" & vbLf, vb.Replace(vbCrLf, vbLf))
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub RosettaSamplesConvertWithoutNotesAndCompile()
+      ConvertEveryProgramIn("Rosetta", 100)
+    End Sub
+
+    <Fact>
+    Public Sub QuickBasicSamplesConvertWithoutNotesAndCompile()
+      ConvertEveryProgramIn("QuickBASIC", 20)
+    End Sub
+
+    ' Every .BAS in a folder of Samples converts without notes and the result compiles.
+    Private Shared Sub ConvertEveryProgramIn(subfolder As String, atLeast As Integer)
+      Dim folder = IO.Path.GetDirectoryName(FindSample(IO.Path.Combine(subfolder, "README.md")))
+      Text.Encoding.RegisterProvider(Text.CodePagesEncodingProvider.Instance)
+      Dim failures As New Concurrent.ConcurrentBag(Of String)
+      Dim files = IO.Directory.GetFiles(folder, "*.BAS")
+      Assert.True(files.Length >= atLeast)
+      Threading.Tasks.Parallel.ForEach(files, Sub(file)
+                                                Dim c As New Converter(IO.File.ReadAllText(file, Text.Encoding.GetEncoding(437)))
+                                                Dim vb = c.Convert("T")
+                                                Dim name = IO.Path.GetFileName(file)
+                                                If c.Notes.Count > 0 Then failures.Add(name & ": " & c.Notes(0).ToString())
+                                                Dim errors = VbCompiler.Compile(vb, "T")
+                                                If errors <> "" Then failures.Add(name & ": " & errors.Split(vbLf(0))(0))
+                                              End Sub)
+      Assert.True(failures.IsEmpty, String.Join(vbLf, failures.OrderBy(Function(f) f)))
     End Sub
 
   End Class

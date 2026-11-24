@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,16 +11,15 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module PlayFunction
+Module Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim Music$
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/PLAY.htm
-    Music$ = "MBT180o2P2P8L8GGGL2E-P24P8L8FFFL2D"
+    Dim Music$ = "MBT180o2P2P8L8GGGL2E-P24P8L8FFFL2D"
     PLAY(Music$)
     While PLAY(0) > 5 : End While
     PRINT("Just about done!")

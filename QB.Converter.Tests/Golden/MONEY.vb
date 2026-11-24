@@ -1,7 +1,4 @@
 ' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
 
 Imports System.Math
 Imports QB
@@ -14,7 +11,7 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module MONEY
+Module Program
 
   Const [TRUE] As Short = -1
   Const [FALSE] As Short = Not [TRUE]
@@ -112,6 +109,7 @@ Module MONEY
   Dim ScrollUpAsm(7) As Short
   Dim ScrollDownAsm(7) As Short
   Dim PrintErr As Short
+  Dim a As Short
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
@@ -119,7 +117,6 @@ Module MONEY
     QB.SdlBackend.Use()
 #End If
     Dim KeyFlags As Short
-    Dim a As Short
     DATA(0, 7, 15, 7, 0, 7, 0, 15, 0, 0)
     DATA(1, 9, 12, 3, 0, 1, 15, 0, 7, 0)
     DATA(3, 15, 13, 1, 14, 3, 15, 0, 7, 0)
@@ -263,7 +260,6 @@ Module MONEY
   '  Draw a box on the screen between the given coordinates.
   Sub Box(ByRef Row1 As Short, ByRef Col1 As Short, ByRef Row2 As Short, ByRef Col2 As Short)
     Static BoxWidth As Short
-    Static a As Short
   
       BoxWidth = CShort((Col2 - Col1) + 1)
   
@@ -322,7 +318,6 @@ Module MONEY
     Dim Max() As Short
     Dim edit$(,)
     Dim u$
-    Dim a As Short
     Dim X As Short
     Dim finished As Short
     Dim CurrRow As Short
@@ -490,7 +485,6 @@ Module MONEY
     Dim Fields2 As FieldRecord
     Dim file_$
     Dim MaxRecord As Short
-    Dim a As Short
     Dim u$
     Dim u1$
     Dim u1x$
@@ -948,7 +942,6 @@ Module MONEY
   'FancyCls:
   '  Clears screen in the right color, and draws nice dots.
   Sub FancyCls(ByRef dots As Short, ByRef Background As Short)
-    Dim a As Short
     Dim row As Short
     Dim col As Short
   
@@ -1053,17 +1046,14 @@ Module MONEY
   'Initialize:
   '  Read colors in and set up assembly routines
   Sub Initialize()
-    Dim ColorSet As Short
-    Dim X As Short
-    Dim I As Short
     Dim J As Short
     Dim P As Short
   
       WIDTH(-1, 25)
       VIEW_PRINT()
   
-      For ColorSet = 1 To 4
-          For X = 1 To 10
+      For ColorSet = 1S To 4S
+          For X = 1S To 10S
               READ(colors(X, ColorSet))
           Next X
       Next ColorSet
@@ -1074,7 +1064,7 @@ Module MONEY
       '   P = VARPTR(ScrollUpAsm(1))
       ' TODO(QB2VB): VARSEG (the address of a variable) isn't supported:
       '   DEF SEG = VARSEG(ScrollUpAsm(1))
-      For I = 0 To 13
+      For I = 0S To 13S
          READ(J)
          POKE((P + I), J)
       Next I
@@ -1083,7 +1073,7 @@ Module MONEY
       '   P = VARPTR(ScrollDownAsm(1))
       ' TODO(QB2VB): VARSEG (the address of a variable) isn't supported:
       '   DEF SEG = VARSEG(ScrollDownAsm(1))
-      For I = 0 To 13
+      For I = 0S To 13S
          READ(J)
          POKE((P + I), J)
       Next I
@@ -1126,7 +1116,6 @@ Module MONEY
   'LoadState:
   '  Load color preferences and account info from MONEY.DAT
   Sub LoadState()
-    Dim a As Short
   
       OPEN("money.dat", OpenMode.Input, 1)
       INPUT(1, ColorPref)
@@ -1157,7 +1146,6 @@ Module MONEY
   '
   Function Menu(ByRef CurrChoiceX As Short, ByRef MaxChoice_Arg As Short, ByRef choice_Arg$(), ByRef ItemRow_Arg() As Short, ByRef ItemCol_Arg() As Short, ByRef help_Arg$(), ByRef BarMode_Arg As Short) As Short
     Dim currChoice As Short
-    Dim a As Short
     Dim finished As Short
     Dim Kbd$
     Dim MaxChoice As Short = MaxChoice_Arg
@@ -1324,7 +1312,6 @@ Module MONEY
     Dim finished As Short
     Dim subchoice As Short
     Dim NewChoice As Short
-    Dim a As Short
     Dim MenuSystemMain As Action
     Dim MenuSystemFile As Action
     Dim MenuSystemEdit As Action
@@ -1518,7 +1505,6 @@ Module MONEY
     Dim Fields4 As FieldRecord
     Dim maxAsset As Short
     Dim maxLiability As Short
-    Dim a As Short
     Dim finished As Short
     Dim u1$
     Dim u2$
@@ -1731,7 +1717,6 @@ Module MONEY
   'SaveState:
   '  Save color preference and account information to "MONEY.DAT" data file.
   Sub SaveState()
-    Dim a As Short
       OPEN("money.dat", OpenMode.Output, 2)
       PRINT(2, Str$(ColorPref) & " ")
   
@@ -1770,24 +1755,21 @@ Module MONEY
   'SparklePause:
   '  Creates flashing border for intro screen
   Sub SparklePause()
-    Dim a$
-    Dim a_Int As Short
-    Dim b As Short
     Dim c As Short
   
       COLOR(4, 0)
-      a$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
+      Dim a_Str$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
       While INKEY$() <> "" : End While  'Clear keyboard buffer
   
       While INKEY$() = ""
-          For a_Int = 1 To 5
+          For a = 1 To 5
               LOCATE(1, 1)  'print horizontal sparkles
-              PRINT(Mid$(a$, a_Int, 80), True)
+              PRINT(Mid$(a_Str$, a, 80), True)
               LOCATE(22, 1)
-              PRINT(Mid$(a$, 6 - a_Int, 80), True)
+              PRINT(Mid$(a_Str$, 6 - a, 80), True)
   
-              For b = 2 To 21  'Print Vertical sparkles
-                  c = CShort((a_Int + b) Mod 5)
+              For b = 2S To 21S  'Print Vertical sparkles
+                  c = CShort((a + b) Mod 5)
                   If c = 1 Then
                       LOCATE(b, 80)
                       PRINT("*", True)
@@ -1800,7 +1782,7 @@ Module MONEY
                       PRINT(" ", True)
                   End If
               Next b
-          Next a_Int
+          Next a
       End While
   End Sub
   
@@ -1919,7 +1901,6 @@ Module MONEY
   '  Remove null and spaces from the end of a string.
   Function Trim$(ByRef X$)
     Dim lastChar As Short
-    Dim a As Short
     Dim y$
   
       If X$ = "" Then

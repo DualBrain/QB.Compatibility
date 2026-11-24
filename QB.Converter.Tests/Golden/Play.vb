@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,20 +11,18 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module Play_Program
+Module Program
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim scale$
-    Dim i As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement%20%28Music%29/PLAY.htm
     'Play scale in 7 different octaves
-    scale$ = "CDEFGAB"
+    Dim scale$ = "CDEFGAB"
     PLAY("L16")
-    For i = 0 To 6
+    For i = 0S To 6S
         PLAY("O" + Str$(i))
         PLAY("X" + VARPTR$(scale$))
     Next i

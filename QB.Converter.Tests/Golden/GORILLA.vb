@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,7 +11,7 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module GORILLA
+Module Program
 
   Structure XYPoint
     Implements IFileRecord
@@ -332,10 +329,9 @@ Module GORILLA
   'CalcDelay:
   '  Checks speed of the machine.
   Function CalcDelay!()
-    Dim s!
     Dim i!
   
-    s! = CSng(Timer)
+    Dim s! = CSng(Timer)
     Do
       i! = i! + 1
     EMPTYLOOP() : Loop Until (Timer - s!) >= .5!
@@ -351,8 +347,7 @@ Module GORILLA
   '   Text$ - text to be printed
   '
   Sub Center(ByRef Row As Short, ByRef Text$)
-    Dim Col As Short
-    Col = CShort(MaxCol \ 2)
+    Dim Col As Short = CShort(MaxCol \ 2)
     LOCATE(Row, CInt(Col - ((Len(Text$) / 2) + .5!)))
     PRINT(Text$, True)
   End Sub
@@ -364,20 +359,17 @@ Module GORILLA
   '   X#, Y# - location of explosion
   '
   Sub DoExplosion(ByRef x_Dbl#, ByRef y#)
-    Dim Radius As Short
     Dim Inc#
-    Dim c#
-    Dim i As Short
   
     PLAY("MBO0L32EFGEFDC")
-    Radius = CShort(ScrHeight / 50)
+    Dim Radius As Short = CShort(ScrHeight / 50)
     If Mode = 9 Then Inc# = .5! Else Inc# = .41!
     For c# = 0 To Radius Step Inc#
       CIRCLE(x_Dbl#, y#, c#, ExplosionColor)
     Next c#
     For c# = Radius To 0 Step ((-1) * Inc#)
       CIRCLE(x_Dbl#, y#, c#, BACKATTR)
-      For i = 1 To 100 : EMPTYLOOP()
+      For i = 1S To 100S : EMPTYLOOP()
       Next i
       Rest(.005!)
     Next c#
@@ -393,10 +385,6 @@ Module GORILLA
   '
   Function DoShot(ByRef PlayerNum As Short, ByRef x_Int As Short, ByRef y As Short) As Short
     Dim LocateCol As Short
-    Dim Angle#
-    Dim Velocity As Short
-    Dim i As Short
-    Dim PlayerHit As Short
   
     'Input shot
     If PlayerNum = 1 Then
@@ -411,18 +399,18 @@ Module GORILLA
   
     LOCATE(2, LocateCol)
     PRINT("Angle:", True)
-    Angle# = GetNum#(2, CShort(LocateCol + 7))
+    Dim Angle# = GetNum#(2, CShort(LocateCol + 7))
   
     LOCATE(3, LocateCol)
     PRINT("Velocity:", True)
-    Velocity = CShort(GetNum#(3, CShort(LocateCol + 10)))
+    Dim Velocity As Short = CShort(GetNum#(3, CShort(LocateCol + 10)))
   
     If PlayerNum = 2 Then
       Angle# = 180 - Angle#
     End If
   
     'Erase input
-    For i = 1 To 4
+    For i = 1S To 4S
       LOCATE(i, 1)
       PRINT(Space$(30 \ (80 \ MaxCol)), True)
       LOCATE(i, (50 \ (80 \ MaxCol)))
@@ -430,7 +418,7 @@ Module GORILLA
     Next
   
     SunHit = [FALSE]
-    PlayerHit = PlotShot(x_Int, y, Angle#, Velocity, PlayerNum)
+    Dim PlayerHit As Short = PlotShot(x_Int, y, Angle#, Velocity, PlayerNum)
     If PlayerHit = 0 Then
       DoShot = [FALSE]
     Else
@@ -583,33 +571,27 @@ Module GORILLA
   'Parameters:
   '  X#, Y# - shot location
   Function ExplodeGorilla(ByRef x_Dbl#, ByRef y#) As Short
-    Dim YAdj As Short
-    Dim XAdj As Short
-    Dim SclX#
-    Dim SclY#
     Dim PlayerHit As Short
-    Dim i As Short
-    Dim Count As Short
-    YAdj = Scl(12)
-    XAdj = Scl(5)
-    SclX# = ScrWidth / 320
-    SclY# = ScrHeight / 200
+    Dim YAdj As Short = Scl(12)
+    Dim XAdj As Short = Scl(5)
+    Dim SclX# = ScrWidth / 320
+    Dim SclY# = ScrHeight / 200
     If x_Dbl# < (ScrWidth / 2) Then PlayerHit = 1 Else PlayerHit = 2
     PLAY("MBO0L16EFGEFDC")
   
-    For i = 1 To CShort(8 * SclX#)
+    For i As Short = 1 To CShort(8 * SclX#)
       CIRCLE((GorillaX(PlayerHit) + (3.5! * SclX#)) + XAdj, (GorillaY(PlayerHit) + (7 * SclY#)) + YAdj, i, ExplosionColor, Nothing, Nothing, -1.57!)
       LINE(GorillaX(PlayerHit) + (7 * SclX#), (GorillaY(PlayerHit) + (9 * SclY#)) - i, GorillaX(PlayerHit), (GorillaY(PlayerHit) + (9 * SclY#)) - i, ExplosionColor)
     Next i
   
-    For i = 1 To CShort(16 * SclX#)
+    For i As Short = 1 To CShort(16 * SclX#)
       If i < (8 * SclX#) Then CIRCLE((GorillaX(PlayerHit) + (3.5! * SclX#)) + XAdj, (GorillaY(PlayerHit) + (7 * SclY#)) + YAdj, ((8 * SclX#) + 1) - i, BACKATTR, Nothing, Nothing, -1.57!)
       CIRCLE((GorillaX(PlayerHit) + (3.5! * SclX#)) + XAdj, GorillaY(PlayerHit) + YAdj, i, (i Mod 2) + 1, Nothing, Nothing, -1.57!)
     Next i
   
-    For i = CShort(24 * SclX#) To 1 Step -1
+    For i As Short = CShort(24 * SclX#) To 1 Step -1
       CIRCLE((GorillaX(PlayerHit) + (3.5! * SclX#)) + XAdj, GorillaY(PlayerHit) + YAdj, i, BACKATTR, Nothing, Nothing, -1.57!)
-      For Count = 1 To 200 : EMPTYLOOP()
+      For Count = 1S To 200S : EMPTYLOOP()
       Next
     Next i
   
@@ -667,11 +649,9 @@ Module GORILLA
   'Parameters:
   '  Row, Col - location to echo input
   Function GetNum#(ByRef Row As Short, ByRef Col As Short)
-    Dim Result$
-    Dim Done As Short
     Dim Kbd$
-    Result$ = ""
-    Done = [FALSE]
+    Dim Result$ = ""
+    Dim Done As Short = [FALSE]
     While INKEY$() <> "" : End While  'Clear keyboard buffer
   
     Do While (Not Done) <> 0
@@ -721,7 +701,6 @@ Module GORILLA
     Dim Char_$
     Dim y As Short
     Dim P$
-    Dim i As Short
     LOCATE(16, 34) : PRINT("--------------")
     LOCATE(18, 34) : PRINT("V = View Intro")
     LOCATE(19, 34) : PRINT("P = Play Game")
@@ -788,7 +767,7 @@ Module GORILLA
       PLAY("o2l16b9n0baan0g-n0g-n0g-eeen0o1b9n0baan0b")
       Rest(.3!)
   
-      For i = 1 To 4
+      For i = 1S To 4S
         PUT(x - 13, y, GorL%, PutOption.PUT_PSET)
         PUT(x + 47, y, GorR%, PutOption.PUT_PSET)
         PLAY("T160O0L32EFGEFDC")
@@ -834,7 +813,6 @@ Module GORILLA
   '  BCoor() - a user-defined type array which stores the coordinates of
   '  the upper left corner of each building.
   Sub MakeCityScape(ByRef BCoor() As XYPoint)
-    Dim Slope As Short
     Dim NewHt As Short
     Dim BottomLine As Short
     Dim HtInc As Short
@@ -844,14 +822,12 @@ Module GORILLA
     Dim WHeight As Short
     Dim WDifV As Short
     Dim WDifh As Short
-    Dim CurBuilding As Short
     Dim BWidth As Short
     Dim BHeight As Short
     Dim MaxHeight As Short
     Dim BuildingColor As Short
     Dim BACKGROUND As Short
     Dim c As Short
-    Dim i As Short
     Dim WinColr As Short
     Dim WindLine As Short
     Dim ArrowDir As Short
@@ -859,7 +835,7 @@ Module GORILLA
     x = 2
   
     'Set the sloping trend of the city scape. NewHt is new building height
-    Slope = FnRan(6)
+    Dim Slope As Short = FnRan(6)
     Select Case Slope
       Case 1 : NewHt = 15  'Upward slope
       Case 2 : NewHt = 130  'Downward slope
@@ -888,7 +864,7 @@ Module GORILLA
       WDifh = 4
     End If
   
-    CurBuilding = 1
+    Dim CurBuilding = 1S
     Do
   
       Select Case Slope
@@ -934,7 +910,7 @@ Module GORILLA
       'Draw the windows
       c = CShort(x + 3)
       Do
-        For i = CShort(BHeight - 3) To 7 Step -WDifV
+        For i As Short = CShort(BHeight - 3) To 7 Step -WDifV
           If Mode <> 9 Then
             WinColr = CShort((FnRan(2) - 2) * (-3))
           ElseIf FnRan(4) = 1 Then
@@ -985,9 +961,6 @@ Module GORILLA
   Sub PlaceGorillas(ByRef BCoor() As XYPoint)
     Dim XAdj As Short
     Dim YAdj As Short
-    Dim SclX#
-    Dim SclY#
-    Dim i As Short
     Dim BNum As Short
     Dim BWidth As Short
   
@@ -998,11 +971,11 @@ Module GORILLA
       XAdj = 7
       YAdj = 16
     End If
-    SclX# = ScrWidth / 320
-    SclY# = ScrHeight / 200
+    Dim SclX# = ScrWidth / 320
+    Dim SclY# = ScrHeight / 200
   
     'Place gorillas on second or third building from edge
-    For i = 1 To 2
+    For i = 1S To 2S
       If i = 1 Then BNum = CShort(FnRan(2) + 1) Else BNum = LastBuilding - FnRan(2)
   
       BWidth = BCoor(BNum + 1).XCoor - BCoor(BNum).XCoor
@@ -1020,17 +993,15 @@ Module GORILLA
   '  Player1$, Player2$ - player names
   '  NumGames - number of games to play
   Sub PlayGame(ByRef Player1$, ByRef Player2$, ByRef NumGames As Short)
-    Dim J As Short
-    Dim i As Short
     Dim Hit As Short
     Dim Tosser As Short
     Dim Tossee As Short
     Dim BCoor(30) As XYPoint
     Dim TotalWins(2) As Short
   
-    J = 1
+    Dim J = 1S
   
-    For i = 1 To NumGames
+    For i As Short = 1 To NumGames
   
       CLS()
       RANDOMIZE(CInt((Timer)))
@@ -1083,20 +1054,6 @@ Module GORILLA
   '  Velocity - shot velocity
   '  PlayerNum - the banana thrower
   Function PlotShot(ByRef StartX As Short, ByRef StartY As Short, ByRef Angle#, ByRef Velocity As Short, ByRef PlayerNum As Short) As Short
-    Dim Radius As Short
-    Dim InitXVel#
-    Dim InitYVel#
-    Dim oldx#
-    Dim oldy#
-    Dim adjust As Short
-    Dim xedge As Short
-    Dim Impact As Short
-    Dim ShotInSun As Short
-    Dim OnScreen As Short
-    Dim PlayerHit As Short
-    Dim NeedErase As Short
-    Dim StartXPos As Short
-    Dim StartYPos As Short
     Dim direction As Short
     Dim x_Dbl#
     Dim y#
@@ -1108,13 +1065,13 @@ Module GORILLA
     Dim rot As Short
   
     Angle# = (Angle# / 180) * pi#  'Convert degree angle to radians
-    Radius = CShort(Mode Mod 7)
+    Dim Radius As Short = CShort(Mode Mod 7)
   
-    InitXVel# = Cos(Angle#) * Velocity
-    InitYVel# = Sin(Angle#) * Velocity
+    Dim InitXVel# = Cos(Angle#) * Velocity
+    Dim InitYVel# = Sin(Angle#) * Velocity
   
-    oldx# = StartX
-    oldy# = StartY
+    Dim oldx# = StartX
+    Dim oldy# = StartY
   
     'draw gorilla toss
     If PlayerNum = 1 Then
@@ -1130,18 +1087,18 @@ Module GORILLA
     'redraw gorilla
     PUT(StartX, StartY, GorD%, PutOption.PUT_PSET)
   
-    adjust = Scl(4)  'For scaling CGA
+    Dim adjust As Short = Scl(4)  'For scaling CGA
   
-    xedge = CShort(Scl(9) * (2 - PlayerNum))  'Find leading edge of banana for check
+    Dim xedge As Short = CShort(Scl(9) * (2 - PlayerNum))  'Find leading edge of banana for check
   
-    Impact = [FALSE]
-    ShotInSun = [FALSE]
-    OnScreen = [TRUE]
-    PlayerHit = 0
-    NeedErase = [FALSE]
+    Dim Impact As Short = [FALSE]
+    Dim ShotInSun As Short = [FALSE]
+    Dim OnScreen As Short = [TRUE]
+    Dim PlayerHit = 0S
+    Dim NeedErase As Short = [FALSE]
   
-    StartXPos = StartX
-    StartYPos = CShort((StartY - adjust) - 3)
+    Dim StartXPos As Short = StartX
+    Dim StartYPos As Short = CShort((StartY - adjust) - 3)
   
     If PlayerNum = 2 Then
       StartXPos = StartXPos + Scl(25)
@@ -1229,10 +1186,8 @@ Module GORILLA
   'Rest:
   '  pauses the program
   Sub Rest(ByRef t#)
-    Dim s#
-    Dim t2#
-    s# = Timer
-    t2# = (MachSpeed * t#) / SPEEDCONST
+    Dim s# = Timer
+    Dim t2# = (MachSpeed * t#) / SPEEDCONST
     Do
     EMPTYLOOP() : Loop Until (Timer - s#) > t2#
   End Sub
@@ -1285,13 +1240,11 @@ Module GORILLA
   'SparklePause:
   '  Creates flashing border for intro and game over screens
   Sub SparklePause()
-    Dim A$
     Dim A_Int As Short
-    Dim b As Short
     Dim c As Short
   
     COLOR(4, 0)
-    A$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
+    Dim A$ = "*    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    "
     While INKEY$() <> "" : End While  'Clear keyboard buffer
   
     While INKEY$() = ""
@@ -1301,7 +1254,7 @@ Module GORILLA
         LOCATE(22, 1)
         PRINT(Mid$(A$, 6 - A_Int, 80), True)
   
-        For b = 2 To 21  'Print Vertical sparkles
+        For b = 2S To 21S  'Print Vertical sparkles
           c = CShort((A_Int + b) Mod 5)
           If c = 1 Then
             LOCATE(b, 80)
@@ -1340,7 +1293,6 @@ Module GORILLA
   'Parameters:
   '  Player - which gorilla is dancing
   Sub VictoryDance(ByRef Player As Short)
-    Dim i#
   
     For i# = 1 To 4
       PUT(GorillaX(Player), GorillaY(Player), GorL%, PutOption.PUT_PSET)

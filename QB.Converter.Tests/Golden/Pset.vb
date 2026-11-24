@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,17 +11,15 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module Pset_Program
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim i As Short
-    Dim delay As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/PSET.htm
     SCREEN(1)
-    For i = 0 To 320
+    For i = 0S To 320S
         PSET(i, 100)
-        For delay = 1 To 100 : EMPTYLOOP() : Next delay
+        For delay = 1S To 100S : EMPTYLOOP() : Next delay
         PRESET(i, 100)
     Next i
   End Sub

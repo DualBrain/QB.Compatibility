@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,14 +11,13 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module Color_Program
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim i As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/COLOR.htm
     SCREEN(7)
-    For i = 0 To 15
+    For i = 0S To 15S
         COLOR(i)
         PRINT(Str$(i) & " ")
     Next i

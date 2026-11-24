@@ -19,6 +19,7 @@ Namespace QB2VB
     Private Sub Pass2()
 
       EmitData()
+      PlanInlineDeclarations()
 
       Dim i = 0
       Do While i < m_lines.Count
@@ -368,6 +369,8 @@ Namespace QB2VB
       Dim dims = If(v.IsArray, "(" & If(v.DeferRank > 0, New String(","c, v.DeferRank - 1), If(v.Dims <> "", v.Dims, "10")) & ")", "")
       If v.UserType <> "" Then Return name & dims & " As " & v.UserType
       If v.HasSuffix Then Return name & dims
+      ' (a variable that the program never declared gets its type character, where VB has one)
+      If Not v.DeclaredAs AndAlso Not name.EndsWith("]", StringComparison.Ordinal) AndAlso Not (v.Qt = QT.String AndAlso v.FixedLen > 0) AndAlso Types.VbSuffix(v.Qt) <> "" Then Return name & Types.VbSuffix(v.Qt) & dims
       If v.FixedLen > 0 AndAlso Not v.IsArray AndAlso v.Qt = QT.String Then Return name & " As String = FixedString.Blank(" & v.FixedLen & ")"
       Return name & dims & " As " & Types.VbName(v.Qt)
     End Function
@@ -642,6 +645,7 @@ Namespace QB2VB
 
     Private Function HoistedConst(t As List(Of Token)) As List(Of String)
       Dim result As New List(Of String)
+      Dim savedScope = m_scope
       m_scope = m_module
       For Each part In SplitTopLevel(t, 1, t.Count)
         If part.Count < 3 OrElse Not part(1).Is_("=") Then Continue For
@@ -659,7 +663,7 @@ Namespace QB2VB
           result.Add("Const " & v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), " As " & Types.VbName(v.Qt)) & " = " & ExprParser.Coerce(e, v.Qt))
         End If
       Next
-      m_scope = If(m_curProc Is Nothing, m_main, m_scope)
+      m_scope = If(m_curProc Is Nothing, m_main, savedScope)
       Return result
     End Function
 
@@ -763,7 +767,14 @@ Namespace QB2VB
       m_scope = savedScope
       Dim result As New List(Of String)
       If redims.Count > 0 Then result.Add("ReDim " & String.Join(", ", redims))
-      If items.Count > 0 Then result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & String.Join(", ", items))
+      If items.Count > 1 AndAlso items.Any(Function(x) Not x.Contains(" As ")) AndAlso items.Any(Function(x) x.Contains(" As ")) Then
+        ' (a name with a type character takes the type of the declarator after it in VB, so each is declared on its own)
+        For Each item In items
+          result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & item)
+        Next
+      ElseIf items.Count > 0 Then
+        result.Add(If(keyword = "ReDim", "Dim", keyword) & " " & String.Join(", ", items))
+      End If
       If hoist Then m_mainPrologue.AddRange(fills) Else result.AddRange(fills)
       Return String.Join(" : ", result)
     End Function

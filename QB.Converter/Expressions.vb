@@ -456,6 +456,7 @@ Namespace QB2VB
         Dim e = New E(value.ToString(CultureInfo.InvariantCulture), If(isLong, QT.Long, QT.Short), QT.Long, True)
         e.IsLiteral = True : e.LiteralValue = value
         If value < 0 Then e.Atom = False
+        If value = Integer.MinValue Then e.Text = "Integer.MinValue" : e.Atom = True      ' (2147483648 alone is a Long in VB)
         Return e
       End If
 
@@ -606,6 +607,7 @@ Namespace QB2VB
           If qty = QT.Bool Then qty = QT.Short : vb = QT.Short
         End If
         Dim texts = args.Select(Function(a) a.Text).ToList()
+        If fn.SameAsArg AndAlso args.Count > 0 AndAlso (args(0).Qt = QT.Bool OrElse args(0).Vb = QT.Bool) Then texts(0) = Numeric(args(0)).Text
         Select Case upper
           Case "ERR", "ERL", "TIMER", "RND", "INKEY$", "DATE$", "TIME$", "CSRLIN", "FREEFILE"
             If args.Count = 0 AndAlso Not hasParen Then

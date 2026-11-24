@@ -523,8 +523,25 @@ Namespace QB2VB
       Dim v = ResolveVariableCore(t(s + 1).Text, False)
       Dim a = Expr(t, eq + 1, toIdx)
       Dim b = Expr(t, toIdx + 1, If(stepIdx > 0, stepIdx, e))
-      Dim text = "For " & ExprParser.VarText(v) & " = " & ExprParser.Coerce(a, v.Qt) & " To " & ExprParser.Coerce(b, v.Qt)
-      If stepIdx > 0 Then text &= " Step " & ExprParser.Coerce(Expr(t, stepIdx + 1, e), v.Qt)
+      Dim stepE = If(stepIdx > 0, Expr(t, stepIdx + 1, e), Nothing)
+      Dim startText = ExprParser.Coerce(a, v.Qt)
+      Dim limitText = ExprParser.Coerce(b, v.Qt)
+      Dim stepText = If(stepIdx > 0, ExprParser.Coerce(stepE, v.Qt), "")
+      Dim declText = ""
+      If m_inlineFor.Contains(m_emitIndex) AndAlso CanDeclareHere(v, True) Then
+        v.Declared = True
+        Dim la = If(v.HasSuffix, "", TypedLiteral(a, v.Qt))
+        Dim lb = If(v.HasSuffix, "", TypedLiteral(b, v.Qt))
+        Dim ls = If(stepIdx > 0 AndAlso Not v.HasSuffix, TypedLiteral(stepE, v.Qt), "")
+        If la <> "" AndAlso lb <> "" AndAlso (stepIdx < 0 OrElse ls <> "") Then
+          ' (the variable takes the type of its constants: For bottles = 4! To 1!)
+          startText = la : limitText = lb : stepText = ls
+        Else
+          declText = InlineDecl(v)
+        End If
+      End If
+      Dim text = "For " & If(declText <> "", declText, ExprParser.VarText(v)) & " = " & startText & " To " & limitText
+      If stepIdx > 0 Then text &= " Step " & stepText
       Return text
     End Function
 
@@ -553,6 +570,32 @@ Namespace QB2VB
     Private Shared Function CaseValue(x As E, sel As QT) As String
       If sel = QT.String OrElse sel = QT.Unknown OrElse x.Qt = QT.String Then Return x.Text
       Return ExprParser.Coerce(x, sel)
+    End Function
+
+    ' A whole or decimal constant of a variable's type, written with that type's character (4!, 1.5#, 7%, 5S), or "" when it isn't a plain number.
+    Private Shared Function TypedLiteral(x As E, qty As QT) As String
+      If Not x.IsLiteral Then Return ""
+      Dim text = ExprParser.Coerce(x, qty)
+      If Not System.Text.RegularExpressions.Regex.IsMatch(text, "^-?[0-9]+(\.[0-9]+)?$") Then Return ""
+      Select Case qty
+        Case QT.Single : Return text & "!"
+        Case QT.Double : Return text & "#"
+        Case QT.Long : If text.Contains("."c) Then Return "" Else Return text & "%"
+        Case QT.Short : If text.Contains("."c) Then Return "" Else Return text & "S"
+        Case Else : Return ""
+      End Select
+    End Function
+
+    ' How a variable is declared where it is first used: with its type character when VB has one (x!, x#, x%, s$), and with AS Short otherwise.
+    Private Shared Function InlineDecl(v As VarSym) As String
+      Dim name = ExprParser.VarText(v)
+      If v.HasSuffix OrElse v.Qt = QT.Short OrElse Types.VbSuffix(v.Qt) = "" OrElse name.EndsWith("]", StringComparison.Ordinal) Then Return DeclItem(v)
+      Return name & Types.VbSuffix(v.Qt)
+    End Function
+
+    ' A scalar local that nothing has declared yet.
+    Private Function CanDeclareHere(v As VarSym, Optional again As Boolean = False) As Boolean
+      Return (again OrElse Not v.Declared) AndAlso Not v.IsShared AndAlso Not v.IsParam AndAlso Not v.IsConst AndAlso Not v.IsArray AndAlso v.UserType = "" AndAlso v.FixedLen = 0 AndAlso v.FieldVar = "" AndAlso m_scope.Locals.Contains(v)
     End Function
 
     ' ---- Assignment ------------------------------------------------------------------------------------
@@ -596,6 +639,16 @@ Namespace QB2VB
       End If
       Dim lhs = Expr(t, s, eq)
       Dim target = lhs.Vb
+      If s = 0 AndAlso eq = 1 AndAlso m_inlineAssign.Contains(m_emitIndex) AndAlso lhs.FixedLen = 0 Then
+        Dim v = ResolveVariableCore(t(s).Text, False)
+        If CanDeclareHere(v) Then
+          v.Declared = True
+          ' (a number that is written out is typed by its own type character, and the variable by inference: Dim x = 1!)
+          Dim lit = If(v.HasSuffix, "", TypedLiteral(rhs, v.Qt))
+          If lit <> "" Then Return "Dim " & ExprParser.VarText(v) & " = " & lit
+          Return "Dim " & InlineDecl(v) & " = " & ExprParser.Coerce(rhs, target)
+        End If
+      End If
       ' STRING * n: what is assigned is padded or cut to n characters.
       If lhs.FixedLen > 0 Then Return lhs.Text & " = FixedString.Fit(" & ExprParser.Coerce(rhs, target) & ", " & lhs.FixedLen & ")"
       Return lhs.Text & " = " & ExprParser.Coerce(rhs, target)

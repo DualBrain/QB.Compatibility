@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,7 +11,7 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Video
 
-Module MkMbf
+Module Program
 
   Structure Buffer
     Implements IFileRecord
@@ -52,14 +49,12 @@ Module MkMbf
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim SNum As Single
-    Dim DNum As Single
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/CVSMBF.htm
     ' TYPE Buffer (see the Structure at the top)
     Dim RecBuffer As Buffer
     OPEN("TESTDAT.DAT", OpenMode.Random, 1, 12)
-    SNum = 98.9!
-    DNum = 645.3235622#
+    Dim SNum! = 98.9!
+    Dim DNum! = 645.3235622#
     RecBuffer.SngNum = MKSMBF$(SNum)
     RecBuffer.DblNum = MKDMBF$(DNum)
     PUT(1, 1, RecBuffer)

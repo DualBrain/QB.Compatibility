@@ -20,6 +20,127 @@ Namespace QB2VB
     Private m_inGosub As Boolean
     Private ReadOnly m_labelOwner As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)   ' label -> the line where its GOSUB routine starts, or -1 for the program itself
 
+    ' ---- Declaring a variable where it is first used ------------------------------------------------------------------
+    ' A variable that a procedure (or the program) first assigns at its top level is declared on that line, and a FOR variable that is
+    ' only used by FOR loops is declared by the loop.  Everything else is declared at the start, because VB's scopes are blocks.
+
+    Private ReadOnly m_inlineAssign As New HashSet(Of Integer)
+    Private ReadOnly m_inlineFor As New HashSet(Of Integer)
+
+    Private Shared Function NameKey(tk As Token) As String
+      Dim idx = tk.Text.Length
+      Dim last = tk.Text(tk.Text.Length - 1)
+      If "%&!#$".IndexOf(last) >= 0 Then idx -= 1
+      Return tk.Text.Substring(0, idx).ToUpperInvariant()
+    End Function
+
+    Private Sub PlanInlineDeclarations()
+      Dim units As New List(Of List(Of Integer))
+      Dim main As New List(Of Integer)
+      Dim cur As List(Of Integer) = Nothing
+      Dim skipUnit = False
+      For i = 0 To m_lines.Count - 1
+        Dim t = m_lines(i).Tokens
+        If cur Is Nothing AndAlso t.Count > 1 AndAlso (t(0).IsWord("SUB") OrElse t(0).IsWord("FUNCTION")) Then
+          cur = New List(Of Integer) From {i}
+          skipUnit = t.Any(Function(x) x.IsWord("STATIC"))
+          Continue For
+        End If
+        If cur IsNot Nothing Then
+          cur.Add(i)
+          If t.Count >= 2 AndAlso t(0).IsWord("END") AndAlso (t(1).IsWord("SUB") OrElse t(1).IsWord("FUNCTION")) Then
+            If Not skipUnit Then units.Add(cur)
+            cur = Nothing
+          End If
+        Else
+          main.Add(i)
+        End If
+      Next
+      If m_gosubTargets.Count = 0 Then units.Add(main)
+      For Each unit In units
+        PlanUnit(unit)
+      Next
+    End Sub
+
+    Private Sub PlanUnit(unit As List(Of Integer))
+      ' Programs that jump around in ways that make the first use hard to know keep their declarations at the start.
+      For Each i In unit
+        For Each tk In m_lines(i).Tokens
+          If tk.IsWord("GOSUB") OrElse tk.IsWord("RESUME") OrElse tk.IsWord("RETURN") OrElse tk.IsWord("COMMON") OrElse tk.IsWord("CHAIN") OrElse tk.IsWord("RUN") Then Return
+          If tk.IsWord("ERROR") Then Return
+        Next
+      Next
+      ' The depth of each line (the blocks that are open before it) and the lines where each name occurs.
+      Dim depthBefore(unit.Count - 1) As Integer
+      Dim depthAfter(unit.Count - 1) As Integer
+      Dim occurs As New Dictionary(Of String, List(Of Integer))
+      Dim depth = 0
+      For n = 0 To unit.Count - 1
+        Dim t = m_lines(unit(n)).Tokens
+        depthBefore(n) = depth
+        If t.Count > 0 Then
+          Dim first = t(0).Upper()
+          Dim delta = BlockDelta(t)
+          If first = "IF" AndAlso t(t.Count - 1).IsWord("THEN") Then delta += 1
+          If first = "END" AndAlso t.Count > 1 AndAlso t(1).IsWord("IF") Then delta -= 1
+          depth = Math.Max(0, depth + delta)
+          If first = "DECLARE" OrElse first.StartsWith("DEF", StringComparison.Ordinal) AndAlso first <> "DEF" Then
+            depthAfter(n) = depth
+            Continue For
+          End If
+        End If
+        depthAfter(n) = depth
+        For k = 0 To t.Count - 1
+          If t(k).Kind <> TokKind.Ident Then Continue For
+          If k > 0 AndAlso t(k - 1).Is_(".") Then Continue For
+          Dim key = NameKey(t(k))
+          Dim lst As List(Of Integer) = Nothing
+          If Not occurs.TryGetValue(key, lst) Then lst = New List(Of Integer) : occurs(key) = lst
+          If lst.Count = 0 OrElse lst(lst.Count - 1) <> n Then lst.Add(n)
+        Next
+      Next
+
+      ' Plain assignments at the top level that come first.
+      Dim forVars As New Dictionary(Of String, List(Of (Start As Integer, [End] As Integer)))
+      For n = 0 To unit.Count - 1
+        Dim ln = m_lines(unit(n))
+        Dim t = ln.Tokens
+        If t.Count < 3 OrElse ln.Label <> "" OrElse ln.LineNumber <> "" Then Continue For
+        If t(0).Kind = TokKind.Ident AndAlso t(1).Is_("=") AndAlso depthBefore(n) = 0 AndAlso Not t.Any(Function(x) x.Is_(":")) Then
+          Dim key = NameKey(t(0))
+          If Keywords.IsStatementWord(t(0).Text) OrElse Builtins.Table.ContainsKey(t(0).Text) Then Continue For
+          If occurs(key)(0) <> n Then Continue For
+          Dim inRhs = False
+          For k = 2 To t.Count - 1
+            If t(k).Kind = TokKind.Ident AndAlso NameKey(t(k)) = key AndAlso Not t(k - 1).Is_(".") Then inRhs = True
+          Next
+          If Not inRhs Then m_inlineAssign.Add(unit(n))
+        ElseIf t(0).IsWord("FOR") AndAlso t.Count > 3 AndAlso t(1).Kind = TokKind.Ident AndAlso t(2).Is_("=") Then
+          ' The loop ends at the NEXT that brings the depth back.
+          Dim [end] = -1
+          For q = n To unit.Count - 1
+            If depthAfter(q) <= depthBefore(n) Then [end] = q : Exit For
+          Next
+          If [end] < 0 Then Continue For
+          Dim key = NameKey(t(1))
+          Dim list As List(Of (Start As Integer, [End] As Integer)) = Nothing
+          If Not forVars.TryGetValue(key, list) Then list = New List(Of (Start As Integer, [End] As Integer)) : forVars(key) = list
+          list.Add((n, [end]))
+        End If
+      Next
+      ' A FOR variable that only FOR loops use is declared by the loops (each is a scope of its own).
+      For Each kv In forVars
+        Dim ok = True
+        For Each line In occurs(kv.Key)
+          If Not kv.Value.Any(Function(r) line >= r.Start AndAlso line <= r.End) Then ok = False : Exit For
+        Next
+        If Not ok Then Continue For
+        For Each r In kv.Value
+          m_inlineFor.Add(unit(r.Start))
+        Next
+      Next
+    End Sub
+
     ' ---- Pass 1: what the program declares ---------------------------------------------------------------
 
     Private Function ParseAsType(toks As List(Of Token), ByRef p As Integer, ByRef userType As String, ByRef fixedLen As Integer) As QT
@@ -90,7 +211,8 @@ Namespace QB2VB
         TypeOfName(tk.Text, hasSuffix, bare)
         If Keywords.IsStatementWord(tk.Text) OrElse s_notVariables.Contains(bare) OrElse Builtins.Table.ContainsKey(tk.Text) OrElse Builtins.LibraryNames.Contains(tk.Text) Then Continue For
         If bare.StartsWith("FN", StringComparison.OrdinalIgnoreCase) OrElse m_procs.ContainsKey(bare) OrElse m_types.ContainsKey(bare) Then Continue For
-        If sym.Params.Any(Function(prm) prm.QbName.Equals(bare, StringComparison.OrdinalIgnoreCase)) Then Continue For
+        If sym IsNot Nothing AndAlso sym.Params.Any(Function(prm) prm.QbName.Equals(bare, StringComparison.OrdinalIgnoreCase)) Then Continue For
+        If k > 0 AndAlso (t(k - 1).IsWord("GOTO") OrElse t(k - 1).IsWord("GOSUB") OrElse t(k - 1).IsWord("RESUME")) Then Continue For
         If k + 1 < t.Count AndAlso t(k + 1).Is_(".") Then Continue For
         If k > 0 AndAlso t(k - 1).IsWord("AS") Then Continue For
         m_sharedNames.Add(tk.Text & If(k + 1 < t.Count AndAlso t(k + 1).Is_("("), "()", ""))
@@ -102,6 +224,7 @@ Namespace QB2VB
 
       Dim inProc As ProcSym = Nothing
       Dim procScope As Scope = Nothing
+      Dim procHandlers As New List(Of String)
 
       For i = 0 To m_lines.Count - 1
         Dim ln = m_lines(i)
@@ -127,6 +250,7 @@ Namespace QB2VB
         End If
 
         If inProc IsNot Nothing AndAlso inProc.IsDefBlock Then ShareDefVariables(t, 0, inProc)
+        If inProc IsNot Nothing AndAlso t.Count >= 4 AndAlso t(0).IsWord("ON") AndAlso t(1).IsWord("ERROR") AndAlso t(2).IsWord("GOTO") Then procHandlers.Add(t(3).Text)
         Try
           Select Case first
             Case "DEFINT", "DEFSNG", "DEFDBL", "DEFLNG", "DEFSTR"
@@ -206,6 +330,16 @@ Namespace QB2VB
         Catch ex As ConvertException
           Note(ex.Message)
         End Try
+      Next
+
+      ' An error handler of the program's own code that a procedure names is copied into the procedure, where it works on the program's
+      ' variables: they are module-level too.
+      For Each label In procHandlers
+        Dim start As Integer
+        If Not m_mainLabels.TryGetValue(label, start) Then Continue For
+        For q = start To HandlerRegionEnd(start)
+          ShareDefVariables(m_lines(q).Tokens, 0, Nothing)
+        Next
       Next
 
       ' A name that a procedure SHARES is module-level for the whole program.

@@ -1,7 +1,4 @@
-' Converted from QBasic by qb2vb.  Lines marked TODO(QB2VB) need attention.
-Option Explicit On
-Option Strict On
-Option Infer On
+' Converted from QBasic by qb2vb.
 
 Imports System.Math
 Imports QB
@@ -14,18 +11,16 @@ Imports QB.Multimedia
 Imports QB.Printer
 Imports QB.Graphics
 
-Module Point_Program
+Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim y As Short
-    Dim x As Short
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/POINT.htm
     SCREEN(1)
     LINE(0, 0, 100, 100, 2)
     LOCATE(14, 1)
-    For y = 1 To 10
-        For x = 1 To 10
+    For y = 1S To 10S
+        For x = 1S To 10S
             PRINT(Str$(POINT(x, y)) & " ", True)
         Next x
         PRINT()

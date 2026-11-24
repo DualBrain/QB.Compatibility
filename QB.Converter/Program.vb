@@ -10,7 +10,7 @@ Namespace QB2VB
   Friend Module Program
 
     ''' <summary>A project file for a converted program: text programs reference only QB.Compatibility; the SDL assembly is added for graphics and sound.</summary>
-    Friend Function ProjectText(moduleName As String, sourceFile As String, projectDir As String, libDir As String, needsSdl As Boolean, needsPorts As Boolean, aot As Boolean) As String
+    Friend Function ProjectText(moduleName As String, sourceFile As String, projectDir As String, libDir As String, needsSdl As Boolean, needsPorts As Boolean, aot As Boolean, Optional namespaces As IEnumerable(Of String) = Nothing) As String
       Dim core = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility", "QB.Compatibility.vbproj"))
       Dim sdl = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility.Sdl", "QB.Compatibility.Sdl.vbproj"))
       Dim ports = Path.GetRelativePath(projectDir, Path.Combine(Path.GetFullPath(libDir), "QB.Compatibility.Ports", "QB.Compatibility.Ports.vbproj"))
@@ -35,6 +35,13 @@ Namespace QB2VB
       sb.AppendLine("  <PropertyGroup Condition=" & q & "'$(OutputType)' == 'WinExe'" & q & ">")
       sb.AppendLine("    <DefineConstants>QB_WINDOW</DefineConstants>")
       sb.AppendLine("  </PropertyGroup>")
+      If namespaces IsNot Nothing Then
+        sb.AppendLine("  <ItemGroup>")
+        For Each name In namespaces
+          sb.AppendLine("    <Import Include=" & q & name & q & " />")
+        Next
+        sb.AppendLine("  </ItemGroup>")
+      End If
       sb.AppendLine("  <ItemGroup>")
       sb.AppendLine("    <Compile Include=" & q & sourceFile & q & " />")
       sb.AppendLine("    <ProjectReference Include=" & q & core & q & " />")
@@ -49,18 +56,9 @@ Namespace QB2VB
       Return sb.ToString
     End Function
 
-    ''' <summary>The VB module name for a source file: its name, made into an identifier that doesn't clash with a statement or function.</summary>
+    ''' <summary>The VB module name of every converted program.</summary>
     Friend Function ModuleNameFor(path As String) As String
-      Dim moduleName = IO.Path.GetFileNameWithoutExtension(path)
-      Dim sb As New StringBuilder
-      For Each c In moduleName
-        sb.Append(If(Char.IsLetterOrDigit(c), c, "_"c))
-      Next
-      moduleName = sb.ToString
-      If moduleName = "" OrElse Char.IsDigit(moduleName(0)) Then moduleName = "Program_" & moduleName
-      ' (A module can't share its name with a statement or function it calls.)
-      If Keywords.IsStatementWord(moduleName) OrElse Keywords.IsVbReserved(moduleName) OrElse Builtins.Table.ContainsKey(moduleName) OrElse Builtins.Table.ContainsKey(moduleName & "$") OrElse Builtins.LibraryNames.Contains(moduleName) Then moduleName &= "_Program"
-      Return moduleName
+      Return "Program"
     End Function
 
     Public Function Main(args As String()) As Integer
@@ -97,16 +95,16 @@ Namespace QB2VB
       Dim source = File.ReadAllText(input, Encoding.GetEncoding(437))
       Dim moduleName = ModuleNameFor(input)
 
-      Dim conv As New Converter(source) With {.EmptyLoopMicroseconds = emptyLoop}
+      Dim conv As New Converter(source) With {.EmptyLoopMicroseconds = emptyLoop, .OmitImports = libDir <> ""}
       Dim vb = conv.Convert(moduleName)
       If output = "" Then output = Path.ChangeExtension(input, ".vb")
       File.WriteAllText(output, vb, New UTF8Encoding(False))
 
       Console.WriteLine($"{input} -> {output}")
       If libDir <> "" Then
-        Dim projectPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), moduleName & ".vbproj")
+        Dim projectPath = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(output)), Path.GetFileNameWithoutExtension(input) & ".vbproj")
         Dim needsSdl = conv.UsesGraphics
-        File.WriteAllText(projectPath, ProjectText(moduleName, Path.GetFileName(output), Path.GetDirectoryName(projectPath), libDir, needsSdl, conv.UsesSerial, aot), New UTF8Encoding(False))
+        File.WriteAllText(projectPath, ProjectText(moduleName, Path.GetFileName(output), Path.GetDirectoryName(projectPath), libDir, needsSdl, conv.UsesSerial, aot, conv.Imports), New UTF8Encoding(False))
         Console.WriteLine($"{projectPath}  (references QB.Compatibility{If(needsSdl, " and QB.Compatibility.Sdl", "")}{If(conv.UsesSerial, " and QB.Compatibility.Ports", "")})")
       End If
       For Each n In conv.Notes
