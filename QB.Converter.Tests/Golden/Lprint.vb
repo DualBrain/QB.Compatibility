@@ -18,7 +18,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim a$
+    Dim a$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/LPRINT.htm
     OPEN("TEST.DAT", OpenMode.Output, 1)
     PRINT_USING(1, "##.###  ", 12.12345!)

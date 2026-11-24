@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim ln$
+    Dim ln$ = ""
     
     OPEN("input.fasta", OpenMode.Input, 1)
     

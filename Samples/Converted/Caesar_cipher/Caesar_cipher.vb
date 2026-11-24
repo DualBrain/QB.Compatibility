@@ -7,10 +7,10 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim dec$
-    Dim tipo$
+    Dim dec$ = ""
+    Dim tipo$ = ""
     Dim llave!
-    Dim cadena$
+    Dim cadena$ = ""
     Dim longitud!
     Dim iTemp!
     dec$ = ""

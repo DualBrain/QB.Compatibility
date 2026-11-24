@@ -35,7 +35,7 @@ Module Program
 #End If
     Dim Year As Short
     Dim Month As Short
-    Dim Resp$
+    Dim Resp$ = ""
     DATA("January", 31, "February", 28, "March", 31)
     DATA("April", 30, "May", 31, "June", 30, "July", 31, "August", 31)
     DATA("September", 30, "October", 31, "November", 30, "December", 31)
@@ -191,7 +191,7 @@ Module Program
   Sub PrintCalendar(ByRef Year As Short, ByRef Month As Short)
     Static StartDay As Short
     Static TotalDays As Short
-    Static Header$
+    Static Header$ = ""
     Static LeftMargin As Short
     Static I As Short
   ' SHARED MonthData() AS MonthType   (shared variables are declared at module level)

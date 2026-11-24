@@ -73,8 +73,8 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     Dim RecordNumber As Short
-    Dim Choice$
-    Dim Pause$
+    Dim Choice$ = ""
+    Dim Pause$ = ""
     ' DEFINT A-Z
     
     ' Define the symbolic constants used globally in the program:
@@ -161,7 +161,7 @@ Module Program
   ' ============================================================
   '
   Sub AddRecord(ByRef RecordVar As StockItem)
-    Static OK$
+    Static OK$ = ""
      ' SHARED Index() AS IndexType, NumberOfRecords   (shared variables are declared at module level)
      Do
         CLS()
@@ -190,11 +190,11 @@ Module Program
   ' ============================================================
   '
   Function Filter$(ByRef Prompt$)
-    Static ValTemp2$
-    Static ValTemp1$
+    Static ValTemp2$ = ""
+    Static ValTemp1$ = ""
     Static StringLength As Short
     Static I As Short
-    Static Char_$
+    Static Char_$ = ""
      ValTemp2$ = ""
      PRINT(Prompt$, True)  ' Print the prompt passed.
      INPUT("", ValTemp1$, False)  ' Input a number as
@@ -230,7 +230,7 @@ Module Program
     Static TopRecord As Short
     Static BottomRecord As Short
     Static Midpoint As Short
-    Static Test$
+    Static Test$ = ""
      ' SHARED Index() AS IndexType, NumberOfRecords   (shared variables are declared at module level)
   
      ' Set top and bottom bounds of search:
@@ -285,7 +285,7 @@ Module Program
   ' ============================================================
   '
   Sub InputRecord(ByRef RecordVar As StockItem)
-    Static Part$
+    Static Part$ = ""
      CLS()
      ShowPartNumbers()  ' Call the ShowPartNumbers SUB.
   

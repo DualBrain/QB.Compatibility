@@ -26,7 +26,7 @@ Module Program
 
   
   Function lcs$(ByRef list$())
-    Dim sub_$
+    Dim sub_$ = ""
       If UBound(list$) = (-1) Then lcs$ = "" : Exit Function
   
       Dim ref$ = list$(0)

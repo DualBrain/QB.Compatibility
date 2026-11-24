@@ -383,9 +383,25 @@ Namespace QB2VB
       Dim l = ParsePrimary()
       Do While Cur IsNot Nothing AndAlso Cur.Is_("^")
         m_pos += 1
-        l = Arith("^", l, ParseUnary())
+        l = Arith("^", l, ParseExponent())
       Loop
       Return l
+    End Function
+
+    ' The exponent after ^ : a primary with an optional sign.  (^ is applied from the left in QBasic: 5^3^2 is (5^3)^2.)
+    Private Function ParseExponent() As E
+      If Cur IsNot Nothing AndAlso Cur.Is_("-") Then
+        m_pos += 1
+        Dim e = Numeric(ParseExponent())
+        Dim r = New E("-" & Paren(e), e.Qt, e.Vb, False)
+        If e.IsLiteral Then r.IsLiteral = True : r.LiteralValue = -e.LiteralValue
+        Return r
+      End If
+      If Cur IsNot Nothing AndAlso Cur.Is_("+") Then
+        m_pos += 1
+        Return ParseExponent()
+      End If
+      Return ParsePrimary()
     End Function
 
     ' ---- Primary expressions ---------------------------------------------------------------------
@@ -611,7 +627,7 @@ Namespace QB2VB
         Select Case upper
           Case "ERR", "ERL", "TIMER", "RND", "INKEY$", "DATE$", "TIME$", "CSRLIN", "FREEFILE"
             If args.Count = 0 AndAlso Not hasParen Then
-              Dim noArgs = If(upper = "ERR" OrElse upper = "ERL" OrElse upper = "TIMER", fn.VbName, fn.VbName & "()")
+              Dim noArgs = If(upper = "ERR" OrElse upper = "ERL" OrElse upper = "TIMER", fn.VbName, If(upper = "DATE$" OrElse upper = "TIME$", "(" & fn.VbName & ")", fn.VbName & "()"))      ' (VB's DateString and TimeString are properties: in parentheses they are not passed back to be set)
               Return New E(noArgs, qty, vb, True)
             End If
         End Select

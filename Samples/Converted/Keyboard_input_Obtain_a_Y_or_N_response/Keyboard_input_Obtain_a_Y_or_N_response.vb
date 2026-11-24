@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim KBD$
+    Dim KBD$ = ""
     PRINT("Press Y or N to continue.")
     Do
         KBD$ = ""

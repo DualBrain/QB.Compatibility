@@ -16,7 +16,7 @@ Module Program
 
   
   Sub colourhex(ByRef s$)
-    Dim ch$
+    Dim ch$ = ""
     Dim k!
       For i! = 1 To Len(s$)
           ch$ = Mid$(s$, CInt(i), 1)

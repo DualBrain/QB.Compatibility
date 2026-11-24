@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim hexi$
+    Dim hexi$ = ""
     ' DECLARE FUNCTION isPrime! (num!)
     ' DECLARE FUNCTION Reverse$ (text$)
     

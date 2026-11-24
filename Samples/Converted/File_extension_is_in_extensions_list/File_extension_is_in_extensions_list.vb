@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim d$
+    Dim d$ = ""
     Dim flag!
     DATA(".zip", ".rar", ".7z", ".gz", ".archive", ".a##", ".tar.bz2")
     DATA("MyData.a##", "MyData.tar.gz", "MyData.gzip", "MyData.7z.backup")

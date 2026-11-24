@@ -8,7 +8,7 @@ Module Program
     Dim Y!
     Dim PaletteVal!
     Dim BackGroundVal!
-    Dim Pause$
+    Dim Pause$ = ""
     SCREEN(1)
     
     Dim Esc$ = QBChr(27)

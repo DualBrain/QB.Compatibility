@@ -7,8 +7,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim KeyInput$
-    Dim ModemInput$
+    Dim KeyInput$ = ""
+    Dim ModemInput$ = ""
     ' DEFINT A-Z
     
     ' DECLARE SUB Filter (InString$)

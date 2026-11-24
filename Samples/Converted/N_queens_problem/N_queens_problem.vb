@@ -29,7 +29,7 @@ Module Program
 
   
   Sub dofila(ByRef ifila As Single)  ' comienza con la fila de abajo
-    Dim s1$
+    Dim s1$ = ""
       For icol! = 1 To queens
           For iqueen! = 1 To ifila - 1  ' Comprueba conflictos con las reinas anteriores
               If arrayqcol(CInt(iqueen)) = icol Then GoTo continue1  ' misma columna?

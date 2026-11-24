@@ -7,8 +7,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim inicio$
-    Dim pieza$
+    Dim inicio$ = ""
+    Dim pieza$ = ""
     Dim posic!
     RANDOMIZE(CInt(Timer))  ' DELETE for Run BASIC, Just Basic & Liberty BASIC
     

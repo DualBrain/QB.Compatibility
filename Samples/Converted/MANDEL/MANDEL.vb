@@ -186,7 +186,7 @@ Module Program
   ' ============================================================
   '
   Sub WindowVals(ByRef WL As Short, ByRef WR As Short, ByRef WT As Short, ByRef WB As Short)
-    Static Resp$
+    Static Resp$ = ""
      CLS()
      PRINT("This program prints the graphic representation of")
      PRINT("the complete Mandelbrot Set. The default window is")

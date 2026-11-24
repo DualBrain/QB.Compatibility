@@ -47,7 +47,7 @@ Module Program
 
   
   Function HexToBinary$(ByRef hexString As String)
-    Dim hexDigit$
+    Dim hexDigit$ = ""
     Dim idx!
       Dim hexMap(15) As String
       hexMap(0) = "0000" : hexMap(1) = "0001" : hexMap(2) = "0010" : hexMap(3) = "0011"
@@ -70,7 +70,7 @@ Module Program
   
   
   Sub ParseASCIIArt()
-    Dim bitPattern$
+    Dim bitPattern$ = ""
       Dim header As String
       header = "  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+" + QBChr(10)
       header = (header + "  |                      ID                       |") + QBChr(10)

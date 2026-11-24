@@ -7,9 +7,9 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim s$
-    Dim letter$
-    Dim char_$
+    Dim s$ = ""
+    Dim letter$ = ""
+    Dim char_$ = ""
     CLS()
     INPUT("Enter a string: ", s$, False)
     Dim ans$ = ""

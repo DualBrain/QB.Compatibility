@@ -7,9 +7,9 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim Ar$
+    Dim Ar$ = ""
     Dim I!
-    Dim P$
+    Dim P$ = ""
     Dim Q!
     Dim Q_Sng!(10)
     Dim K!

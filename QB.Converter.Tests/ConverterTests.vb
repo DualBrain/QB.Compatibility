@@ -16,7 +16,7 @@ Namespace QB2VB.Tests
       Dim lines = vb.Replace(vbCrLf, vbLf).Split(vbLf(0)).Select(Function(l) l.Trim()).ToList()
       Dim s = lines.IndexOf("Public Sub Main()")
       Dim e = lines.IndexOf("End Sub", s)
-      Dim body = lines.GetRange(s + 1, e - s - 1).Select(Function(l) Text.RegularExpressions.Regex.Replace(Text.RegularExpressions.Regex.Replace(l, "^Dim ([\w$%&!#\[\]]+)( As \w+)? = ", "$1 = "), "^For ([\w$%&!#]+) As \w+ = ", "For $1 = ")).ToList()
+      Dim body = lines.GetRange(s + 1, e - s - 1).Where(Function(l) Not Text.RegularExpressions.Regex.IsMatch(l, "^Dim [^ ]+\$ = """"$")).Select(Function(l) Text.RegularExpressions.Regex.Replace(Text.RegularExpressions.Regex.Replace(l, "^Dim ([\w$%&!#\[\]]+)( As \w+)? = ", "$1 = "), "^For ([\w$%&!#]+) As \w+ = ", "For $1 = ")).ToList()
       Return body.Where(Function(l) l <> "" AndAlso Not l.Contains(".WaitForKeyAtExit") AndAlso l <> "#If QB_WINDOW Then" AndAlso l <> "QB.SdlBackend.Use()" AndAlso l <> "#End If" AndAlso Not l.StartsWith("Dim ", StringComparison.Ordinal)).ToList()
     End Function
 
@@ -680,6 +680,20 @@ Namespace QB2VB.Tests
       Assert.Contains("Dim x = 1!", vb)
       ' k is first used inside an IF: it can't be declared there, so it is declared at the start
       Assert.Contains("Dim k!" & vbLf, vb.Replace(vbCrLf, vbLf))
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub PowerIsAppliedFromTheLeft()
+      AssertMain("PRINT 5 ^ 3 ^ 2; 2 ^ -1", "PRINT(Str$((5 ^ 3) ^ 2) & "" "" & Str$(2 ^ (-1)) & "" "")")
+    End Sub
+
+    <Fact>
+    Public Sub StringsStartOutEmptyAndDateAndTimeAreNotPassedBack()
+      Dim vb = Convert("PRINT LEN(a$)" & vbLf & "x$ = DATE$" & vbLf & "PRINT FNy(DATE$)" & vbLf & "DEF FNy(d$) = LEN(d$)")
+      Assert.Contains("Dim a$ = """"", vb)
+      Assert.Contains("(DateString)", vb)
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", errors)
     End Sub

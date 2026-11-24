@@ -7,8 +7,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim d$
-    Dim x$
+    Dim d$ = ""
+    Dim x$ = ""
     DATA("DATA")
     DATA("READ d$")
     DATA("DO")

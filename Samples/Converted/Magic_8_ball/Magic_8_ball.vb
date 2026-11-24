@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim question$
+    Dim question$ = ""
     DATA("It is certain.", "It is decidedly so.")
     DATA("Without a doubt.", "Yes ? definitely.")
     DATA("You may rely on it.", "As I see it, yes.")

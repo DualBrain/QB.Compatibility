@@ -18,10 +18,10 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim Name$
-    Dim Age$
-    Dim R$
-    Dim REC$
+    Dim Name$ = ""
+    Dim Age$ = ""
+    Dim R$ = ""
+    Dim REC$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/INPUT.htm
     CLS()
     OPEN("LIST", OpenMode.Output, 1)

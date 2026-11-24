@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    PRINT("5^3^2   =" & Str$(5 ^ (3 ^ 2)) & " ")
+    PRINT("5^3^2   =" & Str$((5 ^ 3) ^ 2) & " ")
     PRINT("(5^3)^2 =" & Str$((5 ^ 3) ^ 2) & " ")
     PRINT("5^(3^2) =" & Str$(5 ^ (3 ^ 2)) & " ")
     End

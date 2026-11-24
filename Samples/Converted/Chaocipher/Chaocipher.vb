@@ -123,7 +123,7 @@ Module Program
   
   
   Function Decode$(ByRef Text$, ByRef ct$, ByRef pt$)
-    Dim Char_$
+    Dim Char_$ = ""
     Dim CharPos!
       Dim tStr$ = ""
   
@@ -142,7 +142,7 @@ Module Program
   
   
   Function Encode$(ByRef Text$, ByRef ct$, ByRef pt$)
-    Dim Char_$
+    Dim Char_$ = ""
     Dim CharPos!
       Dim tStr$ = ""
   

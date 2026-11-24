@@ -14,7 +14,7 @@ Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim k$
+    Dim k$ = ""
     SCREEN(13)
     PALETTE(1, CInt(pColor(35, 33, 31)))
     PALETTE(2, CInt(pColor(46, 46, 51)))

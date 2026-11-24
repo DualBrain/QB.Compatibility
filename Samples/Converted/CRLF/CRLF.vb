@@ -12,13 +12,13 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim CarReturn$
-    Dim LineFeed$
-    Dim OutFile$
-    Dim InFile$
+    Dim CarReturn$ = ""
+    Dim LineFeed$ = ""
+    Dim OutFile$ = ""
+    Dim InFile$ = ""
     Dim PrevCarReturn As Short
-    Dim FileChar$
-    Dim More$
+    Dim FileChar$ = ""
+    Dim More$ = ""
     ' DEFINT A-Z              ' Default variable type is integer
     
     ' The Backup$ FUNCTION makes a backup file with

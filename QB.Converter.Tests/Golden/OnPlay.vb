@@ -13,7 +13,7 @@ Imports QB.Video
 
 Module Program
 
-  Dim Music$
+  Dim Music$ = ""
   Dim i As Short
 
   Public Sub Main()

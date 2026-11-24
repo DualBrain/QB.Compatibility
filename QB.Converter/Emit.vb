@@ -363,6 +363,13 @@ Namespace QB2VB
       Return If(m_procStatic, "Static", "Dim")
     End Function
 
+    ' The same, and a string variable starts out empty, as in QBasic (a VB string is Nothing until it is set).
+    Private Shared Function DeclItemInit(v As VarSym) As String
+      Dim item = DeclItem(v)
+      If v.Qt = QT.String AndAlso Not v.IsArray AndAlso v.UserType = "" AndAlso v.FixedLen = 0 AndAlso Not item.Contains(" = ") Then Return item & " = """""
+      Return item
+    End Function
+
     ' A declaration (without the keyword) of a variable found by use.
     Private Shared Function DeclItem(v As VarSym) As String
       Dim name = v.VbName & If(v.HasSuffix, Types.VbSuffix(v.Qt), "")
@@ -383,7 +390,7 @@ Namespace QB2VB
       Dim decls As New List(Of String)
       For Each v In m_scope.Locals
         If Not v.Declared AndAlso Not v.IsParam AndAlso Not v.IsShared AndAlso Not v.IsConst Then
-          decls.Add(ln.Indent & "  " & DeclKeyword() & " " & DeclItem(v))
+          decls.Add(ln.Indent & "  " & DeclKeyword() & " " & DeclItemInit(v))
           v.Declared = True
         End If
       Next
@@ -925,13 +932,13 @@ Namespace QB2VB
       ' Module-level variables that are shared only because a procedure says so, and were never DIMmed.
       For Each v In m_module.Locals
         If Not v.Declared AndAlso Not v.IsConst Then
-          m_hoisted.Add("Dim " & DeclItem(v))
+          m_hoisted.Add("Dim " & DeclItemInit(v))
           v.Declared = True
         End If
       Next
       For Each v In m_main.Locals
         If Not v.Declared AndAlso Not v.IsConst AndAlso Not v.IsParam Then
-          mainDecls.Add("Dim " & DeclItem(v))
+          mainDecls.Add("Dim " & DeclItemInit(v))
           v.Declared = True
         End If
       Next

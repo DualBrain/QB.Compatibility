@@ -20,7 +20,7 @@ Module Program
 
   Sub consolidate(ByRef s$)
     Dim p!
-    Dim ts$
+    Dim ts$ = ""
       Dim sets$(100)
       Dim n = 0!
       For i! = 1 To Len(s$)

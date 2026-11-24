@@ -18,8 +18,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim Response$
-    Dim R$
+    Dim Response$ = ""
+    Dim R$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/BEEP.htm
     CLS()  ' Clear the screen
     Do

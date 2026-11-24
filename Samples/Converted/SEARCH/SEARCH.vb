@@ -10,9 +10,9 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim FileName$
-    Dim Pattern$
-    Dim Buffer$
+    Dim FileName$ = ""
+    Dim Pattern$ = ""
+    Dim Buffer$ = ""
     Dim Start As Short
     Dim StringPos As Short
     Dim FoundIt As Short

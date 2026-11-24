@@ -78,8 +78,8 @@ Module Program
   Dim curLevel As Short, colorTable(10) As Short
   Dim NumPlayers As Short
   Dim speed As Short
-  Dim diff$
-  Dim monitor$
+  Dim diff$ = ""
+  Dim monitor$ = ""
   Dim KeyFlags As Short
   Dim a As Short
 
@@ -266,8 +266,8 @@ Module Program
   'GetInputs:
   '  Gets player inputs
   Sub GetInputs(ByRef NumPlayers As Short, ByRef speed As Short, ByRef diff$, ByRef monitor$)
-    Dim num$
-    Dim gamespeed$
+    Dim num$ = ""
+    Dim gamespeed$ = ""
   
       COLOR(7, 0)
       CLS()
@@ -522,7 +522,7 @@ Module Program
     Dim NumberCol As Short
     Dim sisterRow As Short
     Dim count As Short
-    Dim kbd$
+    Dim kbd$ = ""
     Dim tail As Short
   
       'Initialize Snakes
@@ -812,7 +812,7 @@ Module Program
   'StillWantsToPlay:
   '  Determines if users want to play game again.
   Function StillWantsToPlay() As Short
-    Dim kbd$
+    Dim kbd$ = ""
   
       COLOR(colorTable(5), colorTable(6))
       Center(10, "█▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀█")

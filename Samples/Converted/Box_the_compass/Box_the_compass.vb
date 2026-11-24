@@ -9,7 +9,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim d$
+    Dim d$ = ""
     Dim heading!
     Dim ind!
     DATA("North", "North by east", "North-northeast", "Northeast by north")

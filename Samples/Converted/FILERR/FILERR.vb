@@ -11,12 +11,12 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     Dim Restart!
-    Dim FileName$
+    Dim FileName$ = ""
     Dim FileNum!
-    Dim LocString$
+    Dim LocString$ = ""
     Dim LineNum!
-    Dim LineBuffer$
-    Dim Char_$
+    Dim LineBuffer$ = ""
+    Dim Char_$ = ""
     ' Declare symbolic constants used in program:
     ' CONST FALSE = 0, TRUE = NOT FALSE
     
@@ -121,7 +121,7 @@ Module Program
   ' ============================================================
   '
   Function GetFileName$()
-    Static FTemp$
+    Static FTemp$ = ""
      INPUT("Enter file to search (press ENTER to quit): ", FTemp$, False)
      GetFileName$ = FTemp$
   End Function

@@ -140,8 +140,8 @@ Module Program
   '   Modifies LineTable! and LineCount
   '
   Sub BuildTable()
-    Static InLin$
-    Static Token$
+    Static InLin$ = ""
+    Static Token$ = ""
     Static KeyIndex As Short
   
      Do While Not EOF(1)
@@ -183,9 +183,9 @@ Module Program
   '  Processed file
   '
   Sub GenOutFile()
-    Static Sep$
-    Static InLin$
-    Static Token$
+    Static Sep$ = ""
+    Static InLin$ = ""
+    Static Token$ = ""
     Static LineNumber!
     Static FoundNumber As Short
     Static index As Short
@@ -313,7 +313,7 @@ Module Program
   '
   Function GetToken$(ByRef Search$, ByRef Delim$)
     Static BegPos As Short
-    Static SaveStr$
+    Static SaveStr$ = ""
     Static NewPos As Short
   
      ' Note that SaveStr$ and BegPos must be static from call to call
@@ -363,7 +363,7 @@ Module Program
   '
   Sub InitKeyTable()
     Static Count As Short
-    Static KeyWord$
+    Static KeyWord$ = ""
   
      RESTORE("KeyData")
      For Count = 1 To KeyWordCount

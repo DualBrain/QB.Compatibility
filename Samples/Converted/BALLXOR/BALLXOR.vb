@@ -8,7 +8,7 @@ Module Program
     QB.Graphics.WaitForKeyAtExit = True
     Dim EndLoop!
     Dim Y!
-    Dim Esc$
+    Dim Esc$ = ""
     ' DECLARE FUNCTION GetArraySize (WLeft, WRight, WTop, WBottom)
     
     SCREEN(2)

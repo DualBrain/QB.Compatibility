@@ -7,8 +7,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim sFlatter$
-    Dim sComma$
+    Dim sFlatter$ = ""
+    Dim sComma$ = ""
     Dim sString$ = "[[1], 2, [[3,4], 5], [[[]]], [[[6]]], 7, 8 []]"
     
     For siCount! = 1 To Len(sString$)

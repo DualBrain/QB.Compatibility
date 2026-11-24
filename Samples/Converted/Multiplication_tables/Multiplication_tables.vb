@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim o$
+    Dim o$ = ""
     CLS()
     
     'header row

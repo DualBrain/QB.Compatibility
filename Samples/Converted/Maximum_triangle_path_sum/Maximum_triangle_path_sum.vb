@@ -8,7 +8,7 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     Dim trim$(10)
-    Dim ln2$
+    Dim ln2$ = ""
     Dim s1!
     Dim s2!
     Dim ln$(19)

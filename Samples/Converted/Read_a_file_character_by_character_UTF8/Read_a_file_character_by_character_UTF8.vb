@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim char_$
+    Dim char_$ = ""
     Dim f! = FREEFILE()
     Dim filename$ = "file.txt"
     

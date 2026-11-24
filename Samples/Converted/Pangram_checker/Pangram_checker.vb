@@ -2,7 +2,7 @@
 
 Module Program
 
-  Dim x As String
+  Dim x As String = ""
 
   Public Sub Main()
     QB.Video.WaitForKeyAtExit = True

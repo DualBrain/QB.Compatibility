@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim linea$
+    Dim linea$ = ""
     OPEN("test.txt", OpenMode.Input, 1)
     
     While Not EOF(1)

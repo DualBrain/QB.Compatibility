@@ -12,8 +12,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim FileSpec$
-    Dim PathSpec$
+    Dim FileSpec$ = ""
+    Dim PathSpec$ = ""
     ' DEFINT A-Z
     
     ' Declare symbolic constants used in program:
@@ -62,10 +62,10 @@ Module Program
   ' ===========================================================
   '
   Function GetEntry$(ByRef FileNum As Short, ByRef EntryType As Short)
-    Static EntryLine$
-    Static TestCh$
-    Static EntryName$
-    Static EntryExt$
+    Static EntryLine$ = ""
+    Static TestCh$ = ""
+    Static EntryName$ = ""
+    Static EntryExt$ = ""
   
      ' Loop until a valid entry or end-of-file (EOF) is read:
      Do Until EOF(FileNum)
@@ -133,8 +133,8 @@ Module Program
   '
   Sub ScanDir(ByRef PathSpec$, ByRef Level As Short, ByRef FileSpec$, ByRef Row As Short)
     Dim EntryType As Short
-    Dim DirEntry$
-    Dim NewPath$
+    Dim DirEntry$ = ""
+    Dim NewPath$ = ""
   
      LOCATE(1, 1) : PRINT("Now searching" & Space$(50), True)
      LOCATE(1, 15) : PRINT(PathSpec$, True)

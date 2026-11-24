@@ -227,6 +227,7 @@ Namespace Global.QB
     Friend Shared Function SizeOf(Of T)(value As T) As Integer
       Dim boxed As Object = value
       If TypeOf boxed Is String Then Return DirectCast(boxed, String).Length
+      If boxed Is Nothing AndAlso GetType(T) Is GetType(String) Then Return 0
       If IsPrimitive(GetType(T)) Then Return ToBytes(value).Length
       If TypeOf boxed Is IFileRecord Then Return ToBytes(value).Length
       Return SizeByReflection(GetType(T))

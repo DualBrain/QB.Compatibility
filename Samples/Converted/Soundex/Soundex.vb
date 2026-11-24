@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim nombre$
+    Dim nombre$ = ""
     DATA("Aschraft", "Ashcroft", "Euler", "Gauss", "Ghosh", "Hilbert", "Heilbronn", "Lee", "Lissajous", "Lloyd")
     DATA("Moses", "Pfister", "Robert", "Rupert", "Rubin", "Tymczak", "VanDeusen", "Wheaton", "Soundex$", "Example")
     
@@ -36,7 +36,7 @@ Module Program
   
   
   Function Soundex$(ByRef palabra$)
-    Dim actual$
+    Dim actual$ = ""
       palabra$ = UCase$(palabra$)
       Dim code$ = Mid$(palabra$, 1, 1)
       Dim previo$ = getCode$(Left$(palabra$, 1))  ''""

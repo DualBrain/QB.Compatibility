@@ -25,7 +25,7 @@ Module Program
     ON_TIMER(1, AddressOf TimeUpdate)
     TIMER_ON()
     CLS()
-    PRINT("Time: " & TimeString())
+    PRINT("Time: " & (TimeString))
     StartTime = CSng(Timer)
     While TimePast < 10
         TimePast = CSng(Timer - StartTime)
@@ -35,7 +35,7 @@ Module Program
   End Sub
 
   Sub TimeUpdate()
-      LOCATE(1, 7) : PRINT(TimeString())
+      LOCATE(1, 7) : PRINT((TimeString))
       Return
   End Sub
   

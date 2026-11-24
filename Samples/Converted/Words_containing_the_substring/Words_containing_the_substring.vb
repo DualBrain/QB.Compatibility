@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim W$
+    Dim W$ = ""
     OPEN("unixdict.txt", OpenMode.Input, 1)
     While Not EOF(1)
       LINE_INPUT(1, W$)

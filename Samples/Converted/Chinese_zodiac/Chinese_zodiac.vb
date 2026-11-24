@@ -9,9 +9,9 @@ Module Program
 #End If
     Dim i!
     Dim xyear!
-    Dim yelement$
-    Dim yanimal$
-    Dim yyinyang$
+    Dim yelement$ = ""
+    Dim yanimal$ = ""
+    Dim yyinyang$ = ""
     Dim nn!
     DATA_LABEL("290")
     DATA("Rat", "Ox", "Tiger", "Rabbit", "Dragon", "Snake", "Horse", "Goat", "Monkey", "Rooster", "Dog", "Pig")

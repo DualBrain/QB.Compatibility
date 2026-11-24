@@ -13,9 +13,9 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim COMMAND$
+    Dim COMMAND$ = ""
     Dim CurrentColumn As Short
-    Dim C$
+    Dim C$ = ""
     ' ENTAB.BAS
     '
     ' Replace runs of spaces in a file with tabs.
@@ -98,8 +98,8 @@ Module Program
   '------------------SUB StripCommand----------------------
   '
   Sub StripCommand(ByRef CommandLine$)
-    Static InFileName$
-    Static OutFileName$
+    Static InFileName$ = ""
+    Static OutFileName$ = ""
     Static SpacePos As Short
      If CommandLine$ = "" Then
         INPUT("File to entab:   ", InFileName$, False)

@@ -10,7 +10,7 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     Dim d!
-    Dim entry$
+    Dim entry$ = ""
     ' CONST MAXN = 1000
     Dim x(MAXN) As Short
     Dim y(MAXN) As Short

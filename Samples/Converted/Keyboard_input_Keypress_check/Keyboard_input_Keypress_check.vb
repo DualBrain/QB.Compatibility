@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim k$
+    Dim k$ = ""
     Do : k$ = INKEY$() : Loop Until k$ <> ""
     PRINT(k$)
   End Sub

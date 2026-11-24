@@ -18,7 +18,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim a_Str$
+    Dim a_Str$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/PRINT%20USING.htm
     Dim a! = 123.4567!
     PRINT_USING("###.##", a)

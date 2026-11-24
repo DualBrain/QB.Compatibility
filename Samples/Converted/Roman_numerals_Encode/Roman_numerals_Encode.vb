@@ -31,7 +31,7 @@ Module Program
 
   
   Function toRoman$(ByRef value As Single)
-    Dim result$
+    Dim result$ = ""
       result$ = ""
       For i = 0! To 12!
           Do While value >= arabic(CInt(i))

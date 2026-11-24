@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim P$
+    Dim P$ = ""
     ' TOKEN.BAS
     '
     ' Demonstrates a BASIC version of the strtok C function.

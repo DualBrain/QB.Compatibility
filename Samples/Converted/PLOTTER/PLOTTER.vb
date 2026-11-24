@@ -14,7 +14,7 @@ Module Program
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim KeyVal$
+    Dim KeyVal$ = ""
     ' Values for keys on the numeric keypad and the spacebar:
     ' CONST UP = 72, DOWN = 80, LFT = 75, RGHT = 77
     ' CONST UPLFT = 71, UPRGHT = 73, DOWNLFT = 79, DOWNRGHT = 81

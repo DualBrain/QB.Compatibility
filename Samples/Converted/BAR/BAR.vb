@@ -54,7 +54,7 @@ Module Program
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
     Dim N As Short
-    Dim NewGraph$
+    Dim NewGraph$ = ""
     ' Define type for the titles:
     ' TYPE TitleType (see the Structure at the top)
     
@@ -95,7 +95,7 @@ Module Program
     Static Power!
     Static ScaleFactor!
     Static YRange!
-    Static Tile$
+    Static Tile$ = ""
     Static Bottom!
     Static BarMid!
     Static CharMid!
@@ -272,7 +272,7 @@ Module Program
   ' ============================================================
   '
   Sub InputTitles(ByRef T As TitleType)
-    Static OK$
+    Static OK$ = ""
   
      ' Set text screen:
      SCREEN(0, 0)

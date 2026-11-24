@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim cadena$
+    Dim cadena$ = ""
     Dim scalar!
     Dim scalars(10, 4) As Single
     scalars(1, 1) = 1 : scalars(1, 2) = 2 : scalars(1, 3) = 3

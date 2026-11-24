@@ -2,14 +2,14 @@
 
 Module Program
 
-  Dim Pattern$
-  Dim Esc$
+  Dim Pattern$ = ""
+  Dim Esc$ = ""
   Dim Bit(7) As Short
   Dim PatternSize As Short
 
   Public Sub Main()
     QB.Graphics.WaitForKeyAtExit = True
-    Dim OK$
+    Dim OK$ = ""
     ' DECLARE SUB DrawPattern ()
     ' DECLARE SUB EditPattern ()
     ' DECLARE SUB Initialize ()
@@ -47,12 +47,12 @@ Module Program
   Sub EditPattern()
     Static ByteNum As Short
     Static BitNum As Short
-    Static Null$
+    Static Null$ = ""
     Static X As Short
     Static Y As Short
     Static State As Short
     Static RefTime!
-    Static Check$
+    Static Check$ = ""
     Static CurrentByte As Short
     Static CurrentColor As Short
   ' SHARED Pattern$, Esc$, Bit%(), PatternSize%   (shared variables are declared at module level)

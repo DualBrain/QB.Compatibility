@@ -306,17 +306,17 @@ Module Program
     Dim Vis() As Short
     Dim Max() As Short
     Dim edit$(,)
-    Dim u$
+    Dim u$ = ""
     Dim X As Short
     Dim finished As Short
     Dim CurrRow As Short
     Dim CurrCol As Short
-    Dim Kbd$
+    Dim Kbd$ = ""
     Dim Save As Short
     Dim ok As Short
-    Dim start$
-    Dim end_$
-    Dim X_Str$
+    Dim start$ = ""
+    Dim end_$ = ""
+    Dim X_Str$ = ""
     Dim EditAccountsShowCursor As Action
     Dim EditAccountsEditItem As Action
     Dim EditAccountsHideCursor As Action
@@ -472,22 +472,22 @@ Module Program
     Dim Balance#()
     Dim Fields1 As FieldRecord
     Dim Fields2 As FieldRecord
-    Dim file_$
+    Dim file_$ = ""
     Dim MaxRecord As Short
-    Dim u$
-    Dim u1$
-    Dim u1x$
-    Dim u2$
-    Dim u3$
-    Dim u4$
+    Dim u$ = ""
+    Dim u1$ = ""
+    Dim u1x$ = ""
+    Dim u2$ = ""
+    Dim u3$ = ""
+    Dim u4$ = ""
     Dim CurrTopline As Short
     Dim CurrRow As Short
     Dim CurrCol As Short
     Dim finished As Short
-    Dim Kbd$
+    Dim Kbd$ = ""
     Dim CurrRecord As Short
-    Dim new_$
-    Dim start$
+    Dim new_$ = ""
+    Dim start$ = ""
     Dim new4#
     Dim new5#
     Dim temp As Short
@@ -955,9 +955,9 @@ Module Program
   '  VIS is the length of the visible field of entry
   '  MAX is the maximum number of characters allowed in the string
   Function GetString$(ByRef row_Arg As Short, ByRef col_Arg As Short, ByRef start$, ByRef end__Arg$, ByRef Vis_Arg As Short, ByRef Max As Short)
-    Dim curr$
+    Dim curr$ = ""
     Dim finished As Short
-    Dim Kbd$
+    Dim Kbd$ = ""
     Dim row As Short = row_Arg
     Dim col As Short = col_Arg
     Dim end_$ = end__Arg$
@@ -1136,7 +1136,7 @@ Module Program
   Function Menu(ByRef CurrChoiceX As Short, ByRef MaxChoice_Arg As Short, ByRef choice_Arg$(), ByRef ItemRow_Arg() As Short, ByRef ItemCol_Arg() As Short, ByRef help_Arg$(), ByRef BarMode_Arg As Short) As Short
     Dim currChoice As Short
     Dim finished As Short
-    Dim Kbd$
+    Dim Kbd$ = ""
     Dim MaxChoice As Short = MaxChoice_Arg
     Dim choice$() = choice_Arg$
     Dim ItemRow() As Short = ItemRow_Arg
@@ -1495,17 +1495,17 @@ Module Program
     Dim maxAsset As Short
     Dim maxLiability As Short
     Dim finished As Short
-    Dim u1$
-    Dim u2$
+    Dim u1$ = ""
+    Dim u2$ = ""
     Dim assetTotal#
     Dim count1 As Short
-    Dim file_$
+    Dim file_$ = ""
     Dim liabilityTotal#
     Dim count2 As Short
-    Dim Kbd$
-    Dim u0$
-    Dim u3$
-    Dim u4$
+    Dim Kbd$ = ""
+    Dim u0$ = ""
+    Dim u3$ = ""
+    Dim u4$ = ""
       ReDim assetIndex(19), liabilityIndex(19)
   
       maxAsset = 0
@@ -1529,7 +1529,7 @@ Module Program
   
           COLOR(colors(5, ColorPref), colors(4, ColorPref))
           LOCATE(1, 1) : PRINT(Space$(80), True)
-          LOCATE(1, 4) : PRINT(("Net Worth Report: " + DateString()), True)
+          LOCATE(1, 4) : PRINT(("Net Worth Report: " + (DateString)), True)
           PrintHelpLine("<F2=Exit>    <F3=Print Report>")
   
           COLOR(colors(7, ColorPref), colors(4, ColorPref))
@@ -1611,7 +1611,7 @@ Module Program
               LCenter("Q B a s i c")
               LCenter("M O N E Y   M A N A G E R")
               LPRINT() : LPRINT()
-              LCenter("NET WORTH REPORT:  " + DateString())
+              LCenter("NET WORTH REPORT:  " + (DateString))
               LCenter("-------------------------------------------")
               LPRINT_USING(u0$, "ASSETS:")
               assetTotal# = 0
@@ -1781,13 +1781,13 @@ Module Program
   Sub TransactionSummary(ByRef item As Short)
     Dim Fields1 As FieldRecord
     Dim Fields2 As FieldRecord
-    Dim Kbd$
-    Dim u5$
-    Dim u0$
-    Dim u2$
-    Dim u3$
-    Dim u4$
-    Dim file_$
+    Dim Kbd$ = ""
+    Dim u5$ = ""
+    Dim u0$ = ""
+    Dim u2$ = ""
+    Dim u3$ = ""
+    Dim u4$ = ""
+    Dim file_$ = ""
     Dim Balance#
     Dim MaxRecord As Short
     Dim CurrRecord As Short
@@ -1814,7 +1814,7 @@ Module Program
               LCenter("M O N E Y   M A N A G E R")
               LPRINT() : LPRINT()
               LCenter("Transaction summary: " + Trim$(account(item).Title))
-              LCenter(DateString())
+              LCenter((DateString))
               LPRINT()
               u5$ = "--------|------|------------------------|----------|----------|--------------"
               LPRINT(u5$)
@@ -1890,7 +1890,7 @@ Module Program
   '  Remove null and spaces from the end of a string.
   Function Trim$(ByRef X$)
     Dim lastChar As Short
-    Dim y$
+    Dim y$ = ""
   
       If X$ = "" Then
           Trim$ = ""

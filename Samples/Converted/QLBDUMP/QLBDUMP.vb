@@ -100,8 +100,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim FileName$
-    Dim OutFile$
+    Dim FileName$ = ""
+    Dim OutFile$ = ""
     ' This program prints the names of QuickLibrary procedures
     
     ' DECLARE SUB DumpSym (SymStart AS INTEGER, QHdrPos AS LONG)
@@ -147,8 +147,8 @@ Module Program
 
   
   Sub DumpSym(ByRef SymStart As Short, ByRef QHdrPos As Integer)
-    Dim Prospect$
-    Dim SName$
+    Dim Prospect$ = ""
+    Dim SName$ = ""
      Dim QlbSym As QbSym
      Dim NextSym As Integer, CurrentSym As Integer
   

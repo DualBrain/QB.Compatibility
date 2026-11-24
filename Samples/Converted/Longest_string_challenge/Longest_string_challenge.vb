@@ -7,9 +7,9 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim test$
-    Dim test1$
-    Dim test2$
+    Dim test$ = ""
+    Dim test1$ = ""
+    Dim test2$ = ""
     DATA("a", "bb", "ccc", "ddd", "ee", "f", "ggg", "~ :")
     
     Do

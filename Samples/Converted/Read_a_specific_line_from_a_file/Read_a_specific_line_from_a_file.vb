@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim linea$
+    Dim linea$ = ""
     Dim f! = FREEFILE()
     OPEN("input.txt", OpenMode.Input, CInt(f))
     

@@ -18,7 +18,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim f$
+    Dim f$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Function/LOF.htm
     INPUT("Enter filename: ", f$)
     OPEN(f$, OpenMode.Binary, 1)

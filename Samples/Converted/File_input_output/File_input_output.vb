@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim Data$
+    Dim Data$ = ""
     ' File input/output
     OPEN("INPUT.TXT", OpenMode.Input, 1)
     OPEN("OUTPUT.TXT", OpenMode.Output, 2)

@@ -7,10 +7,10 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim A$
+    Dim A$ = ""
     Dim RealValue!
     Dim AsLong%
-    Dim Strout$
+    Dim Strout$ = ""
     Dim SignBit%
     Dim Sign_ As Short
     Dim Exponent As Short
@@ -86,7 +86,7 @@ Module Program
   
   ' MHex$ makes sure we always get two hex digits.
   Function MHex$(ByRef X As Short)
-    Static D$
+    Static D$ = ""
      D$ = Hex$(X)
      If Len(D$) < 2 Then D$ = "0" + D$
      MHex$ = D$

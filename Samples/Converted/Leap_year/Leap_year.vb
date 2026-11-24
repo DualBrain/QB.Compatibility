@@ -11,7 +11,7 @@ Module Program
     ' DECLARE FUNCTION isLeapYear% (yr AS INTEGER)
     ' DECLARE FUNCTION year% (date AS STRING)
     
-    PRINT(Str$(isLeapYear(year(DateString()))) & " ")
+    PRINT(Str$(isLeapYear(year((DateString)))) & " ")
   End Sub
 
   

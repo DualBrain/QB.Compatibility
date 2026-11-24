@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim c$
+    Dim c$ = ""
     Dim mensaje$ = "If Peter Piper picked a pack of pickled peppers" + ", how many pickled peppers did Peter Piper pick?"
     Dim textofinal$ = ""
     

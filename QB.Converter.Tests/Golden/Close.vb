@@ -18,8 +18,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim n$
-    Dim a$
+    Dim n$ = ""
+    Dim a$ = ""
     ' From the QBasic manual: https://qbasic.net/en/qb-manual/Statement/CLOSE.htm
     CLS()
     INPUT("Enter filename: ", n$, False)

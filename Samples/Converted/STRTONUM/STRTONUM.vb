@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim A$
+    Dim A$ = ""
     ' DECLARE FUNCTION Filter$ (Txt$, FilterString$)
     
     ' Input a line:
@@ -30,10 +30,10 @@ Module Program
   ' ============================================================
   '
   Function Filter$(ByRef Txt$, ByRef FilterString$)
-    Static Temp$
+    Static Temp$ = ""
     Static TxtLength!
     Static I!
-    Static C$
+    Static C$ = ""
      Temp$ = ""
      TxtLength = Len(Txt$)
   

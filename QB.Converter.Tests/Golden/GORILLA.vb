@@ -63,8 +63,8 @@ Module Program
   Dim MachSpeed As Single
   Dim x As Short
   Dim KeyFlags As Short
-  Dim Name1$
-  Dim Name2$
+  Dim Name1$ = ""
+  Dim Name2$ = ""
   Dim NumGames As Short
   Dim i As Short
 
@@ -605,8 +605,8 @@ Module Program
   '  Player1$, Player2$ - player names
   '  NumGames - number of games to play
   Sub GetInputs(ByRef Player1$, ByRef Player2$, ByRef NumGames As Short)
-    Dim game$
-    Dim grav$
+    Dim game$ = ""
+    Dim grav$ = ""
     COLOR(7, 0)
     CLS()
   
@@ -649,7 +649,7 @@ Module Program
   'Parameters:
   '  Row, Col - location to echo input
   Function GetNum#(ByRef Row As Short, ByRef Col As Short)
-    Dim Kbd$
+    Dim Kbd$ = ""
     Dim Result$ = ""
     Dim Done As Short = [FALSE]
     While INKEY$() <> "" : End While  'Clear keyboard buffer
@@ -698,9 +698,9 @@ Module Program
   '  Player1$, Player2$ - The names of the players
   '
   Sub GorillaIntro(ByRef Player1$, ByRef Player2$)
-    Dim Char_$
+    Dim Char_$ = ""
     Dim y As Short
-    Dim P$
+    Dim P$ = ""
     LOCATE(16, 34) : PRINT("--------------")
     LOCATE(18, 34) : PRINT("V = View Intro")
     LOCATE(19, 34) : PRINT("P = Play Game")
