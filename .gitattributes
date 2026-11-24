@@ -1,5 +1,5 @@
 # Normalize line endings in text files.
-* text=auto
+* text=auto eol=lf
 
 # The original QBasic sources and expected outputs keep their DOS line endings.
 Samples/Manual/** -text
