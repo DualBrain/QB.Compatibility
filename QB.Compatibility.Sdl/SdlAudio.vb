@@ -20,7 +20,7 @@ Namespace Global.QB
         Throw New InvalidOperationException(SDL.SDL_GetError())
       End If
       Dim want As New SDL.SDL_AudioSpec With {.freq = Rate, .format = SDL.AUDIO_S16, .channels = 1, .samples = 1024}
-      Dim have As SDL.SDL_AudioSpec
+      Dim have As New SDL.SDL_AudioSpec()
       ' (SDL2-CS can't be given a null device name, so the first playback device is used.)
       Dim name = SDL.SDL_GetAudioDeviceName(0, 0)
       If String.IsNullOrEmpty(name) Then Throw New InvalidOperationException("No audio device")

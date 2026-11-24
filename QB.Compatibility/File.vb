@@ -268,6 +268,7 @@ Namespace Global.QB
         If Not m_files.ContainsKey(index) Then Return index
       Next
       QBError.Raise(67, "Too many files")
+      Return 0 ' Not reached: Raise always throws.
     End Function
 
 #End Region
