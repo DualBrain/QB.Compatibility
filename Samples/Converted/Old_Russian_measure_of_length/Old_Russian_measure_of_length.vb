@@ -30,7 +30,7 @@ Module Program
         CLS()
         PRINT()
         For i = 1! To 13!
-            PRINT_USING("## ", i)
+            PRINT_USING_NOCR("## ", i)
             PRINT(units(CInt(i)))
         Next i
         PRINT()

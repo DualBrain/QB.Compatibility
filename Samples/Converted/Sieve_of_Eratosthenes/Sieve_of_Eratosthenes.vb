@@ -24,7 +24,7 @@ Module Program
     Next n
     
     For n! = 1 To limit
-        If flags(CInt(n)) <> 0 Then PRINT_USING("####", n)
+        If flags(CInt(n)) <> 0 Then PRINT_USING_NOCR("####", n)
     Next n
   End Sub
 

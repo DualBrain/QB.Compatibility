@@ -24,7 +24,7 @@ Module Program
   Sub minab(ByRef n As Single)
   	For i! = 1 To n
   		For j! = 1 To n
-  			PRINT_USING("## ", min(min(i - 1, n - i), min(j - 1, n - j)))
+  			PRINT_USING_NOCR("## ", min(min(i - 1, n - i), min(j - 1, n - j)))
   		Next j
   		PRINT()
   	Next i

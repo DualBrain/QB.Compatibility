@@ -19,7 +19,7 @@ Module Program
                 If (CInt(N) Mod CInt(A)) = 0 Then T = T + 1
             Next A
         End If
-        PRINT_USING("###", T)
+        PRINT_USING_NOCR("###", T)
         If (CInt(N) Mod 10) = 0 Then PRINT()
     Next N
     End

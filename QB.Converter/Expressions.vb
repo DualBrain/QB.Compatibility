@@ -357,7 +357,8 @@ Namespace QB2VB
         qty = If(Types.Rank(qty) > Types.Rank(QT.Long), QT.Long, qty)
         vb = If(Types.Rank(vb) > Types.Rank(QT.Long), QT.Double, vb) ' (VB turns the operands into Long)
       ElseIf op = "^" Then
-        qty = QT.Double : vb = QT.Double
+        ' (the power of Singles and whole numbers is a Single in QBasic; VB computes it as a Double)
+        qty = If(a.Qt = QT.Double OrElse b.Qt = QT.Double, QT.Double, QT.Single) : vb = QT.Double
       End If
       Dim e = New E(Paren(a) & " " & op & " " & Paren(b), qty, vb, False)
       ' A sum of literals stays a literal.

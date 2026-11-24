@@ -8,9 +8,9 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     On Error GoTo TratoError
-    PRINT(Str$(2 / 3) & " ")
-    PRINT(Str$(3 / 5) & " ")
-    PRINT(Str$(4 / 0) & " ")
+    PRINT(Str$(CSng(2 / 3)) & " ")
+    PRINT(Str$(CSng(3 / 5)) & " ")
+    PRINT(Str$(CSng(4 / 0)) & " ")
     End
     
     TratoError:

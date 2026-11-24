@@ -10,7 +10,7 @@ Module Program
     ' DECLARE FUNCTION isPrime% (ValorEval!)
     
     For n = 1! To 200!
-        If isPrime(CSng((n ^ 3) + 2)) <> 0 Then PRINT(Str$(n) & " " & vbTab & Str$((n ^ 3) + 2) & " ")
+        If isPrime(CSng((n ^ 3) + 2)) <> 0 Then PRINT(Str$(n) & " " & vbTab & Str$(CSng((n ^ 3) + 2)) & " ")
     Next n
   End Sub
 

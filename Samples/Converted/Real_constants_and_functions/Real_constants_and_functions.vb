@@ -10,20 +10,20 @@ Module Program
     Dim x!
     Dim y!
     
-    PRINT("e     = " & Str$(Exp(1)) & " ")  ' e  not available
-    PRINT("PI    = " & Str$(4 * Atan(1)) & " ")  ' pi not available
+    PRINT("e     = " & Str$(CSng(Exp(1))) & " ")  ' e  not available
+    PRINT("PI    = " & Str$(CSng(4 * Atan(1))) & " ")  ' pi not available
     
     x = 12.345! : y = 1.23!
     
-    PRINT("sqrt  = " & Str$(Sqrt(x)) & " " & vbTab & Str$(x ^ .5!) & " ")  ' square root- NB the unusual name
-    PRINT("ln    = " & Str$(Log(x)) & " ")  ' natural logarithm base e
-    PRINT("log10 = " & Str$(Log(x) / 2.303!) & " ")  ' base 10 logarithm
-    PRINT("log   = " & Str$(Log(x) / Log(y)) & " ")  ' arbitrary base logarithm
-    PRINT("exp   = " & Str$(Exp(x)) & " ")  ' exponential
+    PRINT("sqrt  = " & Str$(CSng(Sqrt(x))) & " " & vbTab & Str$(CSng(x ^ .5!)) & " ")  ' square root- NB the unusual name
+    PRINT("ln    = " & Str$(CSng(Log(x))) & " ")  ' natural logarithm base e
+    PRINT("log10 = " & Str$(CSng(Log(x) / 2.303!)) & " ")  ' base 10 logarithm
+    PRINT("log   = " & Str$(CSng(Log(x) / Log(y))) & " ")  ' arbitrary base logarithm
+    PRINT("exp   = " & Str$(CSng(Exp(x))) & " ")  ' exponential
     PRINT("abs   = " & Str$(Abs(-x)) & " ")  ' absolute value
     PRINT("floor = " & Str$(floor(x)) & " ")  ' floor
     PRINT("ceil  = " & Str$(ceiling(x)) & " ")  ' ceiling
-    PRINT("power = " & Str$(x ^ y) & " ")  ' power
+    PRINT("power = " & Str$(CSng(x ^ y)) & " ")  ' power
     End
   End Sub
 

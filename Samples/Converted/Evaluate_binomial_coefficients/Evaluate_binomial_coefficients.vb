@@ -14,7 +14,7 @@ Module Program
     
     For n = 0 To 14
         For k = 0 To n
-            PRINT_USING(" ####", binomial!(n, k))
+            PRINT_USING_NOCR(" ####", binomial!(n, k))
         Next k
         PRINT()
     Next n

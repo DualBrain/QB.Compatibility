@@ -9,8 +9,8 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    Dim go!
     Dim [True] As Single
+    Dim go!
     Dim pass!
     Dim c!
     DATA(9, 3, 3, 3, 2, 1, 7, 8, 5)
@@ -20,6 +20,7 @@ Module Program
     DATA(4, 6, 8, 7, 2, 3, 3, 3, 1)
     
     ' CONST False = 0: True = NOT False
+    [True] = Not [False]
     
     ' DATA 9,3,3,3,2,1,7,8,5   (DATA is listed at the start of the program)
     ' DATA 5,2,9,3,3,7,8,4,1   (DATA is listed at the start of the program)

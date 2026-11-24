@@ -8,7 +8,7 @@ Module Program
     QB.SdlBackend.Use()
 #End If
     For i = 1! To 10!
-        PRINT_USING("##", i)
+        PRINT_USING_NOCR("##", i)
         If i = 10 Then Exit For
         PRINT(", ", True)
     Next i

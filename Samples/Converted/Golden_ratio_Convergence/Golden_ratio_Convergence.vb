@@ -25,7 +25,7 @@ Module Program
       Loop Until (.00001! > diff)
   
       PRINT("Result: " & Str$(phi1) & " " & " after " & Str$(iter) & " " & " iterations")
-      PRINT("The error is approximately " & Str$(phi1 - (.5! * (1! + Sqrt(5!)))) & " ")
+      PRINT("The error is approximately " & Str$(CSng(phi1 - (.5! * (1! + Sqrt(5!))))) & " ")
   End Sub
   
 End Module

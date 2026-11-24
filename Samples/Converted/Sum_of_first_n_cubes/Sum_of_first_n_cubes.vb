@@ -22,7 +22,7 @@ Module Program
             sumCubos = CInt(sumCubos + (m ^ 3))
         Next m
         fila = fila + 1
-        PRINT_USING(" ####### ", sumCubos)
+        PRINT_USING_NOCR(" ####### ", sumCubos)
         If (fila Mod 5) = 0 Then PRINT()
     Next n
     

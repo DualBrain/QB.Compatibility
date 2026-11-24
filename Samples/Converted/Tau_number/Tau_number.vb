@@ -22,7 +22,7 @@ Module Program
           If (CInt(n) Mod CInt(tau)) = 0 Then
              num = num + 1
              If (CInt(num) Mod 10) = 1 Then PRINT()
-             PRINT_USING(" ####", n)  '""; n; " ";
+             PRINT_USING_NOCR(" ####", n)  '""; n; " ";
           End If
     Loop While num < limit
     End

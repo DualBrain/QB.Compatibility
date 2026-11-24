@@ -1231,6 +1231,11 @@ Namespace Global.QB
       PRINT([USING](template, values))
     End Sub
 
+    ''' <summary>PRINT USING ...; (a trailing semicolon): the cursor stays after the text.</summary>
+    Public Shared Sub PRINT_USING_NOCR(template$, ParamArray values() As Object)
+      PRINT([USING](template, values), True)
+    End Sub
+
     Public Shared Function [USING](template$, ParamArray values() As Object) As String
       Return PrintUsing.Format(template, values)
     End Function
@@ -3023,6 +3028,10 @@ allplotted:
 
     Public Shared Sub PRINT_USING(filenum%, template$, ParamArray values() As Object)
       File.PRINT_USING(filenum, template, values)
+    End Sub
+
+    Public Shared Sub PRINT_USING_NOCR(filenum%, template$, ParamArray values() As Object)
+      File.PRINT(filenum, PrintUsing.Format(template, values), True)
     End Sub
 
     ''' <summary>WRITE # to a file: values separated by commas, strings in quotes, in a form INPUT # can read.</summary>

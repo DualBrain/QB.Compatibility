@@ -32,7 +32,7 @@ Module Program
     Dim mean! = sum / n
     PRINT()
     PRINT("  Mean    = " & Str$(mean) & " ")
-    PRINT("  Std Dev = " & Str$(((sumsq / n) - (mean ^ 2)) ^ .5!) & " ")
+    PRINT("  Std Dev = " & Str$(CSng(((sumsq / n) - (mean ^ 2)) ^ .5!)) & " ")
     PRINT()
     '------- Show histogram
     Dim scal = 10!

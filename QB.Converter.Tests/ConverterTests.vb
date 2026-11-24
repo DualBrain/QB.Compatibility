@@ -686,7 +686,7 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub PowerIsAppliedFromTheLeft()
-      AssertMain("PRINT 5 ^ 3 ^ 2; 2 ^ -1", "PRINT(Str$((5 ^ 3) ^ 2) & "" "" & Str$(2 ^ (-1)) & "" "")")
+      AssertMain("PRINT 5 ^ 3 ^ 2; 2 ^ -1", "PRINT(Str$(CSng((5 ^ 3) ^ 2)) & "" "" & Str$(CSng(2 ^ (-1))) & "" "")")
     End Sub
 
     <Fact>
@@ -694,6 +694,18 @@ Namespace QB2VB.Tests
       Dim vb = Convert("PRINT LEN(a$)" & vbLf & "x$ = DATE$" & vbLf & "PRINT FNy(DATE$)" & vbLf & "DEF FNy(d$) = LEN(d$)")
       Assert.Contains("Dim a$ = """"", vb)
       Assert.Contains("(DateString)", vb)
+      Dim errors = VbCompiler.Compile(vb, "T")
+      Assert.True(errors = "", errors)
+    End Sub
+
+    <Fact>
+    Public Sub FindingsFromRunningTheRosettaSamples()
+      ' CONST ...: an assignment after the colon is kept; a trailing ; after PRINT USING keeps the cursor; SQR and ^ are Singles
+      Dim vb = Convert("CONST F = 0: T = NOT F" & vbLf & "PRINT T" & vbLf & "PRINT USING ""##""; 5;" & vbLf & "PRINT SQR(2); 25264 ^ 2")
+      Assert.Contains("T = Not F", vb)
+      Assert.Contains("PRINT_USING_NOCR(""##"", 5)", vb)
+      Assert.Contains("Str$(CSng(Sqrt(2)))", vb)
+      Assert.Contains("Str$(CSng(25264 ^ 2))", vb)
       Dim errors = VbCompiler.Compile(vb, "T")
       Assert.True(errors = "", errors)
     End Sub

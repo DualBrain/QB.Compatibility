@@ -397,7 +397,7 @@ Module Program
       For a = 5 To 23
           LOCATE(a, 2)
           X = CShort(a - 4)
-          PRINT_USING(u$, X, account(X).Title, account(X).Desc, account(X).AType)
+          PRINT_USING_NOCR(u$, X, account(X).Title, account(X).Desc, account(X).AType)
       Next a
   
       'Initialize variables
@@ -523,13 +523,13 @@ Module Program
               PRINT(Left$(CurrString$(CurrCol), Vis(CurrCol)), True)
           Case 4
               If CurrFig#(4) <> 0 Then
-                  PRINT_USING(u2$, CurrFig#(4))
+                  PRINT_USING_NOCR(u2$, CurrFig#(4))
               Else
                   PRINT(Space$(Vis(CurrCol)), True)
               End If
           Case 5
               If CurrFig#(5) <> 0 Then
-                  PRINT_USING(u2$, CurrFig#(5))
+                  PRINT_USING_NOCR(u2$, CurrFig#(5))
               Else
                   PRINT(Space$(Vis(CurrCol)), True)
               End If
@@ -544,13 +544,13 @@ Module Program
               PRINT(Left$(CurrString$(CurrCol), Vis(CurrCol)), True)
           Case 4
               If CurrFig#(4) <> 0 Then
-                  PRINT_USING(u2$, CurrFig#(4))
+                  PRINT_USING_NOCR(u2$, CurrFig#(4))
               Else
                   PRINT(Space$(Vis(CurrCol)), True)
               End If
           Case 5
               If CurrFig#(5) <> 0 Then
-                  PRINT_USING(u2$, CurrFig#(5))
+                  PRINT_USING_NOCR(u2$, CurrFig#(5))
               Else
                   PRINT(Space$(Vis(CurrCol)), True)
               End If
@@ -652,7 +652,7 @@ Module Program
       ElseIf CurrRecord > MaxRecord Then
           PRINT(u1$, True)
       Else
-          PRINT_USING(u$, CurrString$(1), CurrString$(2), CurrString$(3))
+          PRINT_USING_NOCR(u$, CurrString$(1), CurrString$(2), CurrString$(3))
           If (CurrFig#(4) = 0) And (CurrFig#(5) = 0) Then
               PRINT_USING((((u4$ + "│") + u4$) + "│") + u3$, Balance#(CurrRecord))
           ElseIf CurrFig#(5) = 0 Then
@@ -669,7 +669,7 @@ Module Program
           CurrRecord = CShort((CurrTopline + a) - 1)
           If CurrRecord <= MaxRecord Then
               LOCATE(4 + a, 66)
-              PRINT_USING(u3$, Balance#((CurrTopline + a) - 1))
+              PRINT_USING_NOCR(u3$, Balance#((CurrTopline + a) - 1))
           End If
       Next a
       Return
@@ -1585,7 +1585,7 @@ Module Program
           If count2 > count1 Then count1 = count2
           LOCATE(2 + count1, 25) : PRINT("--------------")
           LOCATE(2 + count1, 65) : PRINT("--------------")
-          LOCATE(3 + count1, 3) : PRINT_USING(u2$, "Total assets", assetTotal#)
+          LOCATE(3 + count1, 3) : PRINT_USING_NOCR(u2$, "Total assets", assetTotal#)
           LOCATE(3 + count1, 43) : PRINT_USING(u2$, "Total liabilities", liabilityTotal#)
   
           COLOR(colors(5, ColorPref), colors(4, ColorPref))
@@ -1851,7 +1851,7 @@ Module Program
                       Fig1# = CVD(Fields1(3))
                       Fig2# = CVD(Fields1(4))
   
-                      LPRINT_USING(u0$, Fields1(0), Fields1(1), Fields1(2))
+                      LPRINT_USING_NOCR(u0$, Fields1(0), Fields1(1), Fields1(2))
                       If (Fig2# = 0) And (Fig1# = 0) Then
                           LPRINT_USING((((u4$ + "|") + u4$) + "|") + u3$, Balance#)
                       ElseIf Fig2# = 0 Then

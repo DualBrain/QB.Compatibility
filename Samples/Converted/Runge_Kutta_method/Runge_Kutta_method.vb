@@ -19,7 +19,7 @@ Module Program
     
         If t = Int(t) Then
            actual! = CSng((((t ^ 2) + 4) ^ 2) / 16)
-            PRINT_USING("y(##) = ###.######  Error = ", t, y!)
+            PRINT_USING_NOCR("y(##) = ###.######  Error = ", t, y!)
            PRINT(Str$(actual! - y!) & " ")
            End If
     

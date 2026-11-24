@@ -18,7 +18,7 @@ Module Program
             If (CInt(n) Mod CInt(m)) = 0 Then num = num + 1
         Next m
         If (CInt(isPrime(num)) And CShort(num <> 2)) <> 0 Then
-            PRINT_USING(" ##### ", n)
+            PRINT_USING_NOCR(" ##### ", n)
             row = row + 1
             If (CInt(row) Mod 5) = 0 Then PRINT()
         End If

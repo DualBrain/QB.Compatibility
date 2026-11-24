@@ -14,7 +14,7 @@ Module Program
     PRINT("Time    ", True)
     Dim tiempo! = 0!
     While tiempo <= 100.1!
-        PRINT_USING("######", tiempo)
+        PRINT_USING_NOCR("######", tiempo)
         tiempo = tiempo + 10!
     End While
     PRINT()
@@ -23,7 +23,7 @@ Module Program
     tiempo = 0!
     While tiempo <= 100.1!
         temperatura = CSng(20! + ((100! - 20!) * Exp((-.07!) * tiempo)))
-        PRINT_USING("###.##", temperatura)
+        PRINT_USING_NOCR("###.##", temperatura)
         tiempo = tiempo + 10!
     End While
     PRINT()
@@ -38,10 +38,10 @@ Module Program
   Sub Euler(ByRef paso As Short)
       Dim tiempo = 0!
       Dim temperatura! = 100!
-      PRINT_USING("Step ## ", paso)
+      PRINT_USING_NOCR("Step ## ", paso)
   
       Do While tiempo <= 100
-          If (CInt(tiempo) Mod 10) = 0 Then PRINT_USING("###.##", temperatura)
+          If (CInt(tiempo) Mod 10) = 0 Then PRINT_USING_NOCR("###.##", temperatura)
           temperatura = temperatura + (paso * ((-.07!) * (temperatura - 20!)))
           tiempo = tiempo + paso
       Loop

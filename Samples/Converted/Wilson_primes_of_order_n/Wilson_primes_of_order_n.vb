@@ -11,7 +11,7 @@ Module Program
     PRINT(" n:      Wilson primes")
     PRINT("----------------------")
     For n = 1! To 11!
-        PRINT_USING("##:      ", n)
+        PRINT_USING_NOCR("##:      ", n)
         For p = 3! To 10099! Step 2!
             If (CInt(isPrime(p)) And CInt(isWilson(n, p))) <> 0 Then PRINT(Str$(p) & " " & " ", True)
         Next p

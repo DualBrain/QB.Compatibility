@@ -15,7 +15,7 @@ Module Program
         For j = 1! To 5!
             n = (i * 5) + j
             c = c + 1
-            PRINT_USING("p(##) = ##  ", n, pancake(n))
+            PRINT_USING_NOCR("p(##) = ##  ", n, pancake(n))
             If (CInt(c) Mod 5) = 0 Then PRINT()
         Next j
     Next i

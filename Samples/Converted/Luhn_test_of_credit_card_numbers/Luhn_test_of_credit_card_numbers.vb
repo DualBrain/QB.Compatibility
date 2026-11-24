@@ -9,11 +9,12 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
+    Dim [False] As Single
     Dim odd!
     Dim sum!
     Dim num!
-    Dim [False] As Single
     ' CONST True = -1: False = NOT True
+    [False] = Not [True]
     
     Dim card$(5)
     card$(1) = "49927398716"

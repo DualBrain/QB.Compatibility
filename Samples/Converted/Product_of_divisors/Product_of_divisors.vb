@@ -14,7 +14,7 @@ Module Program
             If (CInt(n) Mod CInt(i)) = 0 Then p = p * i
         Next i
         If (CInt((n - 1)) Mod 5) = 0 Then PRINT()
-        PRINT_USING("###########", p)
+        PRINT_USING_NOCR("###########", p)
     Next n
     End
   End Sub

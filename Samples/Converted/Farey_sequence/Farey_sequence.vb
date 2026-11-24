@@ -14,13 +14,14 @@ Module Program
     
     CLS()
     ' CONST TRUE = -1: FALSE = NOT TRUE
+    [FALSE] = Not [TRUE]
     
     For i = 1! To 9!
-        PRINT_USING("F# =", i)
+        PRINT_USING_NOCR("F# =", i)
         t = farey(i, [FALSE])
     Next i
     For i = 10! To 11!
-        PRINT_USING("F## =", i)
+        PRINT_USING_NOCR("F## =", i)
     	t = farey(i, [FALSE])
     Next i
     PRINT()

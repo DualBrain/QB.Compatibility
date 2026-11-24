@@ -20,7 +20,7 @@ Module Program
     For i = 0! To 6! : READ(d$(CInt(i))) : Next i
     For i = 1! To 2!
         READ(y) : READ(m) : READ(d_Sng)
-        PRINT_USING("##/##/#### is a ", m, d_Sng, y)
+        PRINT_USING_NOCR("##/##/#### is a ", m, d_Sng, y)
         If m <= 2 Then m = m + 12 : y = y - 1
         J = CInt(y) \ 100
         K = CInt(y) Mod 100

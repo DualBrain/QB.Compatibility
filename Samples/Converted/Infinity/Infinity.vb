@@ -13,7 +13,7 @@ Module Program
     PRINT(Str$(0!) & " ")
     PRINT(Str$(0 / (-1.5!)) & " ")
     PRINT(Str$(1.5! / 0) & " ")
-    PRINT(Str$(0 / 0) & " ")
+    PRINT(Str$(CSng(0 / 0)) & " ")
     PRINT(Str$(f!()) & " ")
     End
     

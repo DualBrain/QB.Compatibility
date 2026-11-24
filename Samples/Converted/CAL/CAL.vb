@@ -218,7 +218,7 @@ Module Program
   
      ' Print out the days of the month:
      For I = 1 To TotalDays
-        PRINT_USING("##   ", I)
+        PRINT_USING_NOCR("##   ", I)
   
         ' Advance to the next line when the cursor
         ' is past column 32:

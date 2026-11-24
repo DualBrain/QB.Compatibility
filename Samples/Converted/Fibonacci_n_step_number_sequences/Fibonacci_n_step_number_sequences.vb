@@ -38,7 +38,7 @@ Module Program
           f(CInt(x)) = a(CInt(x))
       Next x
       For i! = b To 12 + b
-          PRINT_USING("#### ", f(CInt((i - b) + 1)))
+          PRINT_USING_NOCR("#### ", f(CInt((i - b) + 1)))
           For j! = ((i - b) + 1) To i
               f(CInt(i + 1)) = f(CInt(i + 1)) + f(CInt(j))
           Next j

@@ -21,7 +21,7 @@ Module Program
         padovanN(n, p)
     
         For i! = 0 To t - 1
-            PRINT_USING("### ", p(CInt(i)))
+            PRINT_USING_NOCR("### ", p(CInt(i)))
         Next i
         PRINT()
     Next n

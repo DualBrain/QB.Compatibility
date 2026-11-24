@@ -231,6 +231,10 @@ Namespace Global.QB
       LPRINT(PrintUsing.Format(template, values))
     End Sub
 
+    Public Shared Sub LPRINT_USING_NOCR(template$, ParamArray values() As Object)
+      LPRINT(PrintUsing.Format(template, values), True)
+    End Sub
+
     ''' <summary>The number of characters sent to the printer since the last line end (LPT1 to LPT3 share one position).</summary>
     Public Shared Function LPOS(n%) As Integer
       If n < 0 OrElse n > 3 Then Throw New ArgumentException("Illegal function call")

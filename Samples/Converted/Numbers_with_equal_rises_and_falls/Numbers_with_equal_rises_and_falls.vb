@@ -15,7 +15,7 @@ Module Program
     While c < 10000001
         If eqrf(i) <> 0 Then
             c = c + 1
-            If c <= 200 Then PRINT_USING("### ", i)
+            If c <= 200 Then PRINT_USING_NOCR("### ", i)
             If c = 1E+07! Then PRINT() : PRINT(Str$(i) & " ")
         End If
         i = i + 1

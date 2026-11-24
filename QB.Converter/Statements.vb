@@ -1068,7 +1068,7 @@ Namespace QB2VB
           Next
         End If
         Dim trailing = t(e - 1).Is_(";")
-        Return stmt & "_USING(" & If(fileNum <> "", fileNum & ", ", "") & fmt & If(vals.Count > 0, ", " & String.Join(", ", vals), "") & ")"
+        Return stmt & If(trailing, "_USING_NOCR(", "_USING(") & If(fileNum <> "", fileNum & ", ", "") & fmt & If(vals.Count > 0, ", " & String.Join(", ", vals), "") & ")"
       End If
       If p >= e Then Return stmt & "(" & fileNum & ")"
 
@@ -1095,7 +1095,8 @@ Namespace QB2VB
             If x.Qt = QT.String Then
               sb.Append(If(x.Atom, x.Text, "(" & x.Text & ")"))
             Else
-              sb.Append("Str$(" & x.Text & ") & "" """)
+              Dim shown = If(x.Qt = QT.Single AndAlso x.Vb = QT.Double, "CSng(" & x.Text & ")", x.Text)
+              sb.Append("Str$(" & shown & ") & "" """)
             End If
           End If
           If sep = "," Then

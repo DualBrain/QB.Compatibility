@@ -182,12 +182,21 @@ Namespace QB2VB
 
         Case "CONST"
           ' (constants are program-wide here, so one declared inside a procedure is hoisted too)
-          For Each c In HoistedConst(t)
+          ' (CONST A = 1: B = 2 is a constant and then an assignment)
+          Dim colon = -1
+          Dim depth = 0
+          For k = 0 To t.Count - 1
+            If t(k).Is_("(") Then depth += 1
+            If t(k).Is_(")") Then depth -= 1
+            If depth = 0 AndAlso t(k).Is_(":") Then colon = k : Exit For
+          Next
+          For Each c In HoistedConst(If(colon > 0, t.GetRange(0, colon), t))
             If Not m_hoisted.Contains(c) Then m_hoisted.Add(c)
           Next
           Flush(m_target)
           m_target.Add(ln.Indent & "' " & ln.Raw.Trim())
-          Return i + 1
+          If colon < 0 OrElse colon = t.Count - 1 Then Return i + 1
+          t = t.GetRange(colon + 1, t.Count - colon - 1)
 
         Case "DATA"
           Flush(m_target)

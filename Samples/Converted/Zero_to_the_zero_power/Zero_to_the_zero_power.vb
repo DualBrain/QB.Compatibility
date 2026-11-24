@@ -7,7 +7,7 @@ Module Program
 #If QB_WINDOW Then
     QB.SdlBackend.Use()
 #End If
-    PRINT("0 ^ 0 =" & Str$(0 ^ 0) & " ")
+    PRINT("0 ^ 0 =" & Str$(CSng(0 ^ 0)) & " ")
   End Sub
 
 End Module
