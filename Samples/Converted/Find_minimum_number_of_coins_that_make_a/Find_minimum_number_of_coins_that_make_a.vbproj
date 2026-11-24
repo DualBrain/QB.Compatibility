@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace></RootNamespace>
+    <StartupObject>Program</StartupObject>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionInfer>On</OptionInfer>
+    <OptionStrict>On</OptionStrict>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(OutputType)' == 'WinExe'">
+    <DefineConstants>QB_WINDOW</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Import Include="System.Math" />
+    <Import Include="QB" />
+    <Import Include="QB.Core" />
+    <Import Include="QB.Development" />
+    <Import Include="QB.Devices" />
+    <Import Include="QB.Events" />
+    <Import Include="QB.File" />
+    <Import Include="QB.Multimedia" />
+    <Import Include="QB.Printer" />
+    <Import Include="QB.Video" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Find_minimum_number_of_coins_that_make_a.vb" />
+    <ProjectReference Include="../../../QB.Compatibility/QB.Compatibility.vbproj" />
+    <ProjectReference Include="../../../QB.Compatibility.Sdl/QB.Compatibility.Sdl.vbproj" Condition="'$(OutputType)' == 'WinExe'" />
+  </ItemGroup>
+</Project>

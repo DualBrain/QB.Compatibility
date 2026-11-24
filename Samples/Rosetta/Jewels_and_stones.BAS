@@ -1,0 +1,16 @@
+DECLARE FUNCTION contarjoyas (piedras$, joyas$)
+
+PRINT contarjoyas("aAAbbbb", "aA")
+PRINT contarjoyas("ZZ", "z")
+PRINT contarjoyas("ABCDEFGHIJKLMNOPQRSTUVWXYZ@abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ@abcdefghijklmnopqrstuvwxyz")
+PRINT contarjoyas("AB", "")
+END
+
+FUNCTION contarjoyas (piedras$, joyas$)
+    cnt = 0
+    FOR i = 1 TO LEN(piedras$)
+        bc = INSTR(1, joyas$, MID$(piedras$, i, 1))
+        IF bc <> 0 THEN cnt = cnt + 1
+    NEXT i
+    contarjoyas = cnt
+END FUNCTION

@@ -1,0 +1,12 @@
+Program SameChar
+Determines if a string has the same character or not.
+
+'' of length 0 contains all the same character.
+'   ' of length 3 contains all the same character.
+'2' of length 1 contains all the same character.
+'333' of lenght 3 contains all the same character.
+'.55' of length 3 is different at possition 2: '5' (0x35)
+'tttTTT' of length 6 is different at possition 4: 'T' (0x54)
+'4444 444k' of length 9 is different at possition 5: ' ' (0x20)
+
+End of program run.

@@ -1,0 +1,10 @@
+initial   =                                      alphaBETA
+uppercase =                                      ALPHABETA
+lowercase =                                      alphabeta
+first letter capitalized =                       Alphabeta
+length (in characters) =                         9
+length (in bytes) =                              18
+reversed =                                       ATEBahpla
+first position of letter A (case-sensitive) =    9
+first position of letter A (case-insensitive) =  1
+concatenated with '123' =                        alphaBETA123

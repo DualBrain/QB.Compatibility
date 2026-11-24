@@ -1,0 +1,1 @@
+SCREEN 13   ' use 320x200 pixels, 40x25 characters, 256 colors

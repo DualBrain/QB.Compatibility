@@ -1,0 +1,23 @@
+Number 1 : 0  Terminating
+Number 2 : 1  0  Terminating
+Number 3 : 1  0  Terminating
+Number 4 : 3  1  0  Terminating
+Number 5 : 1  0  Terminating
+Number 6 : 6  Perfect
+Number 7 : 1  0  Terminating
+Number 8 : 7  1  0  Terminating
+Number 9 : 4  3  1  0  Terminating
+Number 10 : 8  7  1  0  Terminating
+Number 11 : 1  0  Terminating
+Number 12 : 16  15  9  4  3  1  0  Terminating
+Number 28 : 28  Perfect
+Number 496 : 496  Perfect
+Number 220 : 284  220  Amicable
+Number 1184 : 1210  1184  Amicable
+Number 12496 : 14288  15472  14536  14264  12496  Sociable
+Number 790 : 650  652  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  496  non-terminating
+Number 909 : 417  143  25  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  6  non-terminating
+Number 562 : 284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  220  284  non-terminating
+Number 1064 : 1336  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  1184  1210  non-terminating
+Number 1488 : 2480  3472  4464  8432  9424  10416  21328  22320  55056  95728  96720  non-terminating
+Program normal end.

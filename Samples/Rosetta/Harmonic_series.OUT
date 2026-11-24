@@ -1,0 +1,26 @@
+First 20 harmonic numbers:
+ 1  1.000000
+ 2  1.500000
+ 3  1.833333
+ 4  2.083333
+ 5  2.283333
+ 6  2.450000
+ 7  2.592857
+ 8  2.717857
+ 9  2.828968
+10  2.928968
+11  3.019877
+12  3.103211
+13  3.180134
+14  3.251562
+15  3.318229
+16  3.380729
+17  3.439553
+18  3.495108
+19  3.547740
+20  3.597740
+First term > 1 is at position 2
+First term > 2 is at position 4
+First term > 3 is at position 11
+First term > 4 is at position 31
+First term > 5 is at position 83

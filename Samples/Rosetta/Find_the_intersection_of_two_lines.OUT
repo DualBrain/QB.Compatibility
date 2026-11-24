@@ -1,0 +1,7 @@
+The two lines are:
+yab =-20 + x* 5
+ycd = 3 + x* 0.4
+x = 5
+yab = 5
+ycd = 5
+intersection: ( 5, 5 )

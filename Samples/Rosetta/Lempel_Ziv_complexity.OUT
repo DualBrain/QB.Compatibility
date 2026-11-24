@@ -1,0 +1,17 @@
+AZSEDRFTGYGUJIJOKB -> complexity =  16
+substrings are: <A, Z, S, E, D, R, F, T, G, Y, GU, J, I, JO, K, B>
+
+ABCABCABCABCABCABC -> complexity =  8
+substrings are: <A, B, C, AB, CA, BC, ABC, ABCA>
+
+101001010010111110 -> complexity =  8
+substrings are: <1, 0, 10, 01, 010, 0101, 11, 110>
+
+1001111011000010 -> complexity =  8
+substrings are: <1, 0, 01, 11, 10, 110, 00, 010>
+
+0001 -> complexity =  3
+substrings are: <0, 00, 1>
+
+010 -> complexity =  2
+substrings are: <0, 1>

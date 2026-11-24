@@ -1,0 +1,11 @@
+Enter integer A: 6
+Enter integer B: 4
+
+6 + 4 is 10
+6 - 4 is 2
+6 * 4 is 24
+6 / 4 is 1
+6 % 4 is 2
+6 ^ 4 is 1296
+
+0 OK, 0:230 

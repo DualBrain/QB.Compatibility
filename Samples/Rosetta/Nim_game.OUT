@@ -1,0 +1,23 @@
+Welcome to the Game of Nim.
+We begin with 12 tokens. On each turn, a 
+player may take between 1 and 3 tokens. The player
+who takes the last token wins.
+
+You go first.
+Available tokens: 12  o o o o o o o o o o o o
+You take:? 4
+Must take between 1 and 3
+Try again.
+You take:? 3
+Available tokens: 9  o o o o o o o o o
+I took: 1
+Available tokens: 8  o o o o o o o o
+You take:? 2
+Available tokens: 6  o o o o o o
+I took: 2
+Available tokens: 4  o o o o
+You take:? 1
+Available tokens: 3  o o o
+I took: 3
+I took the last one, so I win. Sorry about that.
+Thanks for playing!

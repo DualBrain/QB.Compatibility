@@ -1,0 +1,14 @@
+DECLARE FUNCTION josephus! (n!, k!, m!)
+
+n = 41
+k = 3
+PRINT "n = "; n, "k = "; k, "final survivor = "; josephus(n, k, 0)
+END
+
+FUNCTION josephus (n, k, m)
+    lm = m
+    FOR i = m + 1 TO n
+        lm = (lm + k) MOD i
+    NEXT i
+    josephus = lm
+END FUNCTION
