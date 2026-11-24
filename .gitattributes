@@ -1,0 +1,12 @@
+# Normalize line endings in text files.
+* text=auto
+
+# The original QBasic sources and expected outputs keep their DOS line endings.
+Samples/Manual/** -text
+Samples/QuickBASIC/** -text
+Samples/Rosetta/** -text
+
+# Binary files.
+*.png binary
+*.ico binary
+*.wav binary
