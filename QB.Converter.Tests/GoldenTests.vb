@@ -81,7 +81,7 @@ Namespace QB2VB.Tests
 
     <Fact>
     Public Sub TheReviewedOutputCompilesTogether()
-      Dim sources = IO.Directory.GetFiles(IO.Path.Combine(Root(), "QB.Converter.Tests", "Golden"), "*.vb").OrderBy(Function(f) f, StringComparer.Ordinal).Select(Function(f, i) IO.File.ReadAllText(f).Replace("Module Program" & vbLf, "Module Program" & i & vbLf)).ToList()
+      Dim sources = IO.Directory.GetFiles(IO.Path.Combine(Root(), "QB.Converter.Tests", "Golden"), "*.vb").OrderBy(Function(f) f, StringComparer.Ordinal).Select(Function(f, i) IO.File.ReadAllText(f).Replace(vbCrLf, vbLf).Replace("Module Program" & vbLf, "Module Program" & i & vbLf)).ToList()
       Assert.True(sources.Count > 50)
       Dim errors = VbCompiler.Compile(sources, "Program0")
       Assert.True(errors = "", errors)
