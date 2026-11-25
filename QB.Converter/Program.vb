@@ -88,28 +88,69 @@ Namespace QB2VB
       Dim libDir = ""
       Dim project = False
       Dim aot = False
+      Dim optionsDone = False
       Dim i = 0
       Do While i < args.Length
         Dim a = args(i)
-        If a = "-o" AndAlso i + 1 < args.Length Then
-          output = args(i + 1) : i += 2
-        ElseIf a = "--empty-loop-us" AndAlso i + 1 < args.Length Then
-          emptyLoop = Double.Parse(args(i + 1), Globalization.CultureInfo.InvariantCulture) : i += 2
-        ElseIf a = "--project" Then
-          project = True : i += 1
-        ElseIf a = "--repo" AndAlso i + 1 < args.Length Then
-          project = True : libDir = args(i + 1) : i += 2
-        ElseIf a = "--aot" Then
-          aot = True : i += 1
-        ElseIf a = "-h" OrElse a = "--help" Then
-          Console.WriteLine("qb2vb input.bas [-o output.vb]    converts a QBasic program to VB that uses QB.Compatibility" & vbLf & "  --project           also write a .vbproj that references the QB.Compatibility NuGet packages (QB.Compatibility.Sdl only if the program draws or reads the joystick; QB.Compatibility.Ports only if it opens a serial port)" & vbLf & "  --repo DIR          like --project, but references the projects of a QB.Compatibility checkout in DIR instead of the packages" & vbLf & "  --aot               with --project or --repo: publish as a Native AOT program" & vbLf & "  --empty-loop-us N   start the program with QB.Core.EmptyLoopMicroseconds = N (the time of one pass of a delay loop; 400 by default)")
-          Return 0
-        Else
-          input = a : i += 1
+        i += 1
+        If optionsDone OrElse a.Length < 2 OrElse a(0) <> "-"c Then
+          input = a
+          Continue Do
         End If
+        If a = "--" Then ' Everything after this is a file name, even if it starts with a dash.
+          optionsDone = True
+          Continue Do
+        End If
+        ' --name=value is the same as --name value.
+        Dim name = a
+        Dim value As String = Nothing
+        If a.StartsWith("--", StringComparison.Ordinal) Then
+          Dim eq = a.IndexOf("="c)
+          If eq > 0 Then
+            name = a.Substring(0, eq)
+            value = a.Substring(eq + 1)
+          End If
+        End If
+        Select Case name
+          Case "-o", "--output", "--repo", "--empty-loop-us"
+            If value Is Nothing Then
+              If i >= args.Length Then
+                Console.Error.WriteLine($"qb2vb: option '{name}' needs a value")
+                Return 2
+              End If
+              value = args(i)
+              i += 1
+            End If
+            If name = "-o" OrElse name = "--output" Then
+              output = value
+            ElseIf name = "--repo" Then
+              project = True : libDir = value
+            Else
+              Dim us As Double
+              If Not Double.TryParse(value, Globalization.NumberStyles.Float, Globalization.CultureInfo.InvariantCulture, us) Then
+                Console.Error.WriteLine($"qb2vb: '{value}' is not a number for '{name}'")
+                Return 2
+              End If
+              emptyLoop = us
+            End If
+          Case "--project"
+            project = True
+          Case "--aot"
+            aot = True
+          Case "-V", "--version"
+            Dim v = PackageVersion()
+            Console.WriteLine("qb2vb " & If(v = "*", "(unknown version)", v))
+            Return 0
+          Case "-h", "--help"
+            Console.WriteLine("usage: qb2vb [options] input.bas" & vbLf & "converts a QBasic program to VB that uses QB.Compatibility" & vbLf & vbLf & "options:" & vbLf & "  -o, --output FILE   the VB file to write (default: the input name with .vb)" & vbLf & "      --project       also write a .vbproj that references the QB.Compatibility NuGet packages (QB.Compatibility.Sdl only if the program draws or reads the joystick; QB.Compatibility.Ports only if it opens a serial port)" & vbLf & "      --repo DIR      like --project, but references the projects of a QB.Compatibility checkout in DIR instead of the packages" & vbLf & "      --aot           with --project or --repo: publish as a Native AOT program" & vbLf & "      --empty-loop-us N   start the program with QB.Core.EmptyLoopMicroseconds = N (the time of one pass of a delay loop; 400 by default)" & vbLf & "  -V, --version       show the version" & vbLf & "  -h, --help          show this help" & vbLf & "  --                  end of options (the next argument is the input file)" & vbLf & vbLf & "Options that take a value accept --name value or --name=value.")
+            Return 0
+          Case Else
+            Console.Error.WriteLine($"qb2vb: unknown option '{name}' (try --help)")
+            Return 2
+        End Select
       Loop
       If input = "" Then
-        Console.Error.WriteLine("usage: qb2vb input.bas [-o output.vb]")
+        Console.Error.WriteLine("usage: qb2vb [options] input.bas (try --help)")
         Return 2
       End If
 
