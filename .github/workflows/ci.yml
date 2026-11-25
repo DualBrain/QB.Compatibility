@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build the libraries
+        run: |
+          dotnet build QB.Compatibility.Sdl -c Release
+          dotnet build QB.Compatibility.Ports -c Release
+      - name: Test
+        run: dotnet test QB.Compatibility.Tests -c Release
+
+  aot:
+    name: Native AOT publish (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Install the native toolchain
+        run: sudo apt-get update && sudo apt-get install -y clang zlib1g-dev
+      - name: Publish the examples ahead of time
+        run: dotnet publish Examples -c Release -r linux-x64 -p:PublishAot=true
