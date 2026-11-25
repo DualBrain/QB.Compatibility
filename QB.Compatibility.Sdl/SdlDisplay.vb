@@ -25,7 +25,7 @@ Namespace Global.QB
       Threading.Volatile.Write(m_newTitle, title)
     End Sub
 
-    ' the QB icon: the letters Q and B in white on the blue of the editor
+    ' the Q icon: a bold white Q on the blue of the editor
     Private Shared Sub SetWindowIcon(window As IntPtr)
       Dim size As Integer
       Dim pixels = WindowIcon.Pixels(size)
