@@ -21,13 +21,20 @@ Namespace Global.QB
       End If
       Dim want As New SDL.SDL_AudioSpec With {.freq = Rate, .format = SDL.AUDIO_S16, .channels = 1, .samples = 1024}
       Dim have As New SDL.SDL_AudioSpec()
-      ' (SDL2-CS can't be given a null device name, so the first playback device is used.)
-      Dim name = SDL.SDL_GetAudioDeviceName(0, 0)
-      If String.IsNullOrEmpty(name) Then Throw New InvalidOperationException("No audio device")
-      m_device = SDL.SDL_OpenAudioDevice(name, 0, want, have, 0)
+      ' No device name: SDL opens the system's default playback device (the first device it lists isn't necessarily the default).
+      m_device = OpenDefaultDevice(want, have)
       If m_device = 0 Then Throw New InvalidOperationException(SDL.SDL_GetError())
       SDL.SDL_PauseAudioDevice(m_device, 0)
     End Sub
+
+    ' (SDL2-CS only takes a device name as a string and can't pass the null that selects the default device.)
+    <DllImport("SDL2", EntryPoint:="SDL_OpenAudioDevice", CallingConvention:=CallingConvention.Cdecl)>
+    Private Shared Function SDL_OpenAudioDevice(device As IntPtr, iscapture As Integer, ByRef desired As SDL.SDL_AudioSpec, ByRef obtained As SDL.SDL_AudioSpec, allowedChanges As Integer) As UInteger
+    End Function
+
+    Private Shared Function OpenDefaultDevice(want As SDL.SDL_AudioSpec, ByRef have As SDL.SDL_AudioSpec) As UInteger
+      Return SDL_OpenAudioDevice(IntPtr.Zero, 0, want, have, 0)
+    End Function
 
     Public Sub Tone(frequency As Double, seconds As Double) Implements IAudioDevice.Tone
       Dim count = CInt(Math.Round(seconds * Rate))
