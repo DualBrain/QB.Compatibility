@@ -1,4 +1,4 @@
-﻿# QB.Compatibility
+# QB.Compatibility
 
 QuickBASIC 4.5 and QBasic Compatibility Library for Visual Basic (.NET).
 
@@ -12,6 +12,23 @@ Examples of projects that have been converted using the library:
 - NIBBLES.BAS
 - GORILLA.BAS
 
+## Getting started
+
+The library is a set of NuGet packages, released together with the same version (currently a preview):
+
+| Package | For |
+|---|---|
+| `QB.Compatibility` | every program: text, files, errors, events, sound |
+| `QB.Compatibility.Sdl` | programs that draw (`SCREEN` 1 and up), or use the joystick or the pen; brings SDL2 |
+| `QB.Compatibility.Ports` | programs that open a serial port |
+| `QB.Compatibility.Converter` | the `qb2vb` tool, which converts QBasic source to VB (not a library; see below) |
+
+```bash
+dotnet add package QB.Compatibility --prerelease
+dotnet add package QB.Compatibility.Sdl --prerelease     # only if the program draws
+dotnet tool install --global QB.Compatibility.Converter --prerelease
+```
+
 ## Platforms and what a program needs
 
 QB.Compatibility targets .NET 10 and runs on Windows, Linux and macOS (no WinForms).  What a program needs follows from what it uses:
@@ -23,7 +40,7 @@ QB.Compatibility targets .NET 10 and runs on Windows, Linux and macOS (no WinFor
 | `SOUND`, `PLAY`, `BEEP` | `QB.Multimedia` | `QB.Compatibility` | the system's audio |
 | a serial port (`OPEN "COM1:..."`, `ON COM`) | `QB.Serial` (instead of `QB.File`) | plus `QB.Compatibility.Ports` | the port |
 
-Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` opens the system's audio.  A program that doesn't draw doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project DIR` chooses the imports and writes a project that references only what the program needs.
+Nothing has to be set up: using a graphics statement installs the window the first time it runs, and `SOUND` or `PLAY` opens the system's audio.  A program that doesn't draw doesn't need `QB.Compatibility.Sdl` or SDL2 at all (a Native AOT text program is about 3.5 MB, with no SDL2 file; one that draws adds SDL2's 9 MB).  `qb2vb --project` chooses the imports and writes a project that references only the packages the program needs.
 
 **The terminal.**  Text programs run in the terminal by default.  A program that only prints and reads lines scrolls like any command-line tool; if the output is redirected it stays plain text (no escape sequences).  The first time a program uses the screen by position (`LOCATE`, `VIEW PRINT`, `WIDTH`, the `SCREEN` function) the terminal switches to a full-screen view of the 80 x 25 text screen (the terminal's alternate screen), redrawn when the text changes, and the last picture is left in the terminal when the program ends.  A terminal smaller than the screen is asked to resize (many honor it); otherwise the rows around the cursor are shown.  On Windows virtual terminal processing is switched on for the console.  Keys come from `Console.ReadKey`, or from the input when it is redirected (reading past the end is QBasic's "Input past end of file").  `BEEP` rings the bell when there is no audio device.
 
@@ -122,17 +139,21 @@ To add one, copy a file in `Examples/Statements` (a module with a `Run` sub) and
 
 ## Converting QBasic programs (qb2vb)
 
-`QB.Converter` builds `qb2vb`, a console tool that converts a QBasic source file to VB that calls this library:
+`qb2vb` is a console tool (the `QB.Compatibility.Converter` package) that converts a QBasic source file to VB that calls this library:
 
 ```bash
-dotnet run --project QB.Converter -- Samples/REMLINE.BAS -o REMLINE.vb
+qb2vb REMLINE.BAS -o REMLINE.vb              # just the VB module
+qb2vb REMLINE.BAS -o REMLINE.vb --project    # also a REMLINE.vbproj that references the QB.Compatibility packages it needs
+dotnet run --project REMLINE.vbproj
 ```
+
+`--aot` (with `--project`) makes the project publish as a Native AOT program.  Working in a checkout of this repository, `dotnet run --project QB.Converter -- ...` runs the tool from source, and `--repo <repository folder>` writes project references to the checkout's projects instead of package references.
 
 The output is deliberately literal: one QBasic statement becomes one library call on the same line, and labels, GOTOs, comments, QBasic variable names (suffixes included) and the layout are kept. What has to change is limited to what VB requires (`CONST`/`DIM SHARED`/`TYPE`/`DATA` move to the top of the module, `SUB ... STATIC` gets `Static` locals, `Resume` handlers that live at module level are copied into the procedure that names them, reserved words are renamed). Anything the converter can't convert yet is left as a `' TODO(QB2VB):` comment and listed in the report printed at the end.
 
 Converted so far: `REMLINE.BAS`, `NIBBLES.BAS`, `GORILLA.BAS` and `MONEY.BAS` (all compile against the library and run; MONEY still has two `CALL ABSOLUTE` machine-code calls flagged). A `GOSUB` routine in the module-level code becomes a `Sub` (the module's variables become module-level so it can share them); inside a `SUB` or `FUNCTION` it becomes a lambda over the procedure's locals (a routine that uses `ON ERROR` is expanded where it is called, since a lambda can't hold an error handler). `ON ... GOSUB/GOTO` becomes a `Select Case`, a one-line `DEF FN` becomes a `Function`, array parameters get their number of dimensions from how the procedure indexes them, and `FIELD` names become the numbered fields of a `FieldRecord` (`LSET name$ = x` is `Fields1.LSET(0, x)`). The graphics statements (`PSET`, `LINE`, `CIRCLE`, `PAINT`, `GET`, `PUT`, `VIEW`, `WINDOW`) keep their shape: `LINE (1, 2)-(3, 4), 5, BF` becomes `LINE(1, 2, 3, 4, 5, LineOption.BF)`. Loops that wait on `TIMER`, and empty `FOR` loops, get an `EMPTYLOOP()` call (`QB.Core.EmptyLoopMicroseconds`, 400 by default) so programs that calibrate themselves by counting get a measurable result. `VARPTR$` works with the `X` and `=` commands of `DRAW` and `PLAY` (`DRAW "C2 X" + VARPTR$(shape$)`, `DRAW "U=" + VARPTR$(n%) + ";"`): the token holds the variable's value at the moment `VARPTR$` runs, where QBasic's holds its address. `STRING * n` variables, arrays and `TYPE` fields keep their length: everything assigned, read with `INPUT`, `LINE INPUT` or `READ` goes through `FixedString.Fit` (padded with spaces or cut), a new one holds `CHR$(0)` characters as in QBasic, and each `TYPE` becomes a `Structure` that implements `IFileRecord` (so records in random and binary files work in Native AOT builds). Still to come: `CALL ABSOLUTE`, `VARPTR`/`VARSEG` (addresses of variables) and multi-line `DEF FN`.
 
-`Samples/Converted` holds the converted programs as projects, one folder per program (the four MS-DOS programs `GORILLA`, `MONEY`, `NIBBLES` and `REMLINE`, the programs of `Samples/QuickBASIC` and those of `Samples/Rosetta`), each with its generated `.vb` and a `.vbproj` that references the library; they are part of the solution, so `dotnet run --project Samples/Converted/NIBBLES` runs one.  They were made with `qb2vb Samples/NIBBLES.BAS -o NIBBLES.vb --project <repository folder>` and can be made again the same way.
+`Samples/Converted` holds the converted programs as projects, one folder per program (the four MS-DOS programs `GORILLA`, `MONEY`, `NIBBLES` and `REMLINE`, the programs of `Samples/QuickBASIC` and those of `Samples/Rosetta`), each with its generated `.vb` and a `.vbproj` that references the library; they are part of the solution, so `dotnet run --project Samples/Converted/NIBBLES` runs one.  They were made with `qb2vb Samples/NIBBLES.BAS -o NIBBLES.vb --repo <repository folder>` and can be made again the same way.
 
 `Samples/Rosetta` holds 234 QBasic programs from [Rosetta Code](https://rosettacode.org) (GNU Free Documentation License 1.2; see the README there), with the output each task page shows where it has one.  A converter test converts every one without notes and compiles the result.
 
