@@ -7,9 +7,9 @@
 
   <!-- One version for everything that ships; the packages rely on one another. -->
   <PropertyGroup>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.1.1</Version>
     <Authors>Cory Smith</Authors>
-    <Copyright>Copyright (c) 2019 Cory Smith</Copyright>
+    <Copyright>Copyright (c) Cory Smith</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/DualBrain/QB.Compatibility</PackageProjectUrl>
     <RepositoryUrl>https://github.com/DualBrain/QB.Compatibility</RepositoryUrl>

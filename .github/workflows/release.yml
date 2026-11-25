@@ -1,6 +1,6 @@
 name: Release
 
-# Pushing a tag such as v0.1.0-preview.1 packs the libraries and publishes them to nuget.org.
+# Pushing a tag such as v0.1.1 packs the libraries and the qb2vb tool and publishes them to nuget.org.
 # It signs in with nuget.org Trusted Publishing (no API key is stored): the nuget.org account needs a policy
 # for this repository and workflow file (release.yml), and the repository needs a variable named NUGET_USER
 # holding the nuget.org profile name (not the email address).
@@ -25,7 +25,7 @@ jobs:
       - name: Pack
         run: |
           version="${GITHUB_REF_NAME#v}"
-          for project in QB.Compatibility QB.Compatibility.Sdl QB.Compatibility.Ports; do
+          for project in QB.Compatibility QB.Compatibility.Sdl QB.Compatibility.Ports QB.Converter; do
             dotnet pack "$project" -c Release -p:Version="$version" -o artifacts
           done
       - uses: actions/upload-artifact@v4

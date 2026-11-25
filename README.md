@@ -14,19 +14,19 @@ Examples of projects that have been converted using the library:
 
 ## Getting started
 
-The library is a set of NuGet packages, released together with the same version (currently a preview):
+The library is a set of NuGet packages, released together with the same version:
 
 | Package | For |
 |---|---|
 | `QB.Compatibility` | every program: text, files, errors, events, sound |
 | `QB.Compatibility.Sdl` | programs that draw (`SCREEN` 1 and up), or use the joystick or the pen; brings SDL2 |
 | `QB.Compatibility.Ports` | programs that open a serial port |
-| `QB.Compatibility.Converter` | the `qb2vb` tool, which converts QBasic source to VB (not a library; see below) |
+| `qb2vb` | the tool that converts QBasic source to VB (not a library; see below) |
 
 ```bash
-dotnet add package QB.Compatibility --prerelease
-dotnet add package QB.Compatibility.Sdl --prerelease     # only if the program draws
-dotnet tool install --global QB.Compatibility.Converter --prerelease
+dotnet add package QB.Compatibility
+dotnet add package QB.Compatibility.Sdl     # only if the program draws
+dotnet tool install --global qb2vb
 ```
 
 ## Platforms and what a program needs
@@ -139,7 +139,7 @@ To add one, copy a file in `Examples/Statements` (a module with a `Run` sub) and
 
 ## Converting QBasic programs (qb2vb)
 
-`qb2vb` is a console tool (the `QB.Compatibility.Converter` package) that converts a QBasic source file to VB that calls this library:
+`qb2vb` is a console tool (installed as a .NET tool) that converts a QBasic source file to VB that calls this library:
 
 ```bash
 qb2vb REMLINE.BAS -o REMLINE.vb              # just the VB module
