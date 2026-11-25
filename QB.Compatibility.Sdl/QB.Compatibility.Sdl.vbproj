@@ -10,6 +10,9 @@
     <LangVersion>latest</LangVersion>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
+    <IsPackable>true</IsPackable>
+    <PackageId>QB.Compatibility.Sdl</PackageId>
+    <Description>The SDL2 window for QB.Compatibility: QBasic graphics (SCREEN, PSET, LINE, CIRCLE, PAINT, GET/PUT, DRAW, PALETTE), the joystick and the pen. Only needed by programs that draw.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="ppy.SDL2-CS" Version="1.0.82" />

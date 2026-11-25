@@ -10,6 +10,9 @@
     <LangVersion>latest</LangVersion>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
+    <IsPackable>true</IsPackable>
+    <PackageId>QB.Compatibility.Ports</PackageId>
+    <Description>Serial port support for QB.Compatibility: OPEN "COM1:..." and ON COM. Only needed by programs that use a serial port.</Description>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="System.IO.Ports" Version="10.0.1" />

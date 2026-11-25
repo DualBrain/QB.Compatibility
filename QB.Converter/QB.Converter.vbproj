@@ -12,6 +12,11 @@
     <LangVersion>latest</LangVersion>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>qb2vb</ToolCommandName>
+    <PackageId>QB.Compatibility.Converter</PackageId>
+    <Description>qb2vb: converts QBasic and QuickBASIC source to Visual Basic (.NET) programs that use QB.Compatibility.</Description>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="QB.Converter.Tests" />

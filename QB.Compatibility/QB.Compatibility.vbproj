@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <RootNamespace>
     </RootNamespace>
@@ -10,10 +10,9 @@
     <LangVersion>latest</LangVersion>
     <IsTrimmable>true</IsTrimmable>
     <IsAotCompatible>true</IsAotCompatible>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-    <DebugSymbols>false</DebugSymbols>
-    <DebugType>none</DebugType>
+    <IsPackable>true</IsPackable>
+    <PackageId>QB.Compatibility</PackageId>
+    <Description>A QuickBASIC 4.5 and QBasic compatibility library for Visual Basic (.NET): the statements and functions of the language (text, files, errors, events, sound) for programs migrated from QB.</Description>
   </PropertyGroup>
   <ItemGroup>
   </ItemGroup>
