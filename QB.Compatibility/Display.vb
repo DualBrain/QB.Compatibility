@@ -20,6 +20,12 @@ Namespace Global.QB
   Public Interface IWindowDisplay
   End Interface
 
+  ''' <summary>A display with a title bar the program can name (see <see cref="Video.WindowTitle"/>).</summary>
+  Public Interface IWindowTitle
+    ''' <summary>Puts <paramref name="title"/> on the window.</summary>
+    Sub SetTitle(title As String)
+  End Interface
+
   ''' <summary>A place where the QB screen is shown and keys are read from.</summary>
   Public Interface IDisplay
     ''' <summary>Starts showing the source.  Returns once the display is ready.</summary>
@@ -65,13 +71,20 @@ Namespace Global.QB
   ''' screen is read with <see cref="Capture"/> or <see cref="SavePpm"/>.
   ''' </summary>
   Public NotInheritable Class HeadlessDisplay
-    Implements IDisplay, IGameInput, IGraphicsDisplay
+    Implements IDisplay, IGameInput, IGraphicsDisplay, IWindowTitle
 
     Private m_source As IVideoSource
     Private ReadOnly m_keys As New ConcurrentQueue(Of String)
     Private m_argb() As UInteger
     Private m_width As Integer
     Private m_height As Integer
+
+    ''' <summary>The title the program last gave the window (what a window would show).</summary>
+    Public Property Title As String = ""
+
+    Private Sub SetTitle(title As String) Implements IWindowTitle.SetTitle
+      Me.Title = title
+    End Sub
 
     Public Sub Open(source As IVideoSource) Implements IDisplay.Open
       m_source = source

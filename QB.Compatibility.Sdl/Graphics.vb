@@ -33,6 +33,16 @@ Namespace Global.QB
       End Set
     End Property
 
+    ''' <summary>The same as <see cref="Video.WindowTitle"/>: the title of the window (the name of the program until it is set).</summary>
+    Public Shared Shadows Property WindowTitle As String
+      Get
+        Return Video.WindowTitle
+      End Get
+      Set(value As String)
+        Video.WindowTitle = value
+      End Set
+    End Property
+
     ' The joystick and the pen come from the window.
     Private Shared Sub EnsureWindow()
       If Not (TypeOf Video.Display Is IGraphicsDisplay) Then Video.Display = New SdlDisplay

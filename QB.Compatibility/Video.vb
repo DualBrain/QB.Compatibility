@@ -2586,6 +2586,36 @@ allplotted:
       Next
     End Sub
 
+    ' ---- The title of the window ------------------------------------------------------------------
+
+    Private Shared m_windowTitle As String
+
+    ''' <summary>
+    ''' The title of the program's window.  Until a program sets it, the window carries the program's own name (the name of its
+    ''' assembly, "Nibbles" for NIBBLES.BAS converted).  Setting it renames a window that is already open; Nothing goes back to the name.
+    ''' </summary>
+    Public Shared Property WindowTitle As String
+      Get
+        Return If(m_windowTitle, DefaultWindowTitle())
+      End Get
+      Set(value As String)
+        m_windowTitle = value
+        TryCast(m_display, IWindowTitle)?.SetTitle(WindowTitle)
+      End Set
+    End Property
+
+    ' the program's name: its assembly, or its file when that is not known (a Native AOT program), or the library's
+    Friend Shared Function DefaultWindowTitle() As String
+      Dim name As String = Nothing
+      Try
+        name = Reflection.Assembly.GetEntryAssembly()?.GetName().Name
+        If String.IsNullOrEmpty(name) Then name = IO.Path.GetFileNameWithoutExtension(Environment.ProcessPath)
+      Catch ex As Exception When TypeOf ex Is ArgumentException OrElse TypeOf ex Is NotSupportedException
+        name = Nothing
+      End Try
+      Return If(String.IsNullOrEmpty(name), "QB.Compatibility", name)
+    End Function
+
     ' ---- Waiting at the end of the program --------------------------------------------------------
 
     Private Shared m_waitAtExit As Boolean

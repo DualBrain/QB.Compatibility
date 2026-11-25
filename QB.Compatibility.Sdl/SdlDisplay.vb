@@ -10,7 +10,7 @@ Namespace Global.QB
 
   ''' <summary>The default display: an SDL2 window that works on Windows, Linux and macOS.</summary>
   Friend NotInheritable Class SdlDisplay
-    Implements IDisplay, IGameInput, IWindowDisplay, IGraphicsDisplay
+    Implements IDisplay, IGameInput, IWindowDisplay, IGraphicsDisplay, IWindowTitle
 
     Private m_source As IVideoSource
     Private m_thread As Threading.Thread
@@ -18,6 +18,28 @@ Namespace Global.QB
     Private ReadOnly m_ready As New Threading.ManualResetEventSlim(False)
     Private m_startError As Exception
     Private ReadOnly m_keys As New ConcurrentQueue(Of String)
+    Private m_newTitle As String
+
+    ' the window's thread puts it on (SDL wants its windows touched from where they were made)
+    Private Sub SetTitle(title As String) Implements IWindowTitle.SetTitle
+      Threading.Volatile.Write(m_newTitle, title)
+    End Sub
+
+    ' the QB icon: the letters Q and B in white on the blue of the editor
+    Private Shared Sub SetWindowIcon(window As IntPtr)
+      Dim size As Integer
+      Dim pixels = WindowIcon.Pixels(size)
+      Dim handle = GCHandle.Alloc(pixels, GCHandleType.Pinned)
+      Try
+        Dim surface = SDL.SDL_CreateRGBSurfaceFrom(handle.AddrOfPinnedObject(), size, size, 32, size * 4, &HFF0000UI, &HFF00UI, &HFFUI, &HFF000000UI)
+        If surface <> IntPtr.Zero Then
+          SDL.SDL_SetWindowIcon(window, surface)
+          SDL.SDL_FreeSurface(surface)
+        End If
+      Finally
+        handle.Free()
+      End Try
+    End Sub
 
     Public Sub Open(source As IVideoSource) Implements IDisplay.Open
       m_source = source
@@ -57,11 +79,12 @@ Namespace Global.QB
         End If
         SDL.SDL_EnableScreenSaver()
 
-        window = SDL.SDL_CreateWindow("QB.Compatibility",
+        window = SDL.SDL_CreateWindow(Video.WindowTitle,
                                       SDL.SDL_WINDOWPOS_CENTERED, SDL.SDL_WINDOWPOS_CENTERED,
                                       800, 600,
                                       SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN Or SDL.SDL_WindowFlags.SDL_WINDOW_RESIZABLE)
         If window = IntPtr.Zero Then Throw New InvalidOperationException(SDL.SDL_GetError())
+        SetWindowIcon(window)
 
         renderer = SDL.SDL_CreateRenderer(window, -1, SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED)
         If renderer = IntPtr.Zero Then
@@ -113,6 +136,9 @@ Namespace Global.QB
               HandleText(e)
           End Select
         Loop
+
+        Dim title = Threading.Interlocked.Exchange(m_newTitle, Nothing)
+        If title IsNot Nothing Then SDL.SDL_SetWindowTitle(window, title)
 
         Dim w, h As Integer
         If m_source.TryCopyFrame(argb, w, h) Then
