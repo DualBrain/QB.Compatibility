@@ -490,6 +490,25 @@ Namespace QB2VB.Tests
     End Sub
 
     <Fact>
+    Public Sub TheProjectReferencesThePackagesWhenThereIsNoRepositoryFolder()
+      Dim text = Program.ProjectText("T", "T.vb", "/work/T", "", False, False, False, Nothing, "1.2.3")
+      Assert.Contains("<PackageReference Include=""QB.Compatibility"" Version=""1.2.3"" />", text)
+      Assert.Contains("<PackageReference Include=""QB.Compatibility.Sdl"" Version=""1.2.3"" Condition=""'$(OutputType)' == 'WinExe'"" />", text)
+      Assert.DoesNotContain("ProjectReference", text)
+      Assert.DoesNotContain("QB.Compatibility.Ports", text)
+      Dim withSdl = Program.ProjectText("T", "T.vb", "/work/T", "", True, True, False, Nothing, "1.2.3")
+      Assert.Contains("<PackageReference Include=""QB.Compatibility.Sdl"" Version=""1.2.3"" />", withSdl)
+      Assert.Contains("<PackageReference Include=""QB.Compatibility.Ports"" Version=""1.2.3"" />", withSdl)
+    End Sub
+
+    <Fact>
+    Public Sub ThePackageVersionIsTheToolsOwnWithoutBuildMetadata()
+      Dim v = Program.PackageVersion()
+      Assert.False(v.Contains("+"))
+      Assert.False(String.IsNullOrEmpty(v))
+    End Sub
+
+    <Fact>
     Public Sub DefFnBecomesAFunction()
       Dim vb = Convert("DEFINT A-Z" & vbLf & "DEF FnTwice (x) = x * 2" & vbLf & "PRINT FnTwice(4)")
       Assert.Contains("Function FnTwice(ByVal x As Short) As Short", vb)
