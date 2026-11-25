@@ -116,9 +116,7 @@ Namespace Global.QB
         Do While SDL.SDL_PollEvent(e) = 1
           Select Case e.type
             Case SDL.SDL_EventType.SDL_QUIT
-              m_running = False
-              Video.WindowClosed()
-              Environment.Exit(0) ' Closing the window ends the program, as it would in QBasic.
+              StopProgram() ' Closing the window ends the program, as it would in QBasic.
             Case SDL.SDL_EventType.SDL_WINDOWEVENT
               redraw = True
               If e.window.windowEvent = SDL.SDL_WindowEventID.SDL_WINDOWEVENT_LEAVE Then
@@ -303,11 +301,23 @@ Namespace Global.QB
 
     Private m_suppressTextUntil As Long   ' Alt+key combinations also produce text input; it is ignored.
 
+    ' The window has no console to send the program Ctrl+C: it ends the program here, as it does in a terminal (Ctrl+Break is the same key as in QBasic).
+    Private Sub StopProgram()
+      m_running = False
+      Video.WindowClosed()
+      Environment.Exit(0)
+    End Sub
+
     Private Sub HandleKeyDown(k As SDL.SDL_Keysym)
 
       Dim shift = (k.mod And SDL.SDL_Keymod.KMOD_SHIFT) <> 0
       Dim ctrl = (k.mod And SDL.SDL_Keymod.KMOD_CTRL) <> 0
       Dim alt = (k.mod And SDL.SDL_Keymod.KMOD_ALT) <> 0
+
+      If ctrl AndAlso Not alt AndAlso (k.sym = SDL.SDL_Keycode.SDLK_c OrElse k.sym = SDL.SDL_Keycode.SDLK_PAUSE) Then
+        StopProgram()
+        Return
+      End If
 
       Dim key As ConsoleKey = 0
       Dim ch = ChrW(0)
